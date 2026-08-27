@@ -8,8 +8,17 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavType
@@ -71,33 +80,63 @@ fun DayMateAppContent() {
 
     DayMateTheme(mode = themeMode) {
         val navController = rememberNavController()
+
+        // 统一过渡：向上飞入（从底部滑入）+ 向下飞出（向底部滑出），约 300ms + 轻微淡入淡出
+        val flySpec = tween<IntOffset>(300)
+        val enterT: AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.() -> EnterTransition = {
+            slideInVertically(animationSpec = flySpec, initialOffsetY = { it }) + fadeIn(animationSpec = tween(300))
+        }
+        val exitT: AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.() -> ExitTransition = {
+            slideOutVertically(animationSpec = flySpec, targetOffsetY = { it }) + fadeOut(animationSpec = tween(300))
+        }
+
         NavHost(
             navController = navController,
             startDestination = Routes.HOME
         ) {
-            composable(Routes.HOME) {
+            composable(
+                Routes.HOME,
+                enterTransition = enterT, exitTransition = exitT,
+                popEnterTransition = enterT, popExitTransition = exitT
+            ) {
                 HomeScreen(
                     container = app.container,
                     onNavigate = { route -> navController.navigate(route) }
                 )
             }
-            composable(Routes.EVENT_FORM) {
+            composable(
+                Routes.EVENT_FORM,
+                enterTransition = enterT, exitTransition = exitT,
+                popEnterTransition = enterT, popExitTransition = exitT
+            ) {
                 EventFormScreen(
                     container = app.container,
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable(Routes.SETTINGS) {
+            composable(
+                Routes.SETTINGS,
+                enterTransition = enterT, exitTransition = exitT,
+                popEnterTransition = enterT, popExitTransition = exitT
+            ) {
                 SettingsScreen(
                     container = app.container,
                     onBack = { navController.popBackStack() },
                     onOpenAbout = { navController.navigate(Routes.ABOUT) }
                 )
             }
-            composable(Routes.ABOUT) {
+            composable(
+                Routes.ABOUT,
+                enterTransition = enterT, exitTransition = exitT,
+                popEnterTransition = enterT, popExitTransition = exitT
+            ) {
                 AboutScreen(onBack = { navController.popBackStack() })
             }
-            composable(Routes.VAULT) {
+            composable(
+                Routes.VAULT,
+                enterTransition = enterT, exitTransition = exitT,
+                popEnterTransition = enterT, popExitTransition = exitT
+            ) {
                 VaultScreen(
                     container = app.container,
                     onExit = { navController.popBackStack() },
@@ -113,7 +152,9 @@ fun DayMateAppContent() {
                     navArgument("folderId") {
                         type = NavType.StringType; nullable = true; defaultValue = null
                     }
-                )
+                ),
+                enterTransition = enterT, exitTransition = exitT,
+                popEnterTransition = enterT, popExitTransition = exitT
             ) { backStack ->
                 val eventId = backStack.arguments?.getString("eventId")?.toLongOrNull()
                 val folderId = backStack.arguments?.getString("folderId")?.toLongOrNull()
@@ -126,7 +167,9 @@ fun DayMateAppContent() {
             }
             composable(
                 route = "folder/{folderId}",
-                arguments = listOf(navArgument("folderId") { type = NavType.LongType })
+                arguments = listOf(navArgument("folderId") { type = NavType.LongType }),
+                enterTransition = enterT, exitTransition = exitT,
+                popEnterTransition = enterT, popExitTransition = exitT
             ) { backStack ->
                 val folderId = backStack.arguments?.getLong("folderId") ?: 0
                 FolderScreen(
@@ -138,7 +181,9 @@ fun DayMateAppContent() {
             }
             composable(
                 route = "vault_folder/{folderId}",
-                arguments = listOf(navArgument("folderId") { type = NavType.LongType })
+                arguments = listOf(navArgument("folderId") { type = NavType.LongType }),
+                enterTransition = enterT, exitTransition = exitT,
+                popEnterTransition = enterT, popExitTransition = exitT
             ) { backStack ->
                 val folderId = backStack.arguments?.getLong("folderId") ?: 0
                 VaultFolderScreen(
