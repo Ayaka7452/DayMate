@@ -25,8 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import sh.calvin.reorderable.ReorderableItem
 import androidx.compose.foundation.shape.CircleShape
@@ -72,7 +70,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -268,19 +265,6 @@ private fun VaultUnlockScreen(
 
 @Composable
 private fun VaultListScreen(
-    container: AppContainer,
-    onExit: () -> Unit,
-    onNavigate: (String) -> Unit
-) {
-    try {
-        VaultListScreenBody(container = container, onExit = onExit, onNavigate = onNavigate)
-    } catch (e: Throwable) {
-        VaultCrashContent(e)
-    }
-}
-
-@Composable
-private fun VaultListScreenBody(
     container: AppContainer,
     onExit: () -> Unit,
     onNavigate: (String) -> Unit
@@ -960,33 +944,6 @@ private fun ListItemDivider() {
             .height(1.dp)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     )
-}
-
-@Composable
-private fun VaultCrashContent(e: Throwable) {
-    val message = remember(e) {
-        buildString {
-            append(e::class.qualifiedName ?: e.javaClass.name)
-            append(": ")
-            append(e.message ?: "no message")
-            append("\n\n")
-            e.stackTraceToString().lineSequence().take(40).forEach { append(it).append("\n") }
-        }
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Text(
-            "Vault 打开时出错（已记录，请把下方文字发给我）",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.error
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(message, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
