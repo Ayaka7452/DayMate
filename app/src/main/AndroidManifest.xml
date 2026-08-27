@@ -22,6 +22,42 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".EventFormActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.DayMate" />
+
+        <activity
+            android:name=".FolderActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.DayMate" />
+
+        <activity
+            android:name=".VaultActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.DayMate" />
+
+        <activity
+            android:name=".VaultFolderActivity"
+            android:exported="false"
+            android:parentActivityName=".VaultActivity"
+            android:theme="@style/Theme.DayMate" />
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.DayMate" />
+
+        <activity
+            android:name=".AboutActivity"
+            android:exported="false"
+            android:parentActivityName=".SettingsActivity"
+            android:theme="@style/Theme.DayMate" />
     </application>
 
 </manifest>
