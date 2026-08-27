@@ -4,6 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,7 +76,36 @@ fun DayMateAppContent() {
 
     DayMateTheme(mode = themeMode) {
         val navController = rememberNavController()
-        NavHost(navController = navController, startDestination = Routes.HOME) {
+        // 系统风过渡：侧滑 + 淡入淡出（push 时新页从右滑入、旧页左滑+淡出；pop 反向）
+        val animDuration = 300
+        NavHost(
+            navController = navController,
+            startDestination = Routes.HOME,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(animDuration)
+                ) + fadeIn(animationSpec = tween(animDuration))
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth / 4 },
+                    animationSpec = tween(animDuration)
+                ) + fadeOut(animationSpec = tween(animDuration))
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> -fullWidth / 4 },
+                    animationSpec = tween(animDuration)
+                ) + fadeIn(animationSpec = tween(animDuration))
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(animDuration)
+                ) + fadeOut(animationSpec = tween(animDuration))
+            }
+        ) {
             composable(Routes.HOME) {
                 HomeScreen(
                     container = app.container,

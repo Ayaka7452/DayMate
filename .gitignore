@@ -18,3 +18,10 @@ Thumbs.db
 
 # Project local data
 .workbuddy/
+
+# Local artifacts & debug helpers (APKs kept locally, never tracked)
+dist/
+
+# User-provided reference videos (analysis only, not source)
+你现在的画面切换效果.mp4
+系统的效果.mp4
