@@ -14,6 +14,9 @@ val keystoreProperties = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
+val envStorePath = System.getenv("KEYSTORE_PATH")
+val propStorePath = keystoreProperties.getProperty("storeFile")
+val hasKeystore = !envStorePath.isNullOrBlank() || !propStorePath.isNullOrBlank()
 
 android {
     namespace = "com.daymate.app"
@@ -31,10 +34,8 @@ android {
 
     signingConfigs {
         create("release") {
-            val storeFilePath = System.getenv("KEYSTORE_PATH")
-                ?: keystoreProperties.getProperty("storeFile")
-            if (!storeFilePath.isNullOrBlank()) {
-                storeFile = file(storeFilePath)
+            if (hasKeystore) {
+                storeFile = file(envStorePath ?: propStorePath!!)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                     ?: keystoreProperties.getProperty("storePassword")
                 keyAlias = System.getenv("KEY_ALIAS")
@@ -48,9 +49,8 @@ android {
     buildTypes {
         release {
             // 若签名未配置则回退到 debug 签名，便于本地无 keystore 时也能 assembleRelease
-            val releaseSigning = signingConfigs.findByName("release")
-            signingConfig = if (releaseSigning?.storeFile?.orNull != null) {
-                releaseSigning
+            signingConfig = if (hasKeystore) {
+                signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
             }
