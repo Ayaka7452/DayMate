@@ -1,8 +1,12 @@
 package com.daymate.app
 
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +38,8 @@ object Routes {
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 全面屏：内容延伸到状态栏/导航栏之下，由 Compose Scaffold 处理内边距
+        enableEdgeToEdge()
         setContent {
             DayMateAppContent()
         }
@@ -46,6 +52,17 @@ fun DayMateAppContent() {
     val app = context.applicationContext as DayMateApp
     val themeMode by app.container.settingsRepository.themeMode
         .collectAsState(initial = "system")
+
+    // 跟随主题模式（含手动 dark/light）同步状态栏图标对比度
+    val activity = context as? ComponentActivity
+    val darkTheme = when (themeMode) {
+        "dark" -> true
+        "light" -> false
+        else -> isSystemInDarkTheme()
+    }
+    LaunchedEffect(darkTheme) {
+        activity?.enableEdgeToEdge(darkTheme = darkTheme)
+    }
 
     DayMateTheme(mode = themeMode) {
         val navController = rememberNavController()
