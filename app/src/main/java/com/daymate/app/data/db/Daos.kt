@@ -48,6 +48,9 @@ interface FolderDao {
     @Query("SELECT * FROM folders ORDER BY isPinned DESC, sortIndex ASC")
     fun observeAll(): Flow<List<FolderEntity>>
 
+    @Query("SELECT * FROM folders WHERE id = :id")
+    suspend fun getById(id: Long): FolderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(folder: FolderEntity): Long
 
