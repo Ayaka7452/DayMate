@@ -8,6 +8,8 @@ class FolderRepository(private val dao: FolderDao) {
 
     fun observeAll(): Flow<List<FolderEntity>> = dao.observeAll()
 
+    fun observeBin(): Flow<List<FolderEntity>> = dao.observeBin()
+
     suspend fun add(folder: FolderEntity): Long = dao.insert(folder)
 
     suspend fun update(folder: FolderEntity) = dao.update(folder)
@@ -17,4 +19,8 @@ class FolderRepository(private val dao: FolderDao) {
     suspend fun getById(id: Long): FolderEntity? = dao.getById(id)
 
     suspend fun deleteByIds(ids: List<Long>) = dao.deleteByIds(ids)
+
+    suspend fun softDeleteByIds(ids: List<Long>, ts: Long) = dao.softDeleteByIds(ids, ts)
+
+    suspend fun restoreByIds(ids: List<Long>) = dao.restoreByIds(ids)
 }

@@ -58,6 +58,12 @@
             android:exported="false"
             android:parentActivityName=".SettingsActivity"
             android:theme="@style/Theme.DayMate" />
+
+        <activity
+            android:name=".RecycleBinActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.DayMate" />
     </application>
 
 </manifest>

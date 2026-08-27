@@ -12,6 +12,8 @@ class EventRepository(private val dao: EventDao) {
 
     fun observeByFolder(folderId: Long): Flow<List<EventEntity>> = dao.observeByFolder(folderId)
 
+    fun observeBin(): Flow<List<EventEntity>> = dao.observeBin()
+
     suspend fun getById(id: Long): EventEntity? = dao.getById(id)
 
     suspend fun add(event: EventEntity): Long = dao.insert(event)
@@ -22,7 +24,19 @@ class EventRepository(private val dao: EventDao) {
 
     suspend fun deleteByIds(ids: List<Long>) = dao.deleteByIds(ids)
 
+    suspend fun softDeleteByIds(ids: List<Long>, ts: Long) = dao.softDeleteByIds(ids, ts)
+
+    suspend fun restoreByIds(ids: List<Long>) = dao.restoreByIds(ids)
+
+    suspend fun softDeleteByFolders(folderIds: List<Long>, ts: Long) =
+        dao.softDeleteByFolders(folderIds, ts)
+
+    suspend fun restoreByFolders(folderIds: List<Long>) = dao.restoreByFolders(folderIds)
+
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?) = dao.moveToFolder(ids, folderId)
+
+    suspend fun hardDeleteEventsByFolders(folderIds: List<Long>) =
+        dao.hardDeleteEventsByFolders(folderIds)
 
     suspend fun nextSortIndex(): Int = (dao.maxSortIndex() ?: -1) + 1
 }

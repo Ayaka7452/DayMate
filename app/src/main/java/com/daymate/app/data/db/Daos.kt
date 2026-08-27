@@ -11,14 +11,17 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface EventDao {
 
-    @Query("SELECT * FROM events ORDER BY isPinned DESC, sortIndex ASC")
+    @Query("SELECT * FROM events WHERE isDeleted = 0 ORDER BY isPinned DESC, sortIndex ASC")
     fun observeAll(): Flow<List<EventEntity>>
 
-    @Query("SELECT * FROM events WHERE folderId IS NULL ORDER BY isPinned DESC, sortIndex ASC")
+    @Query("SELECT * FROM events WHERE folderId IS NULL AND isDeleted = 0 ORDER BY isPinned DESC, sortIndex ASC")
     fun observeRoot(): Flow<List<EventEntity>>
 
-    @Query("SELECT * FROM events WHERE folderId = :folderId ORDER BY isPinned DESC, sortIndex ASC")
+    @Query("SELECT * FROM events WHERE folderId = :folderId AND isDeleted = 0 ORDER BY isPinned DESC, sortIndex ASC")
     fun observeByFolder(folderId: Long): Flow<List<EventEntity>>
+
+    @Query("SELECT * FROM events WHERE isDeleted = 1 ORDER BY deletedAt DESC")
+    fun observeBin(): Flow<List<EventEntity>>
 
     @Query("SELECT * FROM events WHERE id = :id")
     suspend fun getById(id: Long): EventEntity?
@@ -32,11 +35,26 @@ interface EventDao {
     @Delete
     suspend fun delete(event: EventEntity)
 
+    @Query("UPDATE events SET isDeleted = 1, deletedAt = :ts WHERE id IN (:ids)")
+    suspend fun softDeleteByIds(ids: List<Long>, ts: Long)
+
+    @Query("UPDATE events SET isDeleted = 0, deletedAt = 0 WHERE id IN (:ids)")
+    suspend fun restoreByIds(ids: List<Long>)
+
+    @Query("UPDATE events SET isDeleted = 1, deletedAt = :ts WHERE folderId IN (:folderIds)")
+    suspend fun softDeleteByFolders(folderIds: List<Long>, ts: Long)
+
+    @Query("UPDATE events SET isDeleted = 0, deletedAt = 0 WHERE folderId IN (:folderIds)")
+    suspend fun restoreByFolders(folderIds: List<Long>)
+
     @Query("DELETE FROM events WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
 
     @Query("UPDATE events SET folderId = :folderId WHERE id IN (:ids)")
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?)
+
+    @Query("DELETE FROM events WHERE folderId IN (:folderIds)")
+    suspend fun hardDeleteEventsByFolders(folderIds: List<Long>)
 
     @Query("SELECT MAX(sortIndex) FROM events")
     suspend fun maxSortIndex(): Int?
@@ -45,8 +63,11 @@ interface EventDao {
 @Dao
 interface FolderDao {
 
-    @Query("SELECT * FROM folders ORDER BY isPinned DESC, sortIndex ASC")
+    @Query("SELECT * FROM folders WHERE isDeleted = 0 ORDER BY isPinned DESC, sortIndex ASC")
     fun observeAll(): Flow<List<FolderEntity>>
+
+    @Query("SELECT * FROM folders WHERE isDeleted = 1 ORDER BY deletedAt DESC")
+    fun observeBin(): Flow<List<FolderEntity>>
 
     @Query("SELECT * FROM folders WHERE id = :id")
     suspend fun getById(id: Long): FolderEntity?
@@ -59,6 +80,12 @@ interface FolderDao {
 
     @Delete
     suspend fun delete(folder: FolderEntity)
+
+    @Query("UPDATE folders SET isDeleted = 1, deletedAt = :ts WHERE id IN (:ids)")
+    suspend fun softDeleteByIds(ids: List<Long>, ts: Long)
+
+    @Query("UPDATE folders SET isDeleted = 0, deletedAt = 0 WHERE id IN (:ids)")
+    suspend fun restoreByIds(ids: List<Long>)
 
     @Query("DELETE FROM folders WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)

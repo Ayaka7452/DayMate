@@ -13,6 +13,8 @@ data class FolderEntity(
     val color: Int? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
+    val isDeleted: Boolean = false,
+    val deletedAt: Long = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -38,6 +40,8 @@ data class EventEntity(
     val folderId: Long? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
+    val isDeleted: Boolean = false,
+    val deletedAt: Long = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

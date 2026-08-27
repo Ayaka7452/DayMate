@@ -76,6 +76,8 @@ fun HomeScreen(
         .collectAsState(initial = emptyList())
     val folders by container.folderRepository.observeAll()
         .collectAsState(initial = emptyList())
+    val vaultSet by container.settingsRepository.vaultPasswordSet
+        .collectAsState(initial = false)
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
@@ -87,6 +89,11 @@ fun HomeScreen(
     val selectedFolderIds = remember { mutableStateListOf<Long>() }
     var showMoveDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    // Vault 移入相关弹窗状态
+    var vaultConfirmEventId by remember { mutableStateOf<Long?>(null) }
+    var vaultConfirmBatch by remember { mutableStateOf(false) }
+    var vaultNeedSetup by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -138,9 +145,13 @@ fun HomeScreen(
                             TextButton(onClick = { showMoveDialog = true }) { Text("移入文件夹") }
                         }
                         TextButton(
+                            onClick = { if (vaultSet) vaultConfirmBatch = true else vaultNeedSetup = true },
+                            enabled = totalSelected > 0
+                        ) { Text("移入 Vault") }
+                        TextButton(
                             onClick = { showDeleteConfirm = true },
                             enabled = totalSelected > 0
-                        ) { Text("删除") }
+                        ) { Text("移入回收站") }
                     }
                 )
             } else {
@@ -179,6 +190,13 @@ fun HomeScreen(
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.ABOUT)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("回收站") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigate(Routes.RECYCLE_BIN)
                                     }
                                 )
                             }
@@ -221,6 +239,13 @@ fun HomeScreen(
                                 folderDialogTarget = folder
                                 showFolderDialog = true
                             }
+                        },
+                        onMoveToRecycleBin = {
+                            scope.launch {
+                                val ts = System.currentTimeMillis()
+                                container.eventRepository.softDeleteByFolders(listOf(folder.id), ts)
+                                container.folderRepository.softDeleteByIds(listOf(folder.id), ts)
+                            }
                         }
                     )
                     ListItemDivider()
@@ -235,7 +260,15 @@ fun HomeScreen(
                             else onNavigate("event_form?eventId=${event.id}")
                         },
                         onMoveToVault = {
-                            scope.launch { container.vaultBridge.moveEventToVault(event.id) }
+                            if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
+                        },
+                        onMoveToRecycleBin = {
+                            scope.launch {
+                                container.eventRepository.softDeleteByIds(
+                                    listOf(event.id),
+                                    System.currentTimeMillis()
+                                )
+                            }
                         }
                     )
                     ListItemDivider()
@@ -323,22 +356,76 @@ fun HomeScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("删除 $totalSelected 项？") },
-            text = { Text("此操作不可撤销。删除文件夹时，其中的事件会自动移出到根目录。") },
+            title = { Text("移入回收站？") },
+            text = { Text("将把 $totalSelected 项移入回收站，可在「回收站」中恢复或彻底删除（清空后不可恢复）。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
+                        val ts = System.currentTimeMillis()
                         if (selectedEventIds.isNotEmpty())
-                            container.eventRepository.deleteByIds(selectedEventIds.toList())
-                        if (selectedFolderIds.isNotEmpty())
-                            container.folderRepository.deleteByIds(selectedFolderIds.toList())
+                            container.eventRepository.softDeleteByIds(selectedEventIds.toList(), ts)
+                        if (selectedFolderIds.isNotEmpty()) {
+                            container.eventRepository.softDeleteByFolders(selectedFolderIds.toList(), ts)
+                            container.folderRepository.softDeleteByIds(selectedFolderIds.toList(), ts)
+                        }
                     }
                     showDeleteConfirm = false
                     exitSelection()
-                }) { Text("删除") }
+                }) { Text("移入回收站") }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (vaultNeedSetup) {
+        AlertDialog(
+            onDismissRequest = { vaultNeedSetup = false },
+            title = { Text("Vault 尚未设置") },
+            text = { Text("请先进入 Vault 设置密码，之后才能将内容移入。") },
+            confirmButton = {
+                TextButton(onClick = { vaultNeedSetup = false; onNavigate(Routes.VAULT) }) { Text("去设置") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vaultNeedSetup = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (vaultConfirmEventId != null) {
+        AlertDialog(
+            onDismissRequest = { vaultConfirmEventId = null },
+            title = { Text("移入 Vault？") },
+            text = { Text("该事件将被移入 Vault 空间，之后需输入密码才能查看。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { vaultConfirmEventId?.let { container.vaultBridge.moveEventToVault(it) } }
+                    vaultConfirmEventId = null
+                }) { Text("移入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vaultConfirmEventId = null }) { Text("取消") }
+            }
+        )
+    }
+
+    if (vaultConfirmBatch) {
+        AlertDialog(
+            onDismissRequest = { vaultConfirmBatch = false },
+            title = { Text("移入 Vault？") },
+            text = { Text("将把选中的 ${selectedEventIds.size} 个事件移入 Vault（文件夹暂不支持移入 Vault）。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        selectedEventIds.toList().forEach { container.vaultBridge.moveEventToVault(it) }
+                    }
+                    vaultConfirmBatch = false
+                    exitSelection()
+                }) { Text("移入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vaultConfirmBatch = false }) { Text("取消") }
             }
         )
     }
@@ -350,7 +437,8 @@ fun EventRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
-    onMoveToVault: (() -> Unit)? = null
+    onMoveToVault: (() -> Unit)? = null,
+    onMoveToRecycleBin: (() -> Unit)? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
@@ -411,7 +499,14 @@ fun EventRow(
                         text = { Text("移入 Vault") },
                         onClick = {
                             menuExpanded = false
-                            onMoveToVault()
+                            onMoveToVault?.invoke()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("移入回收站") },
+                        onClick = {
+                            menuExpanded = false
+                            onMoveToRecycleBin?.invoke()
                         }
                     )
                 }
@@ -426,8 +521,10 @@ fun FolderRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {}
+    onLongClick: () -> Unit = {},
+    onMoveToRecycleBin: (() -> Unit)? = null
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -453,11 +550,23 @@ fun FolderRow(
             modifier = Modifier.weight(1f)
         )
         if (!selectionMode) {
-            Text(
-                text = "›",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-            )
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("移入回收站") },
+                        onClick = {
+                            menuExpanded = false
+                            onMoveToRecycleBin?.invoke()
+                        }
+                    )
+                }
+            }
         }
     }
 }

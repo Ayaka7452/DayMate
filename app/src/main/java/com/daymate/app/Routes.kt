@@ -10,6 +10,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val ABOUT = "about"
     const val VAULT = "vault"
+    const val RECYCLE_BIN = "recycle_bin"
     const val FOLDER = "folder/{folderId}"
     const val VAULT_FOLDER = "vault_folder/{folderId}"
 }

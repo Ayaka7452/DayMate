@@ -73,6 +73,8 @@ fun FolderScreen(
         .collectAsState(initial = emptyList())
     val allFolders by container.folderRepository.observeAll()
         .collectAsState(initial = emptyList())
+    val vaultSet by container.settingsRepository.vaultPasswordSet
+        .collectAsState(initial = false)
 
     var showFolderDialog by remember { mutableStateOf(false) }
     var pendingMoveAfterCreate by remember { mutableStateOf(false) }
@@ -81,6 +83,9 @@ fun FolderScreen(
     val selectedEventIds = remember { mutableStateListOf<Long>() }
     var showMoveDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    var vaultConfirmBatch by remember { mutableStateOf(false) }
+    var vaultNeedSetup by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val totalSelected = selectedEventIds.size
@@ -117,9 +122,13 @@ fun FolderScreen(
                             TextButton(onClick = { showMoveDialog = true }) { Text("移入文件夹") }
                         }
                         TextButton(
+                            onClick = { if (vaultSet) vaultConfirmBatch = true else vaultNeedSetup = true },
+                            enabled = selectedEventIds.isNotEmpty()
+                        ) { Text("移入 Vault") }
+                        TextButton(
                             onClick = { showDeleteConfirm = true },
                             enabled = totalSelected > 0
-                        ) { Text("删除") }
+                        ) { Text("移入回收站") }
                     }
                 )
             } else {
@@ -149,11 +158,21 @@ fun FolderScreen(
                                     onClick = { menuExpanded = false; showFolderDialog = true }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("删除文件夹") },
+                                    text = { Text("移入回收站") },
                                     onClick = {
                                         menuExpanded = false
                                         scope.launch {
-                                            folder?.let { container.folderRepository.delete(it) }
+                                            folder?.let {
+                                                val ts = System.currentTimeMillis()
+                                                container.eventRepository.softDeleteByFolders(
+                                                    listOf(it.id),
+                                                    ts
+                                                )
+                                                container.folderRepository.softDeleteByIds(
+                                                    listOf(it.id),
+                                                    ts
+                                                )
+                                            }
                                             onBack()
                                         }
                                     }
@@ -202,7 +221,19 @@ fun FolderScreen(
                             else onNavigate("event_form?eventId=${event.id}")
                         },
                         onMoveToVault = {
-                            scope.launch { container.vaultBridge.moveEventToVault(event.id) }
+                            if (vaultSet) {
+                                scope.launch { container.vaultBridge.moveEventToVault(event.id) }
+                            } else {
+                                vaultNeedSetup = true
+                            }
+                        },
+                        onMoveToRecycleBin = {
+                            scope.launch {
+                                container.eventRepository.softDeleteByIds(
+                                    listOf(event.id),
+                                    System.currentTimeMillis()
+                                )
+                            }
                         }
                     )
                     Box(
@@ -266,20 +297,57 @@ fun FolderScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("删除 $totalSelected 项？") },
-            text = { Text("此操作不可撤销。") },
+            title = { Text("移入回收站？") },
+            text = { Text("将把选中的 $totalSelected 项移入回收站，可在「回收站」中恢复或彻底删除。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
                         if (selectedEventIds.isNotEmpty())
-                            container.eventRepository.deleteByIds(selectedEventIds.toList())
+                            container.eventRepository.softDeleteByIds(
+                                selectedEventIds.toList(),
+                                System.currentTimeMillis()
+                            )
                     }
                     showDeleteConfirm = false
                     exitSelection()
-                }) { Text("删除") }
+                }) { Text("移入回收站") }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (vaultNeedSetup) {
+        AlertDialog(
+            onDismissRequest = { vaultNeedSetup = false },
+            title = { Text("Vault 尚未设置") },
+            text = { Text("请先进入 Vault 设置密码，之后才能将内容移入。") },
+            confirmButton = {
+                TextButton(onClick = { vaultNeedSetup = false; onNavigate(Routes.VAULT) }) { Text("去设置") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vaultNeedSetup = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (vaultConfirmBatch) {
+        AlertDialog(
+            onDismissRequest = { vaultConfirmBatch = false },
+            title = { Text("移入 Vault？") },
+            text = { Text("将把选中的 ${selectedEventIds.size} 个事件移入 Vault。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        selectedEventIds.toList().forEach { container.vaultBridge.moveEventToVault(it) }
+                    }
+                    vaultConfirmBatch = false
+                    exitSelection()
+                }) { Text("移入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vaultConfirmBatch = false }) { Text("取消") }
             }
         )
     }

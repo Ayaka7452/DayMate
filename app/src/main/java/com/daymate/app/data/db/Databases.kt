@@ -4,10 +4,11 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 
 @Database(
     entities = [EventEntity::class, FolderEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -15,8 +16,21 @@ abstract class DayMateDatabase : RoomDatabase() {
     abstract fun folderDao(): FolderDao
 
     companion object {
+        /** v1 -> v2：新增回收站软删除字段。 */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE events ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE events ADD COLUMN deletedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE folders ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE folders ADD COLUMN deletedAt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun build(context: Context): DayMateDatabase =
-            Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db").build()
+            Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
+                .addMigration(MIGRATION_1_2)
+                .fallbackToDestructiveMigration()
+                .build()
     }
 }
 

@@ -18,6 +18,7 @@ import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.ui.theme.DayMateTheme
 import com.ayaka7452.daymate.feature.about.AboutScreen
 import com.ayaka7452.daymate.feature.create.EventFormScreen
+import com.ayaka7452.daymate.feature.recyclebin.RecycleBinScreen
 import com.ayaka7452.daymate.feature.folder.FolderScreen
 import com.ayaka7452.daymate.feature.home.HomeScreen
 import com.ayaka7452.daymate.feature.settings.SettingsScreen
@@ -82,6 +83,8 @@ fun Context.route(route: String) {
             Intent(this, SettingsActivity::class.java)
         route == "about" ->
             Intent(this, AboutActivity::class.java)
+        route == "recycle_bin" ->
+            Intent(this, RecycleBinActivity::class.java)
         route.startsWith("folder/") -> {
             val id = route.substringAfter("folder/").toLongOrNull() ?: 0L
             Intent(this, FolderActivity::class.java).apply { putExtra("folderId", id) }
@@ -142,6 +145,13 @@ class AboutActivity : ComposeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setDayMateContent { AboutScreen(onBack = { finish() }) }
+    }
+}
+
+class RecycleBinActivity : ComposeActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setDayMateContent { RecycleBinScreen(container = container, onBack = { finish() }) }
     }
 }
 
