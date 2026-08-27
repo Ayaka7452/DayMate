@@ -109,17 +109,19 @@ fun StorageSetupBody(
         showConfirm = true
     }
 
+    val navigationIcon: (@Composable () -> Unit)? = if (showBack) {
+        {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+            }
+        }
+    } else null
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(title) },
-                navigationIcon = if (showBack) {
-                    {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                        }
-                    }
-                } else null
+                navigationIcon = navigationIcon
             )
         }
     ) { padding ->
@@ -132,7 +134,7 @@ fun StorageSetupBody(
         ) {
             Text(intro, style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onPick, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { onPick() }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.Folder, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("选择文件夹")
