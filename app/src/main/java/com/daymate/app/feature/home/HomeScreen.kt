@@ -1,6 +1,7 @@
 package com.daymate.app.feature.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,16 +11,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,13 +34,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,57 +73,116 @@ fun HomeScreen(
         .collectAsState(initial = emptyList())
 
     var showAddSheet by remember { mutableStateOf(false) }
+    var showFolderDialog by remember { mutableStateOf(false) }
+    var folderDialogTarget by remember { mutableStateOf<FolderEntity?>(null) }
+    var pendingMoveAfterCreate by remember { mutableStateOf(false) }
+
+    var selectionMode by remember { mutableStateOf(false) }
+    val selectedEventIds = remember { mutableStateListOf<Long>() }
+    val selectedFolderIds = remember { mutableStateListOf<Long>() }
+    var showMoveDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     val scope = rememberCoroutineScope()
+
+    val totalSelected = selectedEventIds.size + selectedFolderIds.size
+
+    fun toggleEvent(id: Long) {
+        if (id in selectedEventIds) selectedEventIds.remove(id) else selectedEventIds.add(id)
+    }
+
+    fun toggleFolder(id: Long) {
+        if (id in selectedFolderIds) selectedFolderIds.remove(id) else selectedFolderIds.add(id)
+    }
+
+    fun enterSelection() {
+        selectedEventIds.clear()
+        selectedFolderIds.clear()
+        selectionMode = true
+    }
+
+    fun exitSelection() {
+        selectedEventIds.clear()
+        selectedFolderIds.clear()
+        selectionMode = false
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text("DayMate", fontFamily = FontFamily.Cursive)
-                },
-                actions = {
-                    var menuExpanded by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "菜单")
+            if (selectionMode) {
+                TopAppBar(
+                    title = { Text("已选 $totalSelected 项") },
+                    navigationIcon = {
+                        IconButton(onClick = { exitSelection() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "完成"
+                            )
                         }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("批量管理") },
-                                onClick = { menuExpanded = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Vault") },
-                                onClick = {
-                                    menuExpanded = false
-                                    onNavigate(Routes.VAULT)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("设置") },
-                                onClick = {
-                                    menuExpanded = false
-                                    onNavigate(Routes.SETTINGS)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("关于") },
-                                onClick = {
-                                    menuExpanded = false
-                                    onNavigate(Routes.ABOUT)
-                                }
-                            )
+                    },
+                    actions = {
+                        TextButton(onClick = {
+                            events.forEach { if (it.id !in selectedEventIds) selectedEventIds.add(it.id) }
+                            folders.forEach { if (it.id !in selectedFolderIds) selectedFolderIds.add(it.id) }
+                        }) { Text("全选") }
+                        if (selectedEventIds.isNotEmpty()) {
+                            TextButton(onClick = { showMoveDialog = true }) { Text("移入文件夹") }
+                        }
+                        TextButton(
+                            onClick = { showDeleteConfirm = true },
+                            enabled = totalSelected > 0
+                        ) { Text("删除") }
+                    }
+                )
+            } else {
+                TopAppBar(
+                    title = { Text("DayMate", fontFamily = FontFamily.Cursive) },
+                    actions = {
+                        var menuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "菜单")
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("批量管理") },
+                                    onClick = { menuExpanded = false; enterSelection() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Vault") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigate(Routes.VAULT)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("设置") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigate(Routes.SETTINGS)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("关于") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigate(Routes.ABOUT)
+                                    }
+                                )
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddSheet = true }) {
-                Icon(Icons.Default.Add, contentDescription = "新建")
+            if (!selectionMode) {
+                FloatingActionButton(onClick = { showAddSheet = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "新建")
+                }
             }
         }
     ) { padding ->
@@ -131,10 +199,26 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(folders, key = { it.id }) { folder ->
-                    FolderRow(folder)
+                    FolderRow(
+                        folder = folder,
+                        selectionMode = selectionMode,
+                        selected = folder.id in selectedFolderIds,
+                        onClick = {
+                            if (selectionMode) toggleFolder(folder.id)
+                            else {
+                                folderDialogTarget = folder
+                                showFolderDialog = true
+                            }
+                        }
+                    )
                 }
                 items(events, key = { it.id }) { event ->
-                    EventRow(event)
+                    EventRow(
+                        event = event,
+                        selectionMode = selectionMode,
+                        selected = event.id in selectedEventIds,
+                        onClick = { if (selectionMode) toggleEvent(event.id) }
+                    )
                 }
             }
         }
@@ -149,16 +233,101 @@ fun HomeScreen(
             },
             onCreateFolder = {
                 showAddSheet = false
+                folderDialogTarget = null
+                pendingMoveAfterCreate = false
+                showFolderDialog = true
+            }
+        )
+    }
+
+    if (showFolderDialog) {
+        FolderDialog(
+            existing = folderDialogTarget,
+            onDismiss = {
+                showFolderDialog = false
+                pendingMoveAfterCreate = false
+            },
+            onSave = { name, icon ->
                 scope.launch {
-                    container.folderRepository.add(FolderEntity(name = "新文件夹"))
+                    if (folderDialogTarget == null) {
+                        val newId = container.folderRepository.add(
+                            FolderEntity(name = name, icon = icon)
+                        )
+                        if (pendingMoveAfterCreate) {
+                            container.eventRepository.moveToFolder(
+                                selectedEventIds.toList(),
+                                newId
+                            )
+                            pendingMoveAfterCreate = false
+                            exitSelection()
+                        }
+                    } else {
+                        val f = folderDialogTarget!!
+                        container.folderRepository.update(f.copy(name = name, icon = icon))
+                    }
                 }
+                showFolderDialog = false
+            },
+            onDelete = if (folderDialogTarget != null) {
+                {
+                    scope.launch { container.folderRepository.delete(folderDialogTarget!!) }
+                    showFolderDialog = false
+                }
+            } else null
+        )
+    }
+
+    if (showMoveDialog) {
+        MoveToFolderDialog(
+            folders = folders,
+            onDismiss = { showMoveDialog = false },
+            onPick = { folderId ->
+                scope.launch {
+                    container.eventRepository.moveToFolder(selectedEventIds.toList(), folderId)
+                }
+                showMoveDialog = false
+                exitSelection()
+            },
+            onCreateNew = {
+                showMoveDialog = false
+                folderDialogTarget = null
+                pendingMoveAfterCreate = true
+                showFolderDialog = true
+            }
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除 $totalSelected 项？") },
+            text = { Text("此操作不可撤销。删除文件夹时，其中的事件会自动移出到根目录。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        if (selectedEventIds.isNotEmpty())
+                            container.eventRepository.deleteByIds(selectedEventIds.toList())
+                        if (selectedFolderIds.isNotEmpty())
+                            container.folderRepository.deleteByIds(selectedFolderIds.toList())
+                    }
+                    showDeleteConfirm = false
+                    exitSelection()
+                }) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
             }
         )
     }
 }
 
 @Composable
-fun EventRow(event: EventEntity) {
+fun EventRow(
+    event: EventEntity,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onClick: () -> Unit = {}
+) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
     val text = if (isFuture) "还有 $days 天" else "已过 ${-days} 天"
@@ -166,16 +335,22 @@ fun EventRow(event: EventEntity) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(event.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary)
-        )
-        Spacer(Modifier.width(10.dp))
+        if (selectionMode) {
+            SelectionDot(selected = selected)
+            Spacer(Modifier.width(10.dp))
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(event.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary)
+            )
+            Spacer(Modifier.width(10.dp))
+        }
         Text(
             text = event.title,
             style = MaterialTheme.typography.bodyLarge,
@@ -191,13 +366,25 @@ fun EventRow(event: EventEntity) {
 }
 
 @Composable
-fun FolderRow(folder: FolderEntity) {
+fun FolderRow(
+    folder: FolderEntity,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onClick: () -> Unit = {}
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selectionMode) {
+            SelectionDot(selected = selected)
+            Spacer(Modifier.width(10.dp))
+        } else {
+            Spacer(Modifier.width(0.dp))
+        }
         Text(
             text = folder.icon ?: "📁",
             style = MaterialTheme.typography.bodyLarge
@@ -205,8 +392,37 @@ fun FolderRow(folder: FolderEntity) {
         Spacer(Modifier.width(10.dp))
         Text(
             text = folder.name,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
         )
+        if (!selectionMode) {
+            Text(
+                text = "›",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SelectionDot(selected: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(14.dp)
+            )
+        }
     }
 }
 
@@ -260,6 +476,123 @@ private fun SheetAction(emoji: String, label: String, onClick: () -> Unit) {
         Spacer(Modifier.height(6.dp))
         Text(label, style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FolderDialog(
+    existing: FolderEntity?,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit,
+    onDelete: (() -> Unit)? = null
+) {
+    var name by remember { mutableStateOf(existing?.name ?: "") }
+    var icon by remember { mutableStateOf(existing?.icon ?: "📁") }
+    val icons = listOf(
+        "📁", "📂", "⭐", "❤️", "🎯", "🎁",
+        "📚", "💼", "🏠", "✈️", "🎓", "🍎"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = { onSave(name.trim(), icon) }
+            ) {
+                Text(if (existing == null) "创建" else "保存")
+            }
+        },
+        dismissButton = {
+            Row {
+                if (existing != null && onDelete != null) {
+                    TextButton(onClick = onDelete) { Text("删除") }
+                }
+                TextButton(onClick = onDismiss) { Text("取消") }
+            }
+        },
+        title = { Text(if (existing == null) "新建文件夹" else "编辑文件夹") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("名称") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+                Text("图标", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(icons) { em ->
+                        val isSel = em == icon
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSel) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .border(
+                                    if (isSel) 2.dp else 0.dp,
+                                    MaterialTheme.colorScheme.primary,
+                                    CircleShape
+                                )
+                                .clickable { icon = em },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(em, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun MoveToFolderDialog(
+    folders: List<FolderEntity>,
+    onDismiss: () -> Unit,
+    onPick: (Long?) -> Unit,
+    onCreateNew: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        title = { Text("移动到") },
+        text = {
+            LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(null) }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("📂  根目录（移出文件夹）")
+                    }
+                }
+                items(folders) { folder ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(folder.id) }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("${folder.icon ?: "📁"}  ${folder.name}")
+                    }
+                }
+                item {
+                    TextButton(onClick = onCreateNew) { Text("+ 新建文件夹并移入") }
+                }
+            }
+        }
+    )
 }
 
 @Composable

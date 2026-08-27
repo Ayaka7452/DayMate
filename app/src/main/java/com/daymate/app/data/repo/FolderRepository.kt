@@ -13,4 +13,6 @@ class FolderRepository(private val dao: FolderDao) {
     suspend fun update(folder: FolderEntity) = dao.update(folder)
 
     suspend fun delete(folder: FolderEntity) = dao.delete(folder)
+
+    suspend fun deleteByIds(ids: List<Long>) = dao.deleteByIds(ids)
 }
