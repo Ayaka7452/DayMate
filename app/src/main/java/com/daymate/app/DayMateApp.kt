@@ -22,7 +22,6 @@ class DayMateApp : Application() {
         runCatching { container.close() }
         container = AppContainer(this)
     }
-}
 
     /** 兜底：任何未捕获异常都写入外部文件 + Logcat，方便定位闪退（无 keystore 也能用）。 */
     private fun installCrashHandler() {
