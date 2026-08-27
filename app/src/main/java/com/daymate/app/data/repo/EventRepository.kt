@@ -12,6 +12,8 @@ class EventRepository(private val dao: EventDao) {
 
     fun observeByFolder(folderId: Long): Flow<List<EventEntity>> = dao.observeByFolder(folderId)
 
+    suspend fun getById(id: Long): EventEntity? = dao.getById(id)
+
     suspend fun add(event: EventEntity): Long = dao.insert(event)
 
     suspend fun update(event: EventEntity) = dao.update(event)

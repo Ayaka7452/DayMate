@@ -3,6 +3,7 @@ package com.daymate.app.feature.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,6 +59,8 @@ import com.daymate.app.core.AppContainer
 import com.daymate.app.core.util.CountdownCalculator
 import com.daymate.app.data.db.EventEntity
 import com.daymate.app.data.db.FolderEntity
+import com.daymate.app.feature.common.FolderDialog
+import com.daymate.app.feature.common.PickFolderDialog
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -205,7 +207,10 @@ fun HomeScreen(
                         selected = folder.id in selectedFolderIds,
                         onClick = {
                             if (selectionMode) toggleFolder(folder.id)
-                            else {
+                            else onNavigate("folder/${folder.id}")
+                        },
+                        onLongClick = {
+                            if (!selectionMode) {
                                 folderDialogTarget = folder
                                 showFolderDialog = true
                             }
@@ -217,7 +222,10 @@ fun HomeScreen(
                         event = event,
                         selectionMode = selectionMode,
                         selected = event.id in selectedEventIds,
-                        onClick = { if (selectionMode) toggleEvent(event.id) }
+                        onClick = {
+                            if (selectionMode) toggleEvent(event.id)
+                            else onNavigate("event_form?eventId=${event.id}")
+                        }
                     )
                 }
             }
@@ -242,7 +250,10 @@ fun HomeScreen(
 
     if (showFolderDialog) {
         FolderDialog(
-            existing = folderDialogTarget,
+            initialName = folderDialogTarget?.name ?: "",
+            initialIcon = folderDialogTarget?.icon ?: "📁",
+            title = if (folderDialogTarget == null) "新建文件夹" else "编辑文件夹",
+            confirmLabel = if (folderDialogTarget == null) "创建" else "保存",
             onDismiss = {
                 showFolderDialog = false
                 pendingMoveAfterCreate = false
@@ -278,8 +289,8 @@ fun HomeScreen(
     }
 
     if (showMoveDialog) {
-        MoveToFolderDialog(
-            folders = folders,
+        PickFolderDialog(
+            folders = folders.map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
             onDismiss = { showMoveDialog = false },
             onPick = { folderId ->
                 scope.launch {
@@ -370,20 +381,22 @@ fun FolderRow(
     folder: FolderEntity,
     selectionMode: Boolean = false,
     selected: Boolean = false,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    onLongClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = if (selectionMode) null else onLongClick
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
             SelectionDot(selected = selected)
             Spacer(Modifier.width(10.dp))
-        } else {
-            Spacer(Modifier.width(0.dp))
         }
         Text(
             text = folder.icon ?: "📁",
@@ -406,7 +419,7 @@ fun FolderRow(
 }
 
 @Composable
-private fun SelectionDot(selected: Boolean) {
+fun SelectionDot(selected: Boolean) {
     Box(
         modifier = Modifier
             .size(22.dp)
@@ -476,123 +489,6 @@ private fun SheetAction(emoji: String, label: String, onClick: () -> Unit) {
         Spacer(Modifier.height(6.dp))
         Text(label, style = MaterialTheme.typography.bodyMedium)
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FolderDialog(
-    existing: FolderEntity?,
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit,
-    onDelete: (() -> Unit)? = null
-) {
-    var name by remember { mutableStateOf(existing?.name ?: "") }
-    var icon by remember { mutableStateOf(existing?.icon ?: "📁") }
-    val icons = listOf(
-        "📁", "📂", "⭐", "❤️", "🎯", "🎁",
-        "📚", "💼", "🏠", "✈️", "🎓", "🍎"
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                enabled = name.isNotBlank(),
-                onClick = { onSave(name.trim(), icon) }
-            ) {
-                Text(if (existing == null) "创建" else "保存")
-            }
-        },
-        dismissButton = {
-            Row {
-                if (existing != null && onDelete != null) {
-                    TextButton(onClick = onDelete) { Text("删除") }
-                }
-                TextButton(onClick = onDismiss) { Text("取消") }
-            }
-        },
-        title = { Text(if (existing == null) "新建文件夹" else "编辑文件夹") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("名称") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-                Text("图标", style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(icons) { em ->
-                        val isSel = em == icon
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSel) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .border(
-                                    if (isSel) 2.dp else 0.dp,
-                                    MaterialTheme.colorScheme.primary,
-                                    CircleShape
-                                )
-                                .clickable { icon = em },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(em, style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-                }
-            }
-        }
-    )
-}
-
-@Composable
-fun MoveToFolderDialog(
-    folders: List<FolderEntity>,
-    onDismiss: () -> Unit,
-    onPick: (Long?) -> Unit,
-    onCreateNew: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {},
-        title = { Text("移动到") },
-        text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onPick(null) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("📂  根目录（移出文件夹）")
-                    }
-                }
-                items(folders) { folder ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onPick(folder.id) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("${folder.icon ?: "📁"}  ${folder.name}")
-                    }
-                }
-                item {
-                    TextButton(onClick = onCreateNew) { Text("+ 新建文件夹并移入") }
-                }
-            }
-        }
-    )
 }
 
 @Composable

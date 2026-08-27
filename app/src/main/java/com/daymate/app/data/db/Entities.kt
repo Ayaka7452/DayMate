@@ -42,7 +42,18 @@ data class EventEntity(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
-@Entity(tableName = "vault_events")
+@Entity(
+    tableName = "vault_events",
+    foreignKeys = [
+        ForeignKey(
+            entity = VaultFolderEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["folderId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [Index("folderId")]
+)
 data class VaultEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
@@ -50,8 +61,20 @@ data class VaultEventEntity(
     val repeatYearly: Boolean = false,
     val note: String? = null,
     val color: Int? = null,
+    val folderId: Long? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "vault_folders")
+data class VaultFolderEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val icon: String? = null,
+    val color: Int? = null,
+    val sortIndex: Int = 0,
+    val isPinned: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
 )

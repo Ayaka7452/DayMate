@@ -21,15 +21,19 @@ abstract class DayMateDatabase : RoomDatabase() {
 }
 
 @Database(
-    entities = [VaultEventEntity::class],
-    version = 1,
+    entities = [VaultEventEntity::class, VaultFolderEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class VaultDatabase : RoomDatabase() {
     abstract fun vaultEventDao(): VaultEventDao
+    abstract fun vaultFolderDao(): VaultFolderDao
 
     companion object {
         fun build(context: Context): VaultDatabase =
-            Room.databaseBuilder(context, VaultDatabase::class.java, "vault.db").build()
+            Room.databaseBuilder(context, VaultDatabase::class.java, "vault.db")
+                // Alpha: 结构变更时直接重建（会清空 Vault 数据），正式版需替换为真实 Migration
+                .fallbackToDestructiveMigration()
+                .build()
     }
 }

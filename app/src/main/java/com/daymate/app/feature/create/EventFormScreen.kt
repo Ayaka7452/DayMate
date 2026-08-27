@@ -26,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,25 +46,40 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun EventFormScreen(
     container: AppContainer,
+    eventId: Long? = null,
+    folderId: Long? = null,
     onBack: () -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var epochDay by remember { mutableStateOf(LocalDate.now().plusDays(7).toEpochDay()) }
+    var loaded by remember { mutableStateOf<EventEntity?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = LocalDate.now()
-            .plusDays(7)
+    LaunchedEffect(eventId) {
+        eventId?.let { id ->
+            container.eventRepository.getById(id)?.let { e ->
+                loaded = e
+                title = e.title
+                epochDay = e.targetDateEpochDay
+            }
+        }
+    }
+
+    val isEdit = loaded != null
+
+    val datePickerState = rememberDatePickerState()
+    LaunchedEffect(epochDay) {
+        datePickerState.selectedDateMillis = LocalDate.ofEpochDay(epochDay)
             .atStartOfDay(ZoneOffset.UTC)
             .toInstant()
             .toEpochMilli()
-    )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("新建事件") },
+                title = { Text(if (isEdit) "编辑事件" else "新建事件") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -103,12 +119,22 @@ fun EventFormScreen(
             Button(
                 onClick = {
                     scope.launch {
-                        container.eventRepository.add(
-                            EventEntity(
-                                title = title.ifBlank { "未命名事件" },
-                                targetDateEpochDay = epochDay
+                        if (isEdit) {
+                            container.eventRepository.update(
+                                loaded!!.copy(
+                                    title = title.ifBlank { "未命名事件" },
+                                    targetDateEpochDay = epochDay
+                                )
                             )
-                        )
+                        } else {
+                            container.eventRepository.add(
+                                EventEntity(
+                                    title = title.ifBlank { "未命名事件" },
+                                    targetDateEpochDay = epochDay,
+                                    folderId = folderId
+                                )
+                            )
+                        }
                     }
                     onBack()
                 },

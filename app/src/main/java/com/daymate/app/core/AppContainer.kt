@@ -7,6 +7,7 @@ import com.daymate.app.data.db.VaultDatabase
 import com.daymate.app.data.repo.EventRepository
 import com.daymate.app.data.repo.FolderRepository
 import com.daymate.app.data.repo.SettingsRepository
+import com.daymate.app.data.repo.VaultFolderRepository
 import com.daymate.app.data.repo.VaultRepository
 
 private val Context.settingsDataStore by preferencesDataStore(name = "settings")
@@ -22,4 +23,5 @@ class AppContainer(context: Context) {
     val eventRepository = EventRepository(mainDb.eventDao())
     val folderRepository = FolderRepository(mainDb.folderDao())
     val vaultRepository = VaultRepository(vaultDb.vaultEventDao())
+    val vaultFolderRepository = VaultFolderRepository(vaultDb.vaultFolderDao())
 }
