@@ -24,6 +24,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.draggableHandle
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -274,6 +278,30 @@ private fun VaultListScreen(
         .collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
+    var isDragging by remember { mutableStateOf(false) }
+    val folderList = remember { mutableStateListOf<VaultFolderEntity>() }
+    val listState = rememberLazyListState()
+    LaunchedEffect(folders) {
+        if (!isDragging) {
+            folderList.clear()
+            folderList.addAll(folders)
+        }
+    }
+    val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+        val toIndex = to.index.coerceIn(0, folderList.lastIndex)
+        if (from.index in folderList.indices) {
+            val item = folderList.removeAt(from.index)
+            folderList.add(toIndex, item)
+        }
+    }
+    fun persistFolderOrder() {
+        scope.launch {
+            folderList.forEachIndexed { index, f ->
+                container.vaultFolderRepository.update(f.copy(sortIndex = index))
+            }
+        }
+    }
+
     var showAddSheet by remember { mutableStateOf(false) }
     var showEventDialog by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<VaultEventEntity?>(null) }
@@ -346,23 +374,33 @@ private fun VaultListScreen(
                 )
             }
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(folders, key = { it.id }) { folder ->
-                    VaultFolderRow(
-                        folder = folder,
-                        selectionMode = selectionMode,
-                        selected = folder.id in selectedFolderIds,
-                        onClick = {
-                            if (selectionMode) toggleFolder(folder.id)
-                            else onNavigate("vault_folder/${folder.id}")
-                        },
-                        onLongClick = {
-                            if (!selectionMode) {
-                                folderTarget = folder
-                                showFolderDialog = true
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                items(folderList, key = { it.id }) { folder ->
+                    ReorderableItem(reorderableState, key = folder.id) {
+                        val handleModifier = Modifier.draggableHandle(
+                            onDragStarted = { isDragging = true },
+                            onDragStopped = {
+                                isDragging = false
+                                persistFolderOrder()
                             }
-                        }
-                    )
+                        )
+                        VaultFolderRow(
+                            folder = folder,
+                            selectionMode = selectionMode,
+                            selected = folder.id in selectedFolderIds,
+                            onClick = {
+                                if (selectionMode) toggleFolder(folder.id)
+                                else onNavigate("vault_folder/${folder.id}")
+                            },
+                            onLongClick = {
+                                if (!selectionMode) {
+                                    folderTarget = folder
+                                    showFolderDialog = true
+                                }
+                            },
+                            dragHandle = if (!selectionMode) handleModifier else null
+                        )
+                    }
                 }
                 items(events, key = { it.id }) { event ->
                     VaultEventRow(
@@ -375,6 +413,9 @@ private fun VaultListScreen(
                                 editingEvent = event
                                 showEventDialog = true
                             }
+                        },
+                        onMoveToMain = {
+                            scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                         }
                     )
                 }
@@ -616,6 +657,9 @@ fun VaultFolderScreen(
                                 editingEvent = event
                                 showEventDialog = true
                             }
+                        },
+                        onMoveToMain = {
+                            scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                         }
                     )
                 }
@@ -788,11 +832,13 @@ private fun VaultEventRow(
     event: VaultEventEntity,
     selectionMode: Boolean = false,
     selected: Boolean = false,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    onMoveToMain: (() -> Unit)? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
     val text = if (isFuture) "还有 $days 天" else "已过 ${-days} 天"
+    var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -815,6 +861,25 @@ private fun VaultEventRow(
             color = if (isFuture) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.secondary
         )
+        if (!selectionMode && onMoveToMain != null) {
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("移出到主空间") },
+                        onClick = {
+                            menuExpanded = false
+                            onMoveToMain()
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -824,7 +889,8 @@ private fun VaultFolderRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {}
+    onLongClick: () -> Unit = {},
+    dragHandle: Modifier? = null
 ) {
     Row(
         modifier = Modifier
@@ -847,6 +913,16 @@ private fun VaultFolderRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )
+        if (dragHandle != null) {
+            IconButton(modifier = dragHandle, onClick = {}) {
+                Text(
+                    "⠿",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+        }
         if (!selectionMode) {
             Text(
                 text = "›",

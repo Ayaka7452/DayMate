@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.kotlinx.datetime)
+    implementation(libs.reorderable)
 
     debugImplementation(libs.compose.ui.tooling)
 

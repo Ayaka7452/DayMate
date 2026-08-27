@@ -227,6 +227,9 @@ fun HomeScreen(
                         onClick = {
                             if (selectionMode) toggleEvent(event.id)
                             else onNavigate("event_form?eventId=${event.id}")
+                        },
+                        onMoveToVault = {
+                            scope.launch { container.vaultBridge.moveEventToVault(event.id) }
                         }
                     )
                 }
@@ -339,11 +342,14 @@ fun EventRow(
     event: EventEntity,
     selectionMode: Boolean = false,
     selected: Boolean = false,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    onMoveToVault: (() -> Unit)? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
     val text = if (isFuture) "还有 $days 天" else "已过 ${-days} 天"
+
+    var menuExpanded by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -375,6 +381,25 @@ fun EventRow(
             color = if (isFuture) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.secondary
         )
+        if (!selectionMode && onMoveToVault != null) {
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("移入 Vault") },
+                        onClick = {
+                            menuExpanded = false
+                            onMoveToVault()
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
