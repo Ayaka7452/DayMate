@@ -25,3 +25,7 @@ dist/
 # User-provided reference videos (analysis only, not source)
 你现在的画面切换效果.mp4
 系统的效果.mp4
+
+# Local signing helper (contains plaintext keystore password — never commit)
+apksign.sh
+keystore.properties
