@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DayMate · Android 倒数日 App 开发计划</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --panel: #ffffff;
+    --ink: #1c1c1c;
+    --ink-soft: #555;
+    --ink-faint: #888;
+    --line: #e6e3da;
+    --line-strong: #c9c4b4;
+    --accent: #2f5d62;
+    --accent-soft: #d8e6e3;
+    --warm: #c97a3b;
+    --warm-soft: #f4e0cf;
+    --green: #3f7a3a;
+    --green-soft: #dbe9d4;
+    --red: #b04a3a;
+    --red-soft: #f3d7d0;
+    --code-bg: #f3f0e6;
+    --shadow: 0 1px 0 rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 28px 96px; }
+  header.cover {
+    background: linear-gradient(135deg, #2f5d62 0%, #5e8a8a 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 40px 36px;
+    box-shadow: var(--shadow);
+  }
+  header.cover .eyebrow {
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    opacity: .8; margin-bottom: 12px;
+  }
+  header.cover h1 { font-size: 36px; margin: 0 0 8px; letter-spacing: .5px; }
+  header.cover p { margin: 4px 0; opacity: .92; font-size: 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 16px 28px; margin-top: 22px; font-size: 13px; }
+  .meta span b { font-weight: 600; opacity: .9; margin-right: 6px; }
+
+  nav.toc {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 22px; margin: 28px 0; box-shadow: var(--shadow);
+  }
+  nav.toc h3 { margin: 0 0 10px; font-size: 14px; letter-spacing: .12em; color: var(--ink-faint); text-transform: uppercase; }
+  nav.toc ol { columns: 2; column-gap: 32px; margin: 0; padding-left: 20px; }
+  nav.toc li { margin: 4px 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  section { margin-top: 44px; }
+  section h2 {
+    font-size: 22px; margin: 0 0 6px; padding-bottom: 8px;
+    border-bottom: 2px solid var(--line-strong);
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  section h2 .idx { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 18px; }
+  section .lead { color: var(--ink-soft); margin: 8px 0 18px; font-size: 14px; }
+
+  h3 { font-size: 16px; margin: 24px 0 10px; color: var(--ink); }
+  h4 { font-size: 14px; margin: 18px 0 6px; color: var(--ink-soft); letter-spacing: .04em; }
+
+  p { margin: 8px 0; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+
+  code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 4px;
+    font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg); padding: 14px 16px; border-radius: 8px;
+    overflow-x: auto; border: 1px solid var(--line);
+    font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: 13px; line-height: 1.6;
+  }
+  pre code { background: transparent; padding: 0; }
+
+  .grid { display: grid; gap: 16px; }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 760px) { .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; } nav.toc ol { columns: 1; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .card h3 { margin-top: 0; }
+  .tag {
+    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    background: var(--accent-soft); color: var(--accent); margin-right: 6px;
+    letter-spacing: .04em; vertical-align: middle;
+  }
+  .tag.warm { background: var(--warm-soft); color: var(--warm); }
+  .tag.green { background: var(--green-soft); color: var(--green); }
+  .tag.red { background: var(--red-soft); color: var(--red); }
+  .tag.gray { background: #ece9df; color: #6b6b6b; }
+
+  table {
+    width: 100%; border-collapse: collapse; font-size: 13.5px;
+    background: var(--panel); border-radius: 10px; overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f1eee3; color: var(--ink); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td.center { text-align: center; }
+
+  /* Gantt */
+  .gantt {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; box-shadow: var(--shadow); overflow-x: auto;
+  }
+  .gantt-table { width: 100%; border-collapse: separate; border-spacing: 4px 6px; min-width: 760px; }
+  .gantt-table th { background: transparent; border: none; color: var(--ink-faint); font-size: 12px; font-weight: 500; padding: 2px 6px; }
+  .gantt-table td { border: none; padding: 0; }
+  .gantt-row-label {
+    width: 130px; font-size: 13px; color: var(--ink); font-weight: 600;
+    background: transparent !important; padding-right: 12px !important; white-space: nowrap;
+  }
+  .gantt-bar {
+    height: 22px; border-radius: 6px; color: #fff; font-size: 11.5px;
+    display: flex; align-items: center; padding: 0 10px; white-space: nowrap;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,.08);
+  }
+  .gantt-bar.m0 { background: #b0b0a8; }
+  .gantt-bar.m1 { background: #5a8a87; }
+  .gantt-bar.m2 { background: #4f7a76; }
+  .gantt-bar.m3 { background: #2f5d62; }
+  .gantt-bar.m4 { background: #c97a3b; }
+  .gantt-bar.m5 { background: #9b5a2a; }
+  .gantt-bar.m6 { background: #6a4a2a; }
+  .gantt-axis td { font-size: 11px; color: var(--ink-faint); border-top: 1px solid var(--line); padding-top: 6px !important; }
+  .gantt-axis td:first-child { border-top: 1px solid transparent; }
+
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li {
+    padding: 6px 0 6px 26px; position: relative; border-bottom: 1px dashed var(--line);
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before {
+    content: ""; position: absolute; left: 4px; top: 11px;
+    width: 12px; height: 12px; border: 1.5px solid var(--accent); border-radius: 3px;
+  }
+  .checklist li b { color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 4px; }
+
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--accent-soft);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0; font-size: 14px;
+  }
+  .callout.warm { border-left-color: var(--warm); background: var(--warm-soft); }
+  .callout.red { border-left-color: var(--red); background: var(--red-soft); }
+  .callout b { color: var(--ink); }
+
+  /* Sketch ascii hint */
+  .sketch {
+    background: repeating-linear-gradient(0deg, transparent 0 27px, var(--line) 27px 28px), var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; padding: 16px; font-family: "JetBrains Mono", monospace; font-size: 13px; white-space: pre; overflow-x: auto;
+  }
+
+  footer { margin-top: 60px; text-align: center; color: var(--ink-faint); font-size: 12px; }
+  footer a { color: var(--ink-faint); }
+
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line-strong); color: var(--ink-soft); margin: 0 4px 4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="cover">
+  <div class="eyebrow">Android · 倒数日 App</div>
+  <h1>DayMate · 开发计划</h1>
+  <p>一款以"倒数日 + Vault"为核心的轻量 Android 应用。</p>
+  <div class="meta">
+    <span><b>平台</b>Android 8.0+ (API 26+)</span>
+    <span><b>语言</b>Kotlin</span>
+    <span><b>UI</b>Jetpack Compose</span>
+    <span><b>预计周期</b>10–12 周（MVP → v1.0）</span>
+    <span><b>文档版本</b>v0.1 · 2026-08-27</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h3>目录</h3>
+  <ol>
+    <li><a href="#overview">项目概述</a></li>
+    <li><a href="#features">功能模块（基于手绘稿）</a></li>
+    <li><a href="#ui">UI 设计规范</a></li>
+    <li><a href="#tech">技术选型与架构</a></li>
+    <li><a href="#arch">目录结构与分层</a></li>
+    <li><a href="#data">数据模型设计</a></li>
+    <li><a href="#milestones">里程碑与甘特图</a></li>
+    <li><a href="#tasks">详细任务清单</a></li>
+    <li><a href="#test">测试策略</a></li>
+    <li><a href="#release">发布与维护</a></li>
+    <li><a href="#risks">风险与开放问题</a></li>
+  </ol>
+</nav>
+
+<section id="overview">
+  <h2><span class="idx">01</span>项目概述</h2>
+  <p class="lead">基于 4 张手绘设计稿提炼出的产品定位与目标。</p>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>产品定位</h3>
+      <p>一个界面克制、操作直觉的倒数日 App。主打两大能力：</p>
+      <ul>
+        <li><b>倒数日管理</b>：记录未来的期待日（生日、考试、纪念日）和已过去的天数（戒烟、健身、戒咖啡）。</li>
+        <li><b>Vault</b>：通过密码 + 生物识别，进入一个完全独立的倒数日列表。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>目标用户</h3>
+      <ul>
+        <li>对日历提醒"通知疲劳"的用户，希望一目了然看到"距离 X 还剩几天"。</li>
+        <li>需要为一部分事件留出独立空间（送礼物、惊喜、健康追踪等）的用户。</li>
+        <li>喜欢简洁、纸质手账式视觉风格的用户。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>核心场景</h3>
+      <ol>
+        <li>打开 App → 一眼看到所有"倒数日"，按剩余天数排序。</li>
+        <li>右下 + 按钮 → 选"事件"或"文件夹" → 选日期 → 完成。</li>
+        <li>右上 ⋮ → 进入 Vault → 输入密码/指纹 → 看到独立的倒数日列表 → 离开时点退出。</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>非目标（v1.0 不做）</h3>
+      <ul>
+        <li>云同步、社交分享（v1.x 之后考虑）。</li>
+        <li>桌面小组件（v1.1 候选）。</li>
+        <li>iOS / 平板适配（v2.0 候选）。</li>
+        <li>农历/节气（v1.1 候选）。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <h2><span class="idx">02</span>功能模块（基于手绘稿）</h2>
+  <p class="lead">下面所有模块均来源于 4 张手绘设计稿：主页、条目设计、右上菜单、菜单功能说明 + 文件夹建立方式。</p>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <span class="tag">F1</span>
+      <h3 style="display:inline">主页 · 倒数日列表</h3>
+      <ul>
+        <li>顶部应用名 "DayMate"（手写风格）+ 右上角三点菜单。</li>
+        <li>列表项显示 <code>事件名 + 剩余/已过天数</code>，例如"下次生日 还有 3 天"。</li>
+        <li>每行右侧"汉堡"把手支持长按拖动排序。</li>
+        <li>右下角悬浮圆形 + 按钮：点击弹出底部弹层（事件 / 文件夹）。</li>
+        <li>空状态：插画 + 提示"轻点 + 创建你的第一个倒数日"。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">F2</span>
+      <h3 style="display:inline">事件 / 文件夹 · 新建与编辑</h3>
+      <ul>
+        <li>事件：标题、目标日期、是否每年重复、是否置顶、是否仅在 Vault 中可见、备注、颜色标记。</li>
+        <li>文件夹：名称、图标/emoji、颜色、置顶、是否含 Vault 子项。</li>
+        <li>编辑页支持删除（二次确认）。</li>
+        <li>表单字段做最小可用校验：标题非空、日期合法。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag warm">F3</span>
+      <h3 style="display:inline">文件夹与分类</h3>
+      <ul>
+        <li>主页可下钻到文件夹查看子项。</li>
+        <li>文件夹支持拖入事件（批量管理模式时）。</li>
+        <li>顶部面包屑 / 返回手势回到上一级。</li>
+        <li>支持文件夹重命名、置顶、删除（删除时事件可选择移出或一并删除）。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">F4</span>
+      <h3 style="display:inline">列表项 · 设计与排序</h3>
+      <ul>
+        <li>显示文案：<code>【事件名】还有 N 天</code> / <code>【事件名】已过 N 天</code>。</li>
+        <li>已过事件默认折叠到分组"已过去"，可展开。</li>
+        <li>排序：按"剩余天数升序" / "剩余天数降序" / "手动" / "最近修改"。</li>
+        <li>长按弹出操作：编辑、置顶、移入文件夹、移入 Vault、删除。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">F5</span>
+      <h3 style="display:inline">批量管理</h3>
+      <ul>
+        <li>从右上菜单进入"管理模式"。</li>
+        <li>每行左侧出现多选框，可多选。</li>
+        <li>底部 ActionBar：全选 / 删除 / 移入文件夹 / 移入 Vault / 取消。</li>
+        <li>拖动把支持拖到文件夹（实现：拖到顶部分组或侧边抽屉中的文件夹）。</li>
+        <li>右上角显示"完成"按钮退出管理模式。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag red">F6</span>
+      <h3 style="display:inline">Vault（App 特色）</h3>
+      <ul>
+        <li>入口：右上菜单 → Vault。首次使用需设置密码；密码长度 ≥ 6 位。</li>
+        <li>登录方式：密码 + 系统生物识别（<code>BiometricPrompt</code>，用户已在系统设置开启指纹/面容时可用）。</li>
+        <li>进入后看到独立的倒数日列表（与主空间完全隔离的 UI 副本）。</li>
+        <li>顶部持续显示"🔒 Vault"标识 + <b>退出按钮</b>（任何时间可一键退出）。</li>
+        <li>退出后立即清空屏幕截图防护标志位（FLAG_SECURE），并锁定主空间访问（需重新认证）。</li>
+        <li>支持修改密码、关闭生物识别、忘记密码（安全问题或销毁式重置）。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag green">F7</span>
+      <h3 style="display:inline">设置</h3>
+      <ul>
+        <li>主题：<b>跟随系统 / 始终浅色 / 始终深色</b>（"自动黑白主题"指此）。</li>
+        <li>字体：默认手写风格（应用名）可关闭。</li>
+        <li>每周第一天（周一/周日）。</li>
+        <li>列表默认排序。</li>
+        <li>Vault 超时自动锁定：立刻 / 1 分钟 / 5 分钟 / 永不（应用切换时计算）。</li>
+        <li>通知与提醒（v1.x 候选）。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">F8</span>
+      <h3 style="display:inline">关于</h3>
+      <ul>
+        <li>App 图标、版本号、构建号。</li>
+        <li>开源许可、致谢、隐私政策链接（v1.0 发版前提供占位）。</li>
+        <li>反馈邮箱、GitHub 仓库（如开源）。</li>
+        <li>"检查更新"按钮（如上架应用市场）。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="ui">
+  <h2><span class="idx">03</span>UI 设计规范</h2>
+  <p class="lead">尽量贴合手绘稿的纸质、手账风格；建议通过 Figma 二次细化后再编码。</p>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>视觉风格</h3>
+      <ul>
+        <li>浅色背景 #FAFAF7，纸张感；深色背景 #1A1A18，墨水感。</li>
+        <li>主色：墨绿 <code>#2F5D62</code>；强调色：暖橘 <code>#C97A3B</code>。</li>
+        <li>字体：标题"DayMate"用手写体（推荐 <i>Caveat / Ma Shan Zheng</i>，本机内嵌或下载到 assets/）。</li>
+        <li>列表项：1.2–1.5 间距，无强分割线，使用留白 + 轻底色分块。</li>
+        <li>圆角 12dp；阴影轻；不使用 Material 默认过强的强调色。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>交互规则</h3>
+      <ul>
+        <li>+ 按钮：底部弹层（BottomSheet）选择"事件 / 文件夹"。</li>
+        <li>右上 ⋮ 菜单：DropdownMenu（紧凑、4 项）。</li>
+        <li>拖动排序：长按 0.4s 进入拖动，震动反馈（<code>HapticFeedback</code>）。</li>
+        <li>进入 Vault：模态全屏页；退出需主动点"退出"按钮。</li>
+        <li>所有破坏性操作（删除、清空）需二次确认 Dialog。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>主页低保真示意</h3>
+  <div class="sketch">┌────────────────────────────┐
+│ 9:57           📶 50%      │
+│ DayMate~~~~~~~~~~~        ⋮│
+├────────────────────────────┤
+│ 🎂 下次生日      还有 3 天 ≡│
+│ 📁 拿文件        已过 2 天 ≡│
+│ ✈️  旅行          还有 28天 ≡│
+│ 💪 健身          已过 45天 ≡│
+│                            │
+│                            │
+│                       ( + )│
+└────────────────────────────┘
+   点击 + 弹出  ┌─────────────┐
+                │  📅 事件    │
+                │  📁 文件夹  │
+                └─────────────┘</div>
+</section>
+
+<section id="tech">
+  <h2><span class="idx">04</span>技术选型与架构</h2>
+  <p class="lead">为单人/小团队快速迭代设计，倾向"Google 官方全家桶 + 最小依赖"。</p>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>核心技术栈</h3>
+      <table>
+        <tr><th>维度</th><th>选型</th></tr>
+        <tr><td>语言</td><td>Kotlin 1.9+</td></tr>
+        <tr><td>UI</td><td>Jetpack Compose (BOM 2024.x) + Material 3</td></tr>
+        <tr><td>架构</td><td>MVVM + UseCase 层 + Repository</td></tr>
+        <tr><td>异步</td><td>Kotlin Coroutines + Flow / StateFlow</td></tr>
+        <tr><td>本地存储</td><td>Room 2.6+（明文区）+ SQLCipher（Vault 区可选）</td></tr>
+        <tr><td>偏好设置</td><td>DataStore（Preferences）</td></tr>
+        <tr><td>依赖注入</td><td>Hilt</td></tr>
+        <tr><td>导航</td><td>Navigation-Compose</td></tr>
+        <tr><td>列表拖动</td><td>Reorderable（开源） 或 自研 LazyColumn + detectDragGestures</td></tr>
+        <tr><td>安全</td><td>Android Keystore + EncryptedSharedPreferences / EncryptedFile + BiometricPrompt</td></tr>
+        <tr><td>后台任务</td><td>WorkManager（提醒，v1.x）</td></tr>
+        <tr><td>崩溃/统计</td><td>v1.0 不接；v1.x 接 Firebase Crashlytics（可选）</td></tr>
+        <tr><td>构建</td><td>Gradle Kotlin DSL + Version Catalog（libs.versions.toml）</td></tr>
+        <tr><td>最低 SDK</td><td>minSdk 26 (Android 8.0) / targetSdk 34</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>关键三方依赖（建议）</h3>
+      <ul>
+        <li><code>androidx.biometric:biometric</code> – 指纹/面容</li>
+        <li><code>androidx.security:security-crypto</code> – 加密 SharedPreferences</li>
+        <li><code>androidx.room:room-runtime / room-ktx / room-compiler(KSP)</code></li>
+        <li><code>com.google.dagger:hilt-android</code> + <code>hilt-compiler(KSP)</code></li>
+        <li><code>androidx.navigation:navigation-compose</code></li>
+        <li><code>org.jetbrains.kotlinx:kotlinx-datetime</code> – 日期运算</li>
+        <li><code>io.coil-kt:coil-compose</code> – 图像（如自定义事件图标）</li>
+        <li><code>io.github.burnoo.compose.reorderable:reorderable</code> – 拖动排序</li>
+        <li><code>androidx.compose.material3:material3-window-size-class</code> – 平板适配预留</li>
+      </ul>
+      <h4>说明</h4>
+      <ul>
+        <li>Room 编译器推荐 KSP 而非 KAPT，速度更快。</li>
+        <li>列表项数量级在数百以内，因此不引入 Paging 库。</li>
+        <li>不引入 Tailwind/Flutter/RN，统一原生 Kotlin。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout warm">
+    <b>关于 Vault 加密策略：</b> v1.0 阶段建议"分区隔离 + Keystore 包裹"。即 Vault 表与主表物理分离，Vault 数据写入 <code>EncryptedFile</code>（密钥放 Keystore），登录态内存中持有解密句柄，退出时立即释放。对普通用户已足够；如未来要做端到端备份再升级到 SQLCipher。
+  </div>
+</section>
+
+<section id="arch">
+  <h2><span class="idx">05</span>目录结构与分层</h2>
+  <p class="lead">单 Module 起步，二级包按"功能切片"组织，避免过早拆 multi-module。</p>
+
+<pre><code>app/
+├── src/main/java/com/daymate/app/
+│   ├── DayMateApp.kt              // @HiltAndroidApp
+│   ├── MainActivity.kt            // 单 Activity + Compose
+│   │
+│   ├── core/
+│   │   ├── di/                    // Hilt Modules
+│   │   ├── ui/theme/              // 颜色/字体/主题
+│   │   ├── ui/components/         // 通用 Compose 组件
+│   │   ├── util/                  // 日期、扩展函数
+│   │   └── security/              // Keystore、加密工具
+│   │
+│   ├── data/
+│   │   ├── db/                    // Room：Entities, DAOs, Database
+│   │   │   ├── main/              // 主空间数据库
+│   │   │   └── vault/             // Vault 数据库（独立文件）
+│   │   ├── prefs/                 // DataStore 封装
+│   │   ├── repository/            // EventRepository, FolderRepository, VaultRepository
+│   │   └── model/                 // 领域模型（UI 用）
+│   │
+│   ├── domain/
+│   │   ├── model/                 // Event, Folder, Countdown
+│   │   └── usecase/               // CreateEvent, MoveToFolder, ToggleVault…
+│   │
+│   └── feature/
+│       ├── home/                  // 主页（列表）
+│       │   ├── HomeScreen.kt
+│       │   ├── HomeViewModel.kt
+│       │   └── components/        // EventRow, FolderRow, Fab
+│       ├── create/                // 新建/编辑 弹层
+│       ├── batch/                 // 批量管理
+│       ├── vault/                 // Vault 入口与内容
+│       │   ├── VaultLockScreen.kt
+│       │   ├── VaultScreen.kt
+│       │   └── VaultViewModel.kt
+│       ├── settings/
+│       └── about/
+│
+├── src/main/res/
+│   ├── values/ (colors, strings, themes)
+│   ├── drawable/ (启动图标、底部弹层背景)
+│   ├── font/ (Caveat.ttf, MaShanZheng.ttf)
+│   └── xml/ (backup_rules, data_extraction_rules)
+│
+└── src/test/ + src/androidTest/    // 单元 + UI 测试
+</code></pre>
+</section>
+
+<section id="data">
+  <h2><span class="idx">06</span>数据模型设计</h2>
+  <p class="lead">两个独立 Room 数据库文件：<code>daymate.db</code> 与 <code>vault.db</code>。</p>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>主空间（daymate.db）</h3>
+<pre><code>Event
+- id: Long (PK, auto)
+- title: String
+- targetDate: LocalDate  // 目标日期
+- repeatYearly: Boolean
+- note: String?
+- color: Int?            // ARGB
+- folderId: Long?        // 外键
+- sortIndex: Int
+- isPinned: Boolean
+- createdAt / updatedAt: Long
+
+Folder
+- id: Long (PK, auto)
+- name: String
+- icon: String?          // emoji
+- color: Int?
+- sortIndex: Int
+- isPinned: Boolean
+- createdAt / updatedAt: Long
+</code></pre>
+    </div>
+    <div class="card">
+      <h3>Vault（vault.db，文件级加密）</h3>
+<pre><code>VaultEvent
+- id, title, targetDate,
+  repeatYearly, note, color,
+  sortIndex, isPinned,
+  createdAt, updatedAt
+// 不引用 Folder，独立列表
+
+// 额外：VaultMeta（DataStore/SharedPreferences）
+- hashOfPassword: String  // PBKDF2 / Argon2
+- biometricEnabled: Boolean
+- failedAttempts: Int
+- lastUnlockAt: Long
+</code></pre>
+      <h4>关键约定</h4>
+      <ul>
+        <li>主空间的 <code>Event</code> 也有 <code>isHiddenInVault: Boolean</code> 字段？v1.0 不做"主空间同步到 Vault"；二者完全独立。</li>
+        <li>主空间通过 <code>DataStore</code> 存 Vault 是否启用、自动锁时长等开关。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="milestones">
+  <h2><span class="idx">07</span>里程碑与甘特图</h2>
+  <p class="lead">10–12 周完成 v1.0；M0–M6 共 7 个里程碑。蓝色为基础设施，橘色为发布相关。</p>
+
+  <div class="gantt">
+    <table class="gantt-table">
+      <colgroup>
+        <col style="width: 140px;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+        <col style="width: 11.4%;" />
+      </colgroup>
+      <tr>
+        <th></th>
+        <th>W1</th><th>W2</th><th>W3</th><th>W4</th><th>W5</th>
+        <th>W6</th><th>W7</th><th>W8</th><th>W9</th><th>W10</th>
+      </tr>
+      <tr>
+        <td class="gantt-row-label">M0 · 基础</td>
+        <td colspan="2"><div class="gantt-bar m0">工程脚手架、主题、字体</div></td>
+        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="gantt-row-label">M1 · 数据层</td>
+        <td></td>
+        <td colspan="2"><div class="gantt-bar m1">Room + Repository + Hilt</div></td>
+        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="gantt-row-label">M2 · 主页</td>
+        <td></td><td></td>
+        <td colspan="3"><div class="gantt-bar m2">列表 / + 弹层 / 排序 / 拖动</div></td>
+        <td></td><td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="gantt-row-label">M3 · 文件夹</td>
+        <td></td><td></td><td></td>
+        <td colspan="2"><div class="gantt-bar m3">文件夹 / 下钻 / 批量管理</div></td>
+        <td></td><td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="gantt-row-label">M4 · Vault</td>
+        <td></td><td></td><td></td><td></td><td></td>
+        <td colspan="3"><div class="gantt-bar m4">密码 / 生物识别 / 加密存储 / 退出</div></td>
+        <td></td><td></td>
+      </tr>
+      <tr>
+        <td class="gantt-row-label">M5 · 设置/关于</td>
+        <td></td><td></td><td></td><td></td><td></td><td></td>
+        <td colspan="2"><div class="gantt-bar m5">主题切换 / Vault 设置 / 关于页</div></td>
+        <td></td><td></td>
+      </tr>
+      <tr>
+        <td class="gantt-row-label">M6 · 测试/发布</td>
+        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        <td colspan="2"><div class="gantt-bar m6">UI 测试 / 性能 / 打包上架</div></td>
+        <td></td>
+      </tr>
+      <tr class="gantt-axis">
+        <td></td>
+        <td>W1</td><td>W2</td><td>W3</td><td>W4</td><td>W5</td>
+        <td>W6</td><td>W7</td><td>W8</td><td>W9</td><td>W10</th>
+      </tr>
+    </table>
+  </div>
+
+  <table style="margin-top:16px;">
+    <tr><th>里程碑</th><th>周期</th><th>交付物</th></tr>
+    <tr><td><b>M0 · 工程脚手架</b></td><td>W1–W2</td><td>Android 项目初始化、Gradle 配置、Compose 主题、字体引入、空壳页面、空状态 UI</td></tr>
+    <tr><td><b>M1 · 数据层</b></td><td>W2–W3</td><td>Room 实体/DAO/数据库、Repository、Hilt 注入、DataStore 偏好</td></tr>
+    <tr><td><b>M2 · 主页功能</b></td><td>W3–W5</td><td>列表、+ 弹层（事件/文件夹）、排序、拖动、编辑/删除</td></tr>
+    <tr><td><b>M3 · 文件夹 & 批量管理</b></td><td>W4–W5</td><td>文件夹下钻、面包屑、批量选择与移动</td></tr>
+    <tr><td><b>M4 · Vault（核心）</b></td><td>W6–W8</td><td>密码设置、BiometricPrompt、加密文件、Vault 数据库、自动锁、退出</td></tr>
+    <tr><td><b>M5 · 设置与关于</b></td><td>W7–W8</td><td>主题切换、Vault 超时、关于页、隐私政策占位</td></tr>
+    <tr><td><b>M6 · 测试 & 发布</b></td><td>W9–W10</td><td>UI 测试、覆盖率、性能优化、Release 构建、商店上架</td></tr>
+  </table>
+</section>
+
+<section id="tasks">
+  <h2><span class="idx">08</span>详细任务清单</h2>
+  <p class="lead">按里程碑拆到可执行的颗粒度。每条都是 0.5–3 天可完成的工作单元。</p>
+
+  <h3>M0 · 工程脚手架（W1–W2）</h3>
+  <ul class="checklist">
+    <li><b>T01</b>创建 Android Studio 项目（Kotlin + Compose，minSdk 26 / target 34，Java 17）</li>
+    <li><b>T02</b>配置 <code>libs.versions.toml</code>：Compose、Hilt、Room、Navigation、Biometric、Security-Crypto、DataStore</li>
+    <li><b>T03</b>启用 KSP，关闭 KAPT，配置 <code>buildFeatures { compose = true }</code></li>
+    <li><b>T04</b>定义主题：<code>DayMateTheme</code>（浅/深/跟随系统）+ 颜色 + 字体（手写体下载到 <code>res/font/</code>）</li>
+    <li><b>T05</b>主页 / Vault / 设置 / 关于 四个空 Compose Screen + Nav 图</li>
+    <li><b>T06</b>单 Activity：<code>MainActivity</code> 持有 <code>NavHost</code></li>
+    <li><b>T07</b>通用组件：<code>EmptyState</code>、<code>DayMateAppBar</code>、<code>PrimaryFab</code>、<code>ConfirmDialog</code></li>
+  </ul>
+
+  <h3>M1 · 数据层（W2–W3）</h3>
+  <ul class="checklist">
+    <li><b>T08</b>领域模型 <code>Event</code> / <code>Folder</code> / <code>VaultEvent</code>（纯 Kotlin data class）</li>
+    <li><b>T09</b>Room 实体 + DAO（Flow API，<code>observeAllSortedBy…</code>）</li>
+    <li><b>T10</b><code>DayMateDatabase</code>（主）+ <code>VaultDatabase</code>（独立）</li>
+    <li><b>T11</b><code>EventRepository</code> / <code>FolderRepository</code>：CRUD + 排序 + 移入文件夹</li>
+    <li><b>T12</b>Hilt Module：Database、DAO、Repository、DataStore</li>
+    <li><b>T13</b>DataStore 封装 <code>SettingsRepository</code>（主题、Vault 配置、超时）</li>
+  </ul>
+
+  <h3>M2 · 主页（W3–W5）</h3>
+  <ul class="checklist">
+    <li><b>T14</b><code>HomeViewModel</code>：StateFlow&lt;<code>HomeUiState</code>&gt;，按当前文件夹过滤</li>
+    <li><b>T15</b>渲染 <code>EventRow</code>：标题 + "还有 N 天 / 已过 N 天" + 颜色块</li>
+    <li><b>T16</b>日期工具 <code>CountdownCalculator</code>：处理跨年、每年重复、已过期</li>
+    <li><b>T17</b>底部弹层 <code>AddBottomSheet</code>：选"事件 / 文件夹"</li>
+    <li><b>T18</b>事件表单页：标题、DatePicker、重复、置顶、颜色、备注</li>
+    <li><b>T19</b>文件夹表单页：名称、emoji、颜色</li>
+    <li><b>T20</b>长按拖动排序（Reorderable LazyColumn）</li>
+    <li><b>T21</b>排序菜单：剩余升序 / 降序 / 手动 / 最近修改</li>
+    <li><b>T22</b>右上 ⋮ DropdownMenu（4 项），事件长按操作菜单</li>
+  </ul>
+
+  <h3>M3 · 文件夹 & 批量管理（W4–W5）</h3>
+  <ul class="checklist">
+    <li><b>T23</b>主页下钻：点击文件夹进入子页（复用 <code>HomeScreen</code> + folderId 参数）</li>
+    <li><b>T24</b>面包屑（顶栏左侧返回 + 文件夹名）</li>
+    <li><b>T25</b>管理模式：进入/退出，列表项左侧多选框，底部 ActionBar</li>
+    <li><b>T26</b>批量：全选 / 删除 / 移入文件夹（弹层选目标）/ 移入 Vault</li>
+    <li><b>T27</b>拖到文件夹（顶部"放置到…"区）</li>
+    <li><b>T28</b>文件夹编辑/删除（二次确认）</li>
+  </ul>
+
+  <h3>M4 · Vault（W6–W8，核心）</h3>
+  <ul class="checklist">
+    <li><b>T29</b>设计 Vault 数据库文件路径与加密策略（EncryptedFile + Keystore）</li>
+    <li><b>T30</b>首次进入 Vault：设置密码页（≥6 位，二次确认）</li>
+    <li><b>T31</b>密码哈希：PBKDF2WithHmacSHA256，迭代 ≥ 10w，盐放 Keystore-protected 区域</li>
+    <li><b>T32</b><code>VaultLockScreen</code>：密码输入 + "使用指纹/面容"按钮（若启用）</li>
+    <li><b>T33</b><code>BiometricPrompt</code> 集成（CryptoObject 绑定解锁密钥）</li>
+    <li><b>T34</b>解锁后加载 <code>VaultDatabase</code>，注入 <code>VaultRepository</code></li>
+    <li><b>T35</b><code>VaultScreen</code> 复用 <code>HomeScreen</code>，顶部 AppBar 显示"🔒 Vault" + 退出按钮</li>
+    <li><b>T36</b>退出：清空内存、置 FLAG_SECURE、跳回主页</li>
+    <li><b>T37</b>自动锁：观察 ProcessLifecycleOwner，<code>ON_STOP</code> 时根据超时设置标记锁定</li>
+    <li><b>T38</b>设置：修改密码、关闭生物识别、超时阈值、忘记密码（销毁重置 + 二选一确认）</li>
+    <li><b>T39</b>防截屏：<code>window.addFlags(FLAG_SECURE)</code>，仅在 Vault 页生效</li>
+    <li><b>T40</b>主空间中的"移入 Vault" = 复制到 VaultDatabase + 从主空间删除（事务）</li>
+  </ul>
+
+  <h3>M5 · 设置 & 关于（W7–W8）</h3>
+  <ul class="checklist">
+    <li><b>T41</b>设置页：主题跟随系统 / 浅 / 深；首日；默认排序</li>
+    <li><b>T42</b>Vault 设置子页：超时、生物识别开关、修改密码</li>
+    <li><b>T43</b>关于页：版本号、构建号、开源许可、反馈邮箱、隐私政策链接</li>
+    <li><b>T44</b>导出/导入（v1.0 仅本地 JSON 备份，可放 v1.1）</li>
+  </ul>
+
+  <h3>M6 · 测试 & 发布（W9–W10）</h3>
+  <ul class="checklist">
+    <li><b>T45</b>单元测试：<code>CountdownCalculator</code>、<code>EventRepository</code>、<code>SettingsRepository</code></li>
+    <li><b>T46</b>UI 测试：主页空态、+ 创建事件、Vault 锁定/解锁（Compose UI Test）</li>
+    <li><b>T47</b>真机回归矩阵：小米/华为/三星/OPPO，覆盖 Android 10–14</li>
+    <li><b>T48</b>性能：Baseline Profile，列表滚动 60fps，启动 ≤ 800ms</li>
+    <li><b>T49</b>无障碍：TalkBack、字号缩放、对比度（墨绿/纸张色已达 AA）</li>
+    <li><b>T50</b>Release 构建：签名、ProGuard/R8 规则、<code>shrinkResources</code>、分 ABI</li>
+    <li><b>T51</b>隐私政策、用户协议、App 图标、截图、商店描述</li>
+    <li><b>T52</b>上架：Google Play（可选）、小米/华为/Vivo/OPPO 国内商店（可选）</li>
+  </ul>
+</section>
+
+<section id="test">
+  <h2><span class="idx">09</span>测试策略</h2>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>单元测试（JUnit + Turbine + MockK）</h3>
+      <ul>
+        <li><code>CountdownCalculatorTest</code>：跨年、闰年、每年重复、时区。</li>
+        <li>Repository：CRUD、排序更新、移入文件夹的事务回滚。</li>
+        <li>密码哈希：相同输入相同输出；错误密码失败。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>UI 测试（Compose UI Test）</h3>
+      <ul>
+        <li>主页空态 → 创建事件 → 列表显示"还有 N 天"。</li>
+        <li>管理模式：全选 / 批量删除 / 移入文件夹。</li>
+        <li>Vault：设置密码 → 锁定 → 重新进入 → 错误密码失败 → 指纹解锁成功。</li>
+        <li>主题切换：跟随系统 / 浅 / 深 三种状态切换无残留。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>手动回归用例（每次发版必跑）</h3>
+      <ul>
+        <li>新建/编辑/删除事件 & 文件夹，文件/文件夹混合显示。</li>
+        <li>拖动排序：长按阈值、跨文件夹移动。</li>
+        <li>Vault 进出、退出后能否回不到 Vault 内容。</li>
+        <li>应用切换到后台 5 分钟后再回前台，Vault 应自动锁定。</li>
+        <li>卸载重装：主数据可走云备份（v1.x），Vault 销毁式丢失符合预期。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>覆盖率目标</h3>
+      <ul>
+        <li>关键领域（<code>CountdownCalculator</code>、<code>VaultCrypto</code>）：≥ 90%。</li>
+        <li>Repository 层：≥ 70%。</li>
+        <li>UI 层：核心路径 100% 覆盖（建/删/进 Vault）。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="release">
+  <h2><span class="idx">10</span>发布与维护</h2>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>发布检查清单</h3>
+      <ul class="checklist">
+        <li>应用图标（含前景/背景/单色）</li>
+        <li>启动屏 SplashScreen API</li>
+        <li>隐私政策 / 用户协议 URL（独立部署或 Gist）</li>
+        <li>权限最小化：v1.0 仅 <code>USE_BIOMETRIC</code></li>
+        <li>Backup Rules：禁用 Auto Backup（避免 Vault 数据被系统备份）</li>
+        <li>混淆规则：Hilt、Room、Compose、Biometric 全部 keep</li>
+        <li>崩溃监控（可选 Crashlytics）</li>
+        <li>商店文案（中英双语）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>版本路线图</h3>
+      <ul>
+        <li><b>v1.0</b> · 核心：主页 + 文件夹 + Vault + 设置/关于</li>
+        <li><b>v1.1</b> · 桌面小组件、通知提醒、农历</li>
+        <li><b>v1.2</b> · 本地 JSON 备份 / 恢复、暗色主题微调</li>
+        <li><b>v1.3</b> · 主题包（皮肤/字体）、多语言（英/日/简中/繁中）</li>
+        <li><b>v2.0</b> · 可选云同步（端到端加密）、平板自适应</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>关于备份：</b> 关闭 Android Auto Backup（<code>android:allowBackup="false"</code>），以避免 Vault 内容被云端备份泄漏。后续 v1.2 引入本地导出时，让用户主动选择保存路径（SAF）。
+  </div>
+</section>
+
+<section id="risks">
+  <h2><span class="idx">11</span>风险与开放问题</h2>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>已识别风险</h3>
+      <ul>
+        <li><b>Vault 忘记密码：</b>没有云端就无"找回"路径。→ 缓解：进入 Vault 时强烈提示用户牢记密码；提供"销毁重置"作为最后手段。</li>
+        <li><b>生物识别降级：</b>低端机或未开启指纹时需回退密码。→ 缓解：<code>BiometricManager.canAuthenticate()</code> 检查 + 总是保留密码路径。</li>
+        <li><b>截屏/录屏防护：</b><code>FLAG_SECURE</code> 在系统截图和"最近任务"缩略图有效，但第三方录屏无法完全防。→ 缓解：明确告知 + 文档说明。</li>
+        <li><b>日期与时区：</b>用户跨时区出行时"今天"会偏移。→ v1.0 默认使用设备时区；v1.1 增加"按事件绑定时区"选项。</li>
+        <li><b>列表性能：</b>条目过千时排序卡顿。→ 缓解：DAO 上加索引；分页加载（v1.x）。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>开放问题（建议与设计者确认）</h3>
+      <ol>
+        <li>Vault 是否支持"文件夹"？还是纯扁平列表？</li>
+        <li>每年重复事件："还有 3 天"是指距离下一次发生还是本年度？</li>
+        <li>已过事件是否计入"已过去"分组？保留多久（永久 / 30 天 / 90 天）？</li>
+        <li>Vault 与主空间是否允许互相"移入"？还是单向？</li>
+        <li>列表项颜色是否允许"全 Vault 主题色"统一处理，避免暴露？</li>
+        <li>应用名"DayMate"是否需要中英文版两套品牌字（手写体替换）？</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="callout warm">
+    <b>下一步建议：</b> 1) 在 Figma 中把手绘稿转成中保真线框（2–3 天）；2) 用本计划开 M0 任务；3) 同步确认"开放问题"，避免后期返工。
+  </div>
+</section>
+
+<footer>
+  DayMate · Android 开发计划 v0.1 · 由 WorkBuddy 协助生成 · 基于 2026-08-27 的 4 张手绘设计稿
+</footer>
+
+</div>
+</body>
+</html>
