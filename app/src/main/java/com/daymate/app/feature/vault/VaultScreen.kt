@@ -310,6 +310,18 @@ private fun VaultListScreen(
     VaultScaffold(
         title = "🔒 Vault",
         onExit = onExit,
+        selectionMode = selectionMode,
+        totalSelected = totalSelected,
+        onExitSelection = { exitSelection() },
+        hasEventsSelected = selectedEventIds.isNotEmpty(),
+        onMove = { showMoveDialog = true },
+        onDelete = { showDeleteConfirm = true },
+        menuItems = {
+            DropdownMenuItem(
+                text = { Text("批量管理") },
+                onClick = { enterSelection() }
+            )
+        },
         fab = {
             FloatingActionButton(onClick = { showAddSheet = true }) {
                 Icon(Icons.Default.Add, contentDescription = "新建")
@@ -470,16 +482,6 @@ private fun VaultListScreen(
             }
         )
     }
-
-    if (selectionMode) {
-        VaultSelectionBar(
-            totalSelected = totalSelected,
-            hasEventsSelected = selectedEventIds.isNotEmpty(),
-            onExit = { exitSelection() },
-            onMove = { showMoveDialog = true },
-            onDelete = { showDeleteConfirm = true }
-        )
-    }
 }
 
 @Composable
@@ -552,6 +554,31 @@ fun VaultFolderScreen(
     VaultScaffold(
         title = folder?.name ?: "文件夹",
         onExit = onBack,
+        selectionMode = selectionMode,
+        totalSelected = totalSelected,
+        onExitSelection = { exitSelection() },
+        hasEventsSelected = selectedEventIds.isNotEmpty(),
+        onMove = { showMoveDialog = true },
+        onDelete = { showDeleteConfirm = true },
+        menuItems = {
+            DropdownMenuItem(
+                text = { Text("批量管理") },
+                onClick = { enterSelection() }
+            )
+            DropdownMenuItem(
+                text = { Text("重命名") },
+                onClick = { showFolderDialog = true }
+            )
+            DropdownMenuItem(
+                text = { Text("删除文件夹") },
+                onClick = {
+                    scope.launch {
+                        folder?.let { container.vaultFolderRepository.delete(it) }
+                        onBack()
+                    }
+                }
+            )
+        },
         fab = {
             FloatingActionButton(onClick = {
                 editingEvent = null
@@ -664,18 +691,6 @@ fun VaultFolderScreen(
             },
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } }
         )
-    }
-
-    if (selectionMode) {
-        VaultSelectionBar(
-            totalSelected = totalSelected,
-            hasEventsSelected = selectedEventIds.isNotEmpty(),
-            onExit = { exitSelection() },
-            onMove = { showMoveDialog = true },
-            onDelete = { showDeleteConfirm = true }
-        )
-    } else {
-        Box {}
     }
 }
 
@@ -844,24 +859,74 @@ private fun VaultFolderRow(
 private fun VaultScaffold(
     title: String,
     onExit: () -> Unit,
+    selectionMode: Boolean = false,
+    totalSelected: Int = 0,
+    onExitSelection: (() -> Unit)? = null,
+    hasEventsSelected: Boolean = false,
+    onMove: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
     fab: @Composable (() -> Unit)? = null,
+    menuItems: @Composable ColumnScope.() -> Unit = {},
     content: @Composable () -> Unit
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出 Vault")
+            if (selectionMode) {
+                TopAppBar(
+                    title = { Text("已选 $totalSelected 项") },
+                    navigationIcon = {
+                        IconButton(onClick = { onExitSelection?.invoke() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "完成")
+                        }
+                    },
+                    actions = {
+                        if (hasEventsSelected && onMove != null) {
+                            TextButton(onClick = onMove) { Text("移入文件夹") }
+                        }
+                        if (onDelete != null) {
+                            TextButton(
+                                onClick = onDelete,
+                                enabled = totalSelected > 0
+                            ) { Text("删除") }
+                        }
                     }
-                },
-                actions = {
-                    TextButton(onClick = onExit) { Text("退出") }
-                }
-            )
+                )
+            } else {
+                TopAppBar(
+                    title = { Text(title) },
+                    navigationIcon = {
+                        IconButton(onClick = onExit) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出 Vault")
+                        }
+                    },
+                    actions = {
+                        var menuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "菜单")
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) { menuItems() }
+                        }
+                        TextButton(onClick = onExit) { Text("退出") }
+                    }
+                )
+            }
         },
-        floatingActionButton = { fab?.invoke() }
+        floatingActionButton = { fab?.invoke() },
+        bottomBar = {
+            if (selectionMode) {
+                VaultSelectionBar(
+                    totalSelected = totalSelected,
+                    hasEventsSelected = hasEventsSelected,
+                    onExit = { onExitSelection?.invoke() },
+                    onMove = { onMove?.invoke() },
+                    onDelete = { onDelete?.invoke() }
+                )
+            }
+        }
     ) { padding ->
         Column(
             modifier = Modifier
