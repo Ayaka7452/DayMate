@@ -28,7 +28,7 @@ abstract class DayMateDatabase : RoomDatabase() {
 
         fun build(context: Context): DayMateDatabase =
             Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
-                .addMigration(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
     }
