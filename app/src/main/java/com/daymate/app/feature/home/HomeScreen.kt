@@ -1,10 +1,11 @@
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
-package com.daymate.app.feature.home
+package com.ayaka7452.daymate.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,13 +57,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import com.daymate.app.Routes
-import com.daymate.app.core.AppContainer
-import com.daymate.app.core.util.CountdownCalculator
-import com.daymate.app.data.db.EventEntity
-import com.daymate.app.data.db.FolderEntity
-import com.daymate.app.feature.common.FolderDialog
-import com.daymate.app.feature.common.PickFolderDialog
+import com.ayaka7452.daymate.Routes
+import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.core.util.CountdownCalculator
+import com.ayaka7452.daymate.data.db.EventEntity
+import com.ayaka7452.daymate.data.db.FolderEntity
+import com.ayaka7452.daymate.feature.common.FolderDialog
+import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,6 +110,10 @@ fun HomeScreen(
         selectedEventIds.clear()
         selectedFolderIds.clear()
         selectionMode = false
+    }
+
+    BackHandler(enabled = selectionMode) {
+        exitSelection()
     }
 
     Scaffold(

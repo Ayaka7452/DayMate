@@ -1,7 +1,7 @@
-package com.daymate.app.data.repo
+package com.ayaka7452.daymate.data.repo
 
-import com.daymate.app.data.db.EventDao
-import com.daymate.app.data.db.EventEntity
+import com.ayaka7452.daymate.data.db.EventDao
+import com.ayaka7452.daymate.data.db.EventEntity
 import kotlinx.coroutines.flow.Flow
 
 class EventRepository(private val dao: EventDao) {

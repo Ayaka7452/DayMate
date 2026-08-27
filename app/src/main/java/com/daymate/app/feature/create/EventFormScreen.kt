@@ -1,4 +1,4 @@
-package com.daymate.app.feature.create
+package com.ayaka7452.daymate.feature.create
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -34,8 +34,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.daymate.app.core.AppContainer
-import com.daymate.app.data.db.EventEntity
+import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.data.db.EventEntity
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate

@@ -1,6 +1,6 @@
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
-package com.daymate.app.feature.vault
+package com.ayaka7452.daymate.feature.vault
 
 import android.content.pm.PackageManager
 import android.view.WindowManager
@@ -76,15 +76,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import com.daymate.app.core.AppContainer
-import com.daymate.app.core.security.VaultCrypto
-import com.daymate.app.core.util.CountdownCalculator
-import com.daymate.app.data.db.VaultEventEntity
-import com.daymate.app.data.db.VaultFolderEntity
-import com.daymate.app.feature.common.FolderDialog
-import com.daymate.app.feature.common.PickFolderDialog
-import com.daymate.app.feature.home.AddSheet
-import com.daymate.app.feature.home.SelectionDot
+import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.core.security.VaultCrypto
+import com.ayaka7452.daymate.core.util.CountdownCalculator
+import com.ayaka7452.daymate.data.db.VaultEventEntity
+import com.ayaka7452.daymate.data.db.VaultFolderEntity
+import com.ayaka7452.daymate.feature.common.FolderDialog
+import com.ayaka7452.daymate.feature.common.PickFolderDialog
+import com.ayaka7452.daymate.feature.home.AddSheet
+import com.ayaka7452.daymate.feature.home.SelectionDot
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate

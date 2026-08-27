@@ -1,5 +1,8 @@
-package com.daymate.app.feature.about
+package com.ayaka7452.daymate.feature.about
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,10 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import com.daymate.app.BuildConfig
+import com.ayaka7452.daymate.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +63,21 @@ fun AboutScreen(onBack: () -> Unit) {
             Text(
                 "一款轻量的倒数日应用，记录你的期待与坚持。",
                 style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "由 Ayaka7452 开发",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(8.dp))
+            val ctx = LocalContext.current
+            Text(
+                "GitHub · github.com/Ayaka7452",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Ayaka7452")))
+                }
             )
         }
     }

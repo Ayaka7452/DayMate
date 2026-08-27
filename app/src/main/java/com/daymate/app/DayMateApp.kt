@@ -1,8 +1,8 @@
-package com.daymate.app
+package com.ayaka7452.daymate
 
 import android.app.Application
 import android.util.Log
-import com.daymate.app.core.AppContainer
+import com.ayaka7452.daymate.core.AppContainer
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter

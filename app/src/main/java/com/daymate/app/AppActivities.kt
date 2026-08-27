@@ -1,4 +1,4 @@
-package com.daymate.app
+package com.ayaka7452.daymate
 
 import android.content.Context
 import android.content.Intent
@@ -14,15 +14,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
-import com.daymate.app.core.AppContainer
-import com.daymate.app.core.ui.theme.DayMateTheme
-import com.daymate.app.feature.about.AboutScreen
-import com.daymate.app.feature.create.EventFormScreen
-import com.daymate.app.feature.folder.FolderScreen
-import com.daymate.app.feature.home.HomeScreen
-import com.daymate.app.feature.settings.SettingsScreen
-import com.daymate.app.feature.vault.VaultFolderScreen
-import com.daymate.app.feature.vault.VaultScreen
+import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.core.ui.theme.DayMateTheme
+import com.ayaka7452.daymate.feature.about.AboutScreen
+import com.ayaka7452.daymate.feature.create.EventFormScreen
+import com.ayaka7452.daymate.feature.folder.FolderScreen
+import com.ayaka7452.daymate.feature.home.HomeScreen
+import com.ayaka7452.daymate.feature.settings.SettingsScreen
+import com.ayaka7452.daymate.feature.vault.VaultFolderScreen
+import com.ayaka7452.daymate.feature.vault.VaultScreen
 
 /**
  * 所有页面 Activity 的基类：统一

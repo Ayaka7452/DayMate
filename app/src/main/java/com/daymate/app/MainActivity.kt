@@ -1,7 +1,7 @@
-package com.daymate.app
+package com.ayaka7452.daymate
 
 import android.os.Bundle
-import com.daymate.app.feature.home.HomeScreen
+import com.ayaka7452.daymate.feature.home.HomeScreen
 
 /**
  * 启动 Activity（Launcher）。多 Activity 架构下仅承载主页，

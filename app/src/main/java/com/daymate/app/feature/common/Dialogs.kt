@@ -1,4 +1,4 @@
-package com.daymate.app.feature.common
+package com.ayaka7452.daymate.feature.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

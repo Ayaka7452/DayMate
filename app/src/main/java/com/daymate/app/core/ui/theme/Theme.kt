@@ -1,4 +1,4 @@
-package com.daymate.app.core.ui.theme
+package com.ayaka7452.daymate.core.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

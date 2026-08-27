@@ -1,4 +1,4 @@
-package com.daymate.app.core.util
+package com.ayaka7452.daymate.core.util
 
 import java.time.LocalDate
 

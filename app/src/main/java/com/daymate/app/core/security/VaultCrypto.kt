@@ -1,4 +1,4 @@
-package com.daymate.app.core.security
+package com.ayaka7452.daymate.core.security
 
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory

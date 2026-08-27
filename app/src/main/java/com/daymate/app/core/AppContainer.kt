@@ -1,15 +1,15 @@
-package com.daymate.app.core
+package com.ayaka7452.daymate.core
 
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
-import com.daymate.app.data.db.DayMateDatabase
-import com.daymate.app.data.db.VaultDatabase
-import com.daymate.app.data.repo.EventRepository
-import com.daymate.app.data.repo.FolderRepository
-import com.daymate.app.data.repo.SettingsRepository
-import com.daymate.app.data.repo.VaultFolderRepository
-import com.daymate.app.data.repo.VaultRepository
-import com.daymate.app.core.VaultBridge
+import com.ayaka7452.daymate.data.db.DayMateDatabase
+import com.ayaka7452.daymate.data.db.VaultDatabase
+import com.ayaka7452.daymate.data.repo.EventRepository
+import com.ayaka7452.daymate.data.repo.FolderRepository
+import com.ayaka7452.daymate.data.repo.SettingsRepository
+import com.ayaka7452.daymate.data.repo.VaultFolderRepository
+import com.ayaka7452.daymate.data.repo.VaultRepository
+import com.ayaka7452.daymate.core.VaultBridge
 
 private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 

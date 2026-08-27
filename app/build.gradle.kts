@@ -19,11 +19,11 @@ val propStorePath = keystoreProperties.getProperty("storeFile")
 val hasKeystore = !envStorePath.isNullOrBlank() || !propStorePath.isNullOrBlank()
 
 android {
-    namespace = "com.daymate.app"
+    namespace = "com.ayaka7452.daymate"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.daymate.app"
+        applicationId = "com.ayaka7452.daymate"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

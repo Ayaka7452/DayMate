@@ -1,7 +1,7 @@
-package com.daymate.app.data.repo
+package com.ayaka7452.daymate.data.repo
 
-import com.daymate.app.data.db.VaultFolderDao
-import com.daymate.app.data.db.VaultFolderEntity
+import com.ayaka7452.daymate.data.db.VaultFolderDao
+import com.ayaka7452.daymate.data.db.VaultFolderEntity
 import kotlinx.coroutines.flow.Flow
 
 class VaultFolderRepository(private val dao: VaultFolderDao) {

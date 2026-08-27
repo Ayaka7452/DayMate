@@ -1,4 +1,4 @@
-package com.daymate.app.data.repo
+package com.ayaka7452.daymate.data.repo
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences

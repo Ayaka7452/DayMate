@@ -1,4 +1,4 @@
-package com.daymate.app.feature.settings
+package com.ayaka7452.daymate.feature.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -29,7 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.daymate.app.core.AppContainer
+import com.ayaka7452.daymate.core.AppContainer
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -1,9 +1,9 @@
-package com.daymate.app.core
+package com.ayaka7452.daymate.core
 
-import com.daymate.app.data.db.EventEntity
-import com.daymate.app.data.db.VaultEventEntity
-import com.daymate.app.data.repo.EventRepository
-import com.daymate.app.data.repo.VaultRepository
+import com.ayaka7452.daymate.data.db.EventEntity
+import com.ayaka7452.daymate.data.db.VaultEventEntity
+import com.ayaka7452.daymate.data.repo.EventRepository
+import com.ayaka7452.daymate.data.repo.VaultRepository
 
 /**
  * 主空间事件 ↔ Vault 事件的跨库搬运。

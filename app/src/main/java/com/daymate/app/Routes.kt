@@ -1,4 +1,4 @@
-package com.daymate.app
+package com.ayaka7452.daymate
 
 /**
  * 路由常量。多 Activity 架构下仅作为 onNavigate(String) 的语义化字符串，

@@ -1,4 +1,4 @@
-package com.daymate.app.data.db
+package com.ayaka7452.daymate.data.db
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
