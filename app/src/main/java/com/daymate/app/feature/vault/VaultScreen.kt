@@ -237,7 +237,16 @@ private fun VaultUnlockScreen(
             onClick = {
                 val h = hash ?: return@Button
                 val s = salt ?: return@Button
-                if (VaultCrypto.hash(password, s) == h) {
+                if (password.isBlank()) {
+                    error = "请输入密码"
+                    return@Button
+                }
+                val ok = try {
+                    VaultCrypto.hash(password, s) == h
+                } catch (e: Exception) {
+                    false
+                }
+                if (ok) {
                     onUnlocked()
                 } else {
                     error = "密码错误"
