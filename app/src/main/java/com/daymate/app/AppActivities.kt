@@ -1,5 +1,6 @@
 package com.daymate.app
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -41,6 +42,12 @@ abstract class ComposeActivity : FragmentActivity() {
         enableEdgeToEdge()
     }
 
+    /** 返回时当前页向下飞出，与「系统设置」式转场一致 */
+    override fun finish() {
+        super.finish()
+        overridePendingTransition(R.anim.slide_in_down, R.anim.slide_out_down)
+    }
+
     fun setDayMateContent(content: @Composable () -> Unit) {
         val repo = container.settingsRepository
         setContent {
@@ -74,20 +81,20 @@ private fun DayMateChrome(themeMode: String, content: @Composable () -> Unit) {
  * Home 等页面仍用 onNavigate(String) 回调，由宿主 Activity 调用本函数。
  */
 fun Context.route(route: String) {
-    when {
+    val intent = when {
         route == "vault" ->
-            startActivity(Intent(this, VaultActivity::class.java))
+            Intent(this, VaultActivity::class.java)
         route == "settings" ->
-            startActivity(Intent(this, SettingsActivity::class.java))
+            Intent(this, SettingsActivity::class.java)
         route == "about" ->
-            startActivity(Intent(this, AboutActivity::class.java))
+            Intent(this, AboutActivity::class.java)
         route.startsWith("folder/") -> {
             val id = route.substringAfter("folder/").toLongOrNull() ?: 0L
-            startActivity(Intent(this, FolderActivity::class.java).apply { putExtra("folderId", id) })
+            Intent(this, FolderActivity::class.java).apply { putExtra("folderId", id) }
         }
         route.startsWith("vault_folder/") -> {
             val id = route.substringAfter("vault_folder/").toLongOrNull() ?: 0L
-            startActivity(Intent(this, VaultFolderActivity::class.java).apply { putExtra("folderId", id) })
+            Intent(this, VaultFolderActivity::class.java).apply { putExtra("folderId", id) }
         }
         route.startsWith("event_form") -> {
             val qs = route.substringAfter("?").split("&")
@@ -97,12 +104,16 @@ fun Context.route(route: String) {
                 if (p.startsWith("eventId=")) eventId = p.substringAfter("=").toLongOrNull()
                 if (p.startsWith("folderId=")) folderId = p.substringAfter("=").toLongOrNull()
             }
-            startActivity(Intent(this, EventFormActivity::class.java).apply {
+            Intent(this, EventFormActivity::class.java).apply {
                 eventId?.let { putExtra("eventId", it) }
                 folderId?.let { putExtra("folderId", it) }
-            })
+            }
         }
-    }
+        else -> null
+    } ?: return
+    startActivity(intent)
+    // 进入新页：向上飞入，旧页向上飞出；与系统设置一致
+    (this as? Activity)?.overridePendingTransition(R.anim.slide_in_up, R.anim.slide_out_up)
 }
 
 class EventFormActivity : ComposeActivity() {
