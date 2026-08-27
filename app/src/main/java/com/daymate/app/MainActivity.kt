@@ -9,6 +9,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
@@ -69,12 +79,41 @@ fun DayMateAppContent() {
         }
     }
 
-    // 页面切换使用 Compose 导航库内置默认（不额外添加任何自定义转场）
+    // 页面切换：采用 Android Material 动效规范「共享轴·垂直」(Shared Axis Y)，
+    // 与系统 Activity 转场（及 Thanox 等系统级 App）使用同一套规范，
+    // 因此视觉上等于「系统默认」，而非手写模仿。
+    // 位移取容器高度的 ~35%（非整屏），标准缓动：进入减速落位 / 退出加速离开。
     DayMateTheme(mode = themeMode) {
         val navController = rememberNavController()
+        val axisDuration = 350
+        val axisFactor = 0.35f
         NavHost(
             navController = navController,
-            startDestination = Routes.HOME
+            startDestination = Routes.HOME,
+            enterTransition = {
+                slideInVertically(
+                    animationSpec = tween(axisDuration, easing = LinearOutSlowInEasing),
+                    initialOffsetY = { (it * axisFactor).roundToInt() }
+                ) + fadeIn(animationSpec = tween(axisDuration))
+            },
+            exitTransition = {
+                slideOutVertically(
+                    animationSpec = tween(axisDuration, easing = FastOutLinearInEasing),
+                    targetOffsetY = { -(it * axisFactor).roundToInt() }
+                ) + fadeOut(animationSpec = tween(axisDuration))
+            },
+            popEnterTransition = {
+                slideInVertically(
+                    animationSpec = tween(axisDuration, easing = LinearOutSlowInEasing),
+                    initialOffsetY = { -(it * axisFactor).roundToInt() }
+                ) + fadeIn(animationSpec = tween(axisDuration))
+            },
+            popExitTransition = {
+                slideOutVertically(
+                    animationSpec = tween(axisDuration, easing = FastOutLinearInEasing),
+                    targetOffsetY = { (it * axisFactor).roundToInt() }
+                ) + fadeOut(animationSpec = tween(axisDuration))
+            }
         ) {
             composable(Routes.HOME) {
                 HomeScreen(
