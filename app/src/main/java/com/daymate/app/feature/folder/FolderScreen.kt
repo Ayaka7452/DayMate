@@ -200,6 +200,9 @@ fun FolderScreen(
                         onClick = {
                             if (selectionMode) toggleEvent(event.id)
                             else onNavigate("event_form?eventId=${event.id}")
+                        },
+                        onMoveToVault = {
+                            scope.launch { container.vaultBridge.moveEventToVault(event.id) }
                         }
                     )
                     Box(

@@ -372,11 +372,21 @@ fun EventRow(
             )
             Spacer(Modifier.width(10.dp))
         }
-        Text(
-            text = event.title,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = event.title,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            if (!event.note.isNullOrBlank()) {
+                Text(
+                    text = event.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+        }
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,

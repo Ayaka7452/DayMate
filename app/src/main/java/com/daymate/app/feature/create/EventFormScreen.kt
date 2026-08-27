@@ -51,6 +51,7 @@ fun EventFormScreen(
     onBack: () -> Unit
 ) {
     var title by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
     var epochDay by remember { mutableStateOf(LocalDate.now().plusDays(7).toEpochDay()) }
     var loaded by remember { mutableStateOf<EventEntity?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -61,6 +62,7 @@ fun EventFormScreen(
             container.eventRepository.getById(id)?.let { e ->
                 loaded = e
                 title = e.title
+                note = e.note ?: ""
                 epochDay = e.targetDateEpochDay
             }
         }
@@ -104,6 +106,18 @@ fun EventFormScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("简述（可选）") },
+                placeholder = { Text("补充说明，例如地点、注意事项") },
+                minLines = 2,
+                maxLines = 5,
+                modifier = Modifier.fillMaxWidth()
+            )
+
             Spacer(Modifier.height(16.dp))
 
             TextButton(onClick = { showDatePicker = true }) {
@@ -119,10 +133,12 @@ fun EventFormScreen(
             Button(
                 onClick = {
                     scope.launch {
+                        val noteValue = note.takeIf { it.isNotBlank() }
                         if (isEdit) {
                             container.eventRepository.update(
                                 loaded!!.copy(
                                     title = title.ifBlank { "未命名事件" },
+                                    note = noteValue,
                                     targetDateEpochDay = epochDay
                                 )
                             )
@@ -130,6 +146,7 @@ fun EventFormScreen(
                             container.eventRepository.add(
                                 EventEntity(
                                     title = title.ifBlank { "未命名事件" },
+                                    note = noteValue,
                                     targetDateEpochDay = epochDay,
                                     folderId = folderId
                                 )
