@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -53,7 +54,7 @@ fun DayMateAppContent() {
     val themeMode by app.container.settingsRepository.themeMode
         .collectAsState(initial = "system")
 
-    // 跟随主题模式（含手动 dark/light）同步状态栏图标对比度
+    // 跟随主题模式（含手动 dark/light）同步状态栏/导航栏图标对比度
     val activity = context as? ComponentActivity
     val darkTheme = when (themeMode) {
         "dark" -> true
@@ -61,7 +62,11 @@ fun DayMateAppContent() {
         else -> isSystemInDarkTheme()
     }
     LaunchedEffect(darkTheme) {
-        activity?.enableEdgeToEdge(darkTheme = darkTheme)
+        activity?.window?.let { win ->
+            val controller = WindowInsetsControllerCompat(win, win.decorView)
+            controller.isAppearanceLightStatusBars = !darkTheme
+            controller.isAppearanceLightNavigationBars = !darkTheme
+        }
     }
 
     DayMateTheme(mode = themeMode) {
