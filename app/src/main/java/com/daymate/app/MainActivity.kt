@@ -1,6 +1,7 @@
 package com.daymate.app
 
 import android.os.Bundle
+import com.daymate.app.feature.home.HomeScreen
 
 /**
  * 启动 Activity（Launcher）。多 Activity 架构下仅承载主页，
