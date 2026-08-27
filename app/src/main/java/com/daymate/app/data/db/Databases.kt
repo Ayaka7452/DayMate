@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
+import java.io.File
 
 @Database(
     entities = [EventEntity::class, FolderEntity::class],
@@ -26,11 +27,13 @@ abstract class DayMateDatabase : RoomDatabase() {
             }
         }
 
-        fun build(context: Context): DayMateDatabase =
-            Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
+        fun build(context: Context, file: File? = null): DayMateDatabase {
+            val builder = Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
                 .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
-                .build()
+            return if (file == null) builder.build()
+            else builder.createFromFile(file).build()
+        }
     }
 }
 
@@ -44,10 +47,12 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun vaultFolderDao(): VaultFolderDao
 
     companion object {
-        fun build(context: Context): VaultDatabase =
-            Room.databaseBuilder(context, VaultDatabase::class.java, "vault.db")
+        fun build(context: Context, file: File? = null): VaultDatabase {
+            val builder = Room.databaseBuilder(context, VaultDatabase::class.java, "vault.db")
                 // Alpha: 结构变更时直接重建（会清空 Vault 数据），正式版需替换为真实 Migration
                 .fallbackToDestructiveMigration()
-                .build()
+            return if (file == null) builder.build()
+            else builder.createFromFile(file).build()
+        }
     }
 }

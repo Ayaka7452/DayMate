@@ -8,7 +8,7 @@ import java.io.PrintWriter
 import java.io.StringWriter
 
 class DayMateApp : Application() {
-    lateinit var container: AppContainer
+    var container: AppContainer = AppContainer(this)
         private set
 
     override fun onCreate() {
@@ -16,6 +16,13 @@ class DayMateApp : Application() {
         container = AppContainer(this)
         installCrashHandler()
     }
+
+    /** 切换数据库存储位置后，关闭旧库并以新位置重建容器。 */
+    fun rebuildContainer() {
+        runCatching { container.close() }
+        container = AppContainer(this)
+    }
+}
 
     /** 兜底：任何未捕获异常都写入外部文件 + Logcat，方便定位闪退（无 keystore 也能用）。 */
     private fun installCrashHandler() {

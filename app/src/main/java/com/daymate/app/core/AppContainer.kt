@@ -2,6 +2,7 @@ package com.ayaka7452.daymate.core
 
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
+import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.data.db.DayMateDatabase
 import com.ayaka7452.daymate.data.db.VaultDatabase
 import com.ayaka7452.daymate.data.repo.EventRepository
@@ -17,8 +18,8 @@ private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
 
-    private val mainDb = DayMateDatabase.build(appContext)
-    private val vaultDb = VaultDatabase.build(appContext)
+    private val mainDb = DayMateDatabase.build(appContext, StorageConfig.mainDbFile(appContext))
+    private val vaultDb = VaultDatabase.build(appContext, StorageConfig.vaultDbFile(appContext))
 
     val settingsRepository = SettingsRepository(appContext.settingsDataStore)
     val eventRepository = EventRepository(mainDb.eventDao())
@@ -26,4 +27,10 @@ class AppContainer(context: Context) {
     val vaultRepository = VaultRepository(vaultDb.vaultEventDao())
     val vaultFolderRepository = VaultFolderRepository(vaultDb.vaultFolderDao())
     val vaultBridge = VaultBridge(eventRepository, vaultRepository)
+
+    /** 关闭底层数据库（切换存储位置时先关闭以保证 WAL 落盘，再迁移文件）。 */
+    fun close() {
+        runCatching { mainDb.close() }
+        runCatching { vaultDb.close() }
+    }
 }
