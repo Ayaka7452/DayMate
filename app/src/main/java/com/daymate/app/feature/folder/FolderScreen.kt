@@ -190,7 +190,7 @@ fun FolderScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 items(events, key = { it.id }) { event ->
                     EventRow(
@@ -201,6 +201,12 @@ fun FolderScreen(
                             if (selectionMode) toggleEvent(event.id)
                             else onNavigate("event_form?eventId=${event.id}")
                         }
+                    )
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     )
                 }
             }

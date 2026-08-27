@@ -400,6 +400,7 @@ private fun VaultListScreen(
                             dragHandle = if (!selectionMode) handleModifier else null
                         )
                     }
+                    ListItemDivider()
                 }
                 items(events, key = { it.id }) { event ->
                     VaultEventRow(
@@ -417,6 +418,7 @@ private fun VaultListScreen(
                             scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                         }
                     )
+                    ListItemDivider()
                 }
             }
         }
@@ -661,6 +663,7 @@ fun VaultFolderScreen(
                             scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                         }
                     )
+                    ListItemDivider()
                 }
             }
         }
@@ -842,7 +845,7 @@ private fun VaultEventRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
@@ -898,7 +901,7 @@ private fun VaultFolderRow(
                 onClick = onClick,
                 onLongClick = if (selectionMode) null else onLongClick
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
@@ -930,6 +933,16 @@ private fun VaultFolderRow(
             )
         }
     }
+}
+
+@Composable
+private fun ListItemDivider() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

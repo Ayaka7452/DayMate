@@ -200,7 +200,7 @@ fun HomeScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 items(folders, key = { it.id }) { folder ->
                     FolderRow(
@@ -218,6 +218,7 @@ fun HomeScreen(
                             }
                         }
                     )
+                    ListItemDivider()
                 }
                 items(events, key = { it.id }) { event ->
                     EventRow(
@@ -232,6 +233,7 @@ fun HomeScreen(
                             scope.launch { container.vaultBridge.moveEventToVault(event.id) }
                         }
                     )
+                    ListItemDivider()
                 }
             }
         }
@@ -355,7 +357,7 @@ fun EventRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
@@ -418,7 +420,7 @@ fun FolderRow(
                 onClick = onClick,
                 onLongClick = if (selectionMode) null else onLongClick
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
@@ -443,6 +445,16 @@ fun FolderRow(
             )
         }
     }
+}
+
+@Composable
+private fun ListItemDivider() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    )
 }
 
 @Composable
