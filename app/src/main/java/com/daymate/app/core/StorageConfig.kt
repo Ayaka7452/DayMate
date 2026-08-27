@@ -36,6 +36,9 @@ object StorageConfig {
     fun externalPath(ctx: Context): String? = prefs(ctx).getString(KEY_PATH, null)
     fun externalUri(ctx: Context): String? = prefs(ctx).getString(KEY_URI, null)
 
+    /** 是否已初始化（首次启动向导已完成文件夹选择）。以「外部路径是否已记录」判定。 */
+    fun isConfigured(ctx: Context): Boolean = externalPath(ctx) != null
+
     fun setExternal(ctx: Context, uri: String, path: String) {
         prefs(ctx).edit()
             .putString(KEY_MODE, EXTERNAL)
@@ -89,6 +92,21 @@ object StorageConfig {
             val dst = File(to.path + suffix)
             if (src.exists()) src.copyTo(dst, overwrite = true)
         }
+    }
+
+    /**
+     * 判断文件是否为合法的 SQLite 数据库（读取文件头 "SQLite format 3"）。
+     * 仅做轻量校验，真正的打开与校验交给 Room.createFromFile。
+     */
+    fun isReadableSqlite(file: File): Boolean {
+        if (!file.exists() || file.length() < 16) return false
+        return try {
+            file.inputStream().use { ins ->
+                val header = ByteArray(16)
+                if (ins.read(header) != 16) return false
+                String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
+            }
+        } catch (_: Throwable) { false }
     }
 
     /**
