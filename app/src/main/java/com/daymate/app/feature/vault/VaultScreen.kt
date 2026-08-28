@@ -597,6 +597,9 @@ private fun VaultListScreen(
         )
     }
 }
+
+@Composable
+private fun VaultSelectionBar(
     totalSelected: Int,
     hasEventsSelected: Boolean,
     onExit: () -> Unit,
