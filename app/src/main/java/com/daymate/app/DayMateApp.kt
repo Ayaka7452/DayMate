@@ -38,12 +38,12 @@ class DayMateApp : Application() {
         for (old in candidates.distinct()) {
             if (!old.exists()) continue
             runCatching {
-                val legacy = VaultDatabase.buildForMigration(this, old)
-                val events = legacy.vaultEventDao().getAll()
-                val folders = legacy.vaultFolderDao().getAll()
-                legacy.close()
-                if (events.isNotEmpty() || folders.isNotEmpty()) {
-                    runBlocking(Dispatchers.IO) {
+                runBlocking(Dispatchers.IO) {
+                    val legacy = VaultDatabase.buildForMigration(this@DayMateApp, old)
+                    val events = legacy.vaultEventDao().getAll()
+                    val folders = legacy.vaultFolderDao().getAll()
+                    legacy.close()
+                    if (events.isNotEmpty() || folders.isNotEmpty()) {
                         container.vaultRepository.addAll(events)
                         container.vaultFolderRepository.addAll(folders)
                     }
