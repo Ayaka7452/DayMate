@@ -109,19 +109,17 @@ fun StorageSetupBody(
         showConfirm = true
     }
 
-    val navigationIcon: (@Composable () -> Unit)? = if (showBack) {
-        {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-            }
-        }
-    } else null
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(title) },
-                navigationIcon = navigationIcon
+                navigationIcon = {
+                    if (showBack) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        }
+                    }
+                }
             )
         }
     ) { padding ->
