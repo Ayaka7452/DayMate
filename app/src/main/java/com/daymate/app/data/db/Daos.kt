@@ -106,6 +106,9 @@ interface VaultEventDao {
     @Query("SELECT * FROM vault_events WHERE id = :id")
     suspend fun getById(id: Long): VaultEventEntity?
 
+    @Query("SELECT * FROM vault_events")
+    suspend fun getAll(): List<VaultEventEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: VaultEventEntity): Long
 
@@ -117,6 +120,9 @@ interface VaultEventDao {
 
     @Query("DELETE FROM vault_events WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
+
+    @Query("DELETE FROM vault_events")
+    suspend fun clearAll()
 
     @Query("UPDATE vault_events SET folderId = :folderId WHERE id IN (:ids)")
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?)
@@ -131,6 +137,9 @@ interface VaultFolderDao {
     @Query("SELECT * FROM vault_folders WHERE id = :id")
     suspend fun getById(id: Long): VaultFolderEntity?
 
+    @Query("SELECT * FROM vault_folders")
+    suspend fun getAll(): List<VaultFolderEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(folder: VaultFolderEntity): Long
 
@@ -142,4 +151,7 @@ interface VaultFolderDao {
 
     @Query("DELETE FROM vault_folders WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
+
+    @Query("DELETE FROM vault_folders")
+    suspend fun clearAll()
 }

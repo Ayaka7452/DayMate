@@ -52,4 +52,13 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     suspend fun setVaultBiometric(enabled: Boolean) {
         dataStore.edit { it[VAULT_BIOMETRIC] = enabled }
     }
+
+    /** 清除 Vault 密码相关记录（重置密码时调用；Vault 数据本身由仓库清空）。 */
+    suspend fun clearVaultPassword() {
+        dataStore.edit {
+            it.remove(VAULT_PASSWORD_HASH)
+            it.remove(VAULT_SALT)
+            it.remove(VAULT_BIOMETRIC)
+        }
+    }
 }

@@ -61,11 +61,6 @@ object StorageConfig {
         return File(path, "daymate.db")
     }
 
-    fun vaultDbFile(ctx: Context): File? {
-        val path = externalPath(ctx) ?: return null
-        return File(path, "vault.db")
-    }
-
     /**
      * 把 SAF tree Uri 解析为真实文件系统目录路径。
      * 主存储（primary:）可可靠解析；其它可识别卷也会尝试 /storage/<volume>。

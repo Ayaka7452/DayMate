@@ -8,13 +8,20 @@ import androidx.room.migration.Migration
 import java.io.File
 
 @Database(
-    entities = [EventEntity::class, FolderEntity::class],
-    version = 2,
+    entities = [
+        EventEntity::class,
+        FolderEntity::class,
+        VaultEventEntity::class,
+        VaultFolderEntity::class
+    ],
+    version = 3,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
     abstract fun eventDao(): EventDao
     abstract fun folderDao(): FolderDao
+    abstract fun vaultEventDao(): VaultEventDao
+    abstract fun vaultFolderDao(): VaultFolderDao
 
     companion object {
         /** v1 -> v2：新增回收站软删除字段。 */
@@ -27,9 +34,47 @@ abstract class DayMateDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 -> v3：把 Vault 表并入主库（去掉独立 vault.db）。 */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE vault_folders (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        icon TEXT,
+                        color INTEGER,
+                        sortIndex INTEGER NOT NULL DEFAULT 0,
+                        isPinned INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE vault_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        title TEXT NOT NULL,
+                        targetDateEpochDay INTEGER NOT NULL,
+                        repeatYearly INTEGER NOT NULL DEFAULT 0,
+                        note TEXT,
+                        color INTEGER,
+                        folderId INTEGER,
+                        sortIndex INTEGER NOT NULL DEFAULT 0,
+                        isPinned INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        FOREIGN KEY(folderId) REFERENCES vault_folders(id) ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX index_vault_events_folderId ON vault_events(folderId)")
+            }
+        }
+
         fun build(context: Context, file: File? = null): DayMateDatabase {
             val builder = Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
             return if (file == null) builder.build()
             else builder.createFromFile(file).build()
@@ -37,6 +82,10 @@ abstract class DayMateDatabase : RoomDatabase() {
     }
 }
 
+/**
+ * 仅用于「旧版独立 vault.db」的一次性明文迁移读取（[com.ayaka7452.daymate.DayMateApp] 启动时）。
+ * 合并后正常运行不再使用本类；其 schema 必须与历史 vault.db 一致。
+ */
 @Database(
     entities = [VaultEventEntity::class, VaultFolderEntity::class],
     version = 2,
@@ -47,12 +96,11 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun vaultFolderDao(): VaultFolderDao
 
     companion object {
-        fun build(context: Context, file: File? = null): VaultDatabase {
-            val builder = Room.databaseBuilder(context, VaultDatabase::class.java, "vault.db")
-                // Alpha: 结构变更时直接重建（会清空 Vault 数据），正式版需替换为真实 Migration
+        fun buildForMigration(context: Context, file: File): VaultDatabase {
+            return Room.databaseBuilder(context, VaultDatabase::class.java, "vault_migration_tmp")
+                .createFromFile(file)
                 .fallbackToDestructiveMigration()
-            return if (file == null) builder.build()
-            else builder.createFromFile(file).build()
+                .build()
         }
     }
 }

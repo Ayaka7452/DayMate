@@ -78,6 +78,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.security.VaultCrypto
+import com.ayaka7452.daymate.core.security.VaultSession
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.VaultEventEntity
 import com.ayaka7452.daymate.data.db.VaultFolderEntity
@@ -101,15 +102,36 @@ fun VaultScreen(
         .collectAsState(initial = false)
     var unlocked by remember { mutableStateOf(false) }
 
+    // 退出 Vault 界面时不主动清空密钥：保留会话内解锁态，
+    // 以便从主页「移入 Vault」等操作能正确用密钥加密。仅重置密码时清空（见下方）。
+    val handleExit: () -> Unit = onExit
+
     when {
-        !passwordSet -> VaultSetupScreen(container, onExit)
-        !unlocked -> VaultUnlockScreen(container, onUnlocked = { unlocked = true }, onExit = onExit)
-        else -> VaultListScreen(container, onExit = onExit, onNavigate = onNavigate)
+        unlocked -> VaultListScreen(
+            container,
+            onExit = handleExit,
+            onReset = { unlocked = false },
+            onNavigate = onNavigate
+        )
+        !passwordSet -> VaultSetupScreen(
+            container,
+            onUnlocked = { unlocked = true },
+            onExit = handleExit
+        )
+        else -> VaultUnlockScreen(
+            container,
+            onUnlocked = { unlocked = true },
+            onExit = handleExit
+        )
     }
 }
 
 @Composable
-private fun VaultSetupScreen(container: AppContainer, onExit: () -> Unit) {
+private fun VaultSetupScreen(
+    container: AppContainer,
+    onUnlocked: () -> Unit,
+    onExit: () -> Unit
+) {
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var enableBiometric by remember { mutableStateOf(true) }
@@ -158,6 +180,8 @@ private fun VaultSetupScreen(container: AppContainer, onExit: () -> Unit) {
                             val hash = VaultCrypto.hash(password, salt)
                             container.settingsRepository.setVaultPassword(hash, salt)
                             container.settingsRepository.setVaultBiometric(enableBiometric)
+                            VaultSession.unlock(VaultCrypto.key(password, salt))
+                            onUnlocked()
                         }
                     }
                 }
@@ -247,6 +271,7 @@ private fun VaultUnlockScreen(
                     false
                 }
                 if (ok) {
+                    VaultSession.unlock(VaultCrypto.key(password, s))
                     onUnlocked()
                 } else {
                     error = "密码错误"
@@ -276,6 +301,7 @@ private fun VaultUnlockScreen(
 private fun VaultListScreen(
     container: AppContainer,
     onExit: () -> Unit,
+    onReset: () -> Unit = {},
     onNavigate: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -323,6 +349,7 @@ private fun VaultListScreen(
     val selectedFolderIds = remember { mutableStateListOf<Long>() }
     var showMoveDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
 
     val totalSelected = selectedEventIds.size + selectedFolderIds.size
 
@@ -360,6 +387,10 @@ private fun VaultListScreen(
             DropdownMenuItem(
                 text = { Text("批量管理") },
                 onClick = { enterSelection() }
+            )
+            DropdownMenuItem(
+                text = { Text("重置 Vault 密码") },
+                onClick = { showResetConfirm = true }
             )
         },
         fab = {
@@ -537,10 +568,35 @@ private fun VaultListScreen(
             }
         )
     }
-}
 
-@Composable
-private fun VaultSelectionBar(
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("重置 Vault 密码？") },
+            text = {
+                Text(
+                    "此操作会清空 Vault 内的全部数据（事件与文件夹），且无法找回。" +
+                        "重置完成后你需要重新设置 Vault 密码。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        container.vaultRepository.clearAll()
+                        container.vaultFolderRepository.clearAll()
+                        container.settingsRepository.clearVaultPassword()
+                        VaultSession.lock()
+                        onReset()
+                    }
+                    showResetConfirm = false
+                }) { Text("清空并重置") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+}
     totalSelected: Int,
     hasEventsSelected: Boolean,
     onExit: () -> Unit,
