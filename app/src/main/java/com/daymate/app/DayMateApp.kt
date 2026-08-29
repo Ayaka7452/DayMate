@@ -12,7 +12,9 @@ import java.io.PrintWriter
 import java.io.StringWriter
 
 class DayMateApp : Application() {
-    var container: AppContainer = AppContainer(this)
+    // 必须在 onCreate 里赋值：字段初始化器阶段 base context 尚未 attach，
+    // 此时 AppContainer(this) 访问 applicationContext 会 NPE。
+    lateinit var container: AppContainer
         private set
 
     override fun onCreate() {
