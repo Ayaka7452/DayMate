@@ -117,11 +117,33 @@ object StorageConfig {
         return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
     }
 
-    /** 打开系统「所有文件访问」授权页，直接定位到本应用。 */
-    fun allFilesAccessIntent(ctx: Context): Intent =
-        Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).apply {
-            data = Uri.parse("package:${ctx.packageName}")
+    /**
+     * 打开系统「所有文件访问」授权页，直接定位到本应用。
+     *
+     * 注意：包名必须取自 applicationContext.packageName（而非 LocalContext.current）。
+     * 在 AlertDialog 的按钮回调里，LocalContext.current 可能是被包装过的 Context，
+     * 其 packageName 偶发返回空串，导致 Intent.data 变成 "package:"（无包名），
+     * 系统找不到可处理的 Activity 而抛 ActivityNotFoundException 崩溃。
+     * applicationContext.packageName 永远非空，必要时回退到已知包名。
+     */
+    fun allFilesAccessIntent(ctx: Context): Intent {
+        val pkg = ctx.applicationContext.packageName.ifBlank { "com.ayaka7452.daymate" }
+        return Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).apply {
+            data = Uri.parse("package:$pkg")
         }
+    }
+
+    /**
+     * 降级方案：打开本应用详情设置页，供用户手动开启「所有文件访问」权限。
+     * 当系统未提供 MANAGE_ALL_FILES_ACCESS_PERMISSION 设置页（部分定制 ROM）时调用。
+     */
+    fun openAppDetails(ctx: Context) {
+        val pkg = ctx.applicationContext.packageName.ifBlank { "com.ayaka7452.daymate" }
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:$pkg")
+        }
+        ctx.startActivity(intent)
+    }
 
     /** 重启到主页面（数据位置切换后刷新全部界面与容器）。 */
     fun restartToHome(ctx: Context) {

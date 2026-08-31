@@ -1,5 +1,6 @@
 package com.ayaka7452.daymate.feature.setup
 
+import android.content.ActivityNotFoundException
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -169,7 +170,17 @@ fun StorageSetupBody(
                 confirmButton = {
                     TextButton(onClick = {
                         showPerm = false
-                        permLauncher.launch(StorageConfig.allFilesAccessIntent(ctx))
+                        val intent = StorageConfig.allFilesAccessIntent(ctx)
+                        try {
+                            if (intent.resolveActivity(ctx.packageManager) != null) {
+                                permLauncher.launch(intent)
+                            } else {
+                                StorageConfig.openAppDetails(ctx)
+                            }
+                        } catch (_: ActivityNotFoundException) {
+                            // 极少数 ROM 即便 resolveActivity 通过也会抛异常，降级到应用详情页
+                            StorageConfig.openAppDetails(ctx)
+                        }
                     }) { Text("去授权") }
                 },
                 dismissButton = {
