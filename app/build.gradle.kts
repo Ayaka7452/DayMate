@@ -100,6 +100,7 @@ dependencies {
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.kotlinx.datetime)
     implementation(libs.reorderable)
+    implementation(libs.androidx.documentfile)
 
     debugImplementation(libs.compose.ui.tooling)
 
