@@ -16,6 +16,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val VAULT_SALT = stringPreferencesKey("vault_salt")
         private val VAULT_BIOMETRIC = booleanPreferencesKey("vault_biometric_enabled")
         private val DEFAULT_SORT = stringPreferencesKey("default_sort")        // remaining_asc 等
+        private val AUTO_BACKUP = booleanPreferencesKey("auto_backup_enabled")  // 修改后自动备份，默认开启
     }
 
     val themeMode: Flow<String> = dataStore.data.map { it[THEME] ?: "system" }
@@ -33,6 +34,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         dataStore.data.map { it[VAULT_BIOMETRIC] ?: false }
 
     val defaultSort: Flow<String> = dataStore.data.map { it[DEFAULT_SORT] ?: "remaining_asc" }
+
+    /** 是否在每次数据库修改后自动备份到已配置的 SAF 备份文件夹（默认开启）。 */
+    val autoBackupEnabled: Flow<Boolean> = dataStore.data.map { it[AUTO_BACKUP] ?: true }
 
     suspend fun setThemeMode(mode: String) {
         dataStore.edit { it[THEME] = mode }
@@ -60,5 +64,10 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
             it.remove(VAULT_SALT)
             it.remove(VAULT_BIOMETRIC)
         }
+    }
+
+    /** 设置「修改后自动备份」开关。 */
+    suspend fun setAutoBackupEnabled(enabled: Boolean) {
+        dataStore.edit { it[AUTO_BACKUP] = enabled }
     }
 }

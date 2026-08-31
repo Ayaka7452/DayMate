@@ -19,10 +19,11 @@ class AppContainer(context: Context) {
     private val mainDb = DayMateDatabase.build(appContext)
 
     val settingsRepository = SettingsRepository(appContext.settingsDataStore)
-    val eventRepository = EventRepository(mainDb.eventDao())
-    val folderRepository = FolderRepository(mainDb.folderDao())
-    val vaultRepository = VaultRepository(mainDb.vaultEventDao())
-    val vaultFolderRepository = VaultFolderRepository(mainDb.vaultFolderDao())
+    val autoBackup = AutoBackupManager(appContext, mainDb, settingsRepository)
+    val eventRepository = EventRepository(mainDb.eventDao(), autoBackup::onDataChanged)
+    val folderRepository = FolderRepository(mainDb.folderDao(), autoBackup::onDataChanged)
+    val vaultRepository = VaultRepository(mainDb.vaultEventDao(), autoBackup::onDataChanged)
+    val vaultFolderRepository = VaultFolderRepository(mainDb.vaultFolderDao(), autoBackup::onDataChanged)
     val vaultBridge = VaultBridge(eventRepository, vaultRepository)
 
     /** 关闭底层数据库（切换存储位置时先关闭以保证 WAL 落盘，再迁移文件）。 */

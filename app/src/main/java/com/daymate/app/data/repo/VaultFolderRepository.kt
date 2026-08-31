@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.map
 /**
  * Vault 文件夹仓库。与 [VaultRepository] 同理：对外明文，DAO 层存密文（仅 name 加密）。
  */
-class VaultFolderRepository(private val dao: VaultFolderDao) {
+class VaultFolderRepository(
+    private val dao: VaultFolderDao,
+    private val onChanged: () -> Unit = {}
+) {
 
     private fun decrypt(f: VaultFolderEntity): VaultFolderEntity {
         val k = VaultSession.key ?: return f
@@ -26,18 +29,19 @@ class VaultFolderRepository(private val dao: VaultFolderDao) {
 
     suspend fun getById(id: Long): VaultFolderEntity? = dao.getById(id)?.let(::decrypt)
 
-    suspend fun add(folder: VaultFolderEntity): Long = dao.insert(encrypt(folder))
+    suspend fun add(folder: VaultFolderEntity): Long = dao.insert(encrypt(folder)).also { onChanged() }
 
     suspend fun addAll(folders: List<VaultFolderEntity>) {
         for (f in folders) dao.insert(encrypt(f))
+        onChanged()
     }
 
-    suspend fun update(folder: VaultFolderEntity) = dao.update(encrypt(folder))
+    suspend fun update(folder: VaultFolderEntity) = dao.update(encrypt(folder)).also { onChanged() }
 
-    suspend fun delete(folder: VaultFolderEntity) = dao.delete(folder)
+    suspend fun delete(folder: VaultFolderEntity) = dao.delete(folder).also { onChanged() }
 
-    suspend fun deleteByIds(ids: List<Long>) = dao.deleteByIds(ids)
+    suspend fun deleteByIds(ids: List<Long>) = dao.deleteByIds(ids).also { onChanged() }
 
     /** 清空整个 Vault 文件夹表（重置密码时调用）。 */
-    suspend fun clearAll() = dao.clearAll()
+    suspend fun clearAll() = dao.clearAll().also { onChanged() }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -21,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -52,6 +54,10 @@ fun SettingsScreen(
         .collectAsState(initial = "remaining_asc")
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
+
+    val autoBackup by container.settingsRepository.autoBackupEnabled
+        .collectAsState(initial = true)
+    val backupConfigured = StorageConfig.isBackupConfigured(ctx)
 
     // 数据备份：选择文件夹仅作 SAF 导出/导入目标，不需要任何存储权限（全屏覆盖）
     var showSetup by remember { mutableStateOf(false) }
@@ -177,6 +183,28 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(start = 8.dp, top = 2.dp)
             )
+
+            // 修改后自动备份：默认开启；未选择备份文件夹时禁用
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("修改后自动备份", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (backupConfigured) "每次修改数据后自动备份到所选文件夹" else "需先选择备份文件夹",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = autoBackup,
+                    enabled = backupConfigured,
+                    onCheckedChange = { scope.launch { container.settingsRepository.setAutoBackupEnabled(it) } }
+                )
+            }
 
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
