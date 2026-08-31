@@ -2,6 +2,7 @@ package com.ayaka7452.daymate.feature.setup
 
 import android.content.ActivityNotFoundException
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -171,8 +172,10 @@ fun StorageSetupBody(
                     TextButton(onClick = {
                         showPerm = false
                         val intent = StorageConfig.allFilesAccessIntent(ctx)
+                        val resolved = intent.resolveActivity(ctx.packageManager) != null
+                        Log.d("DayMateStorage", "去授权: resolveActivity=$resolved")
                         try {
-                            if (intent.resolveActivity(ctx.packageManager) != null) {
+                            if (resolved) {
                                 permLauncher.launch(intent)
                             } else {
                                 StorageConfig.openAppDetails(ctx)

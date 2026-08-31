@@ -8,6 +8,8 @@ import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.Settings
+import android.util.Log
+import com.ayaka7452.daymate.BuildConfig
 import java.io.File
 
 /**
@@ -120,14 +122,15 @@ object StorageConfig {
     /**
      * 打开系统「所有文件访问」授权页，直接定位到本应用。
      *
-     * 注意：包名必须取自 applicationContext.packageName（而非 LocalContext.current）。
+     * 包名使用编译期常量 BuildConfig.APPLICATION_ID（而非运行时 Context.packageName）。
      * 在 AlertDialog 的按钮回调里，LocalContext.current 可能是被包装过的 Context，
      * 其 packageName 偶发返回空串，导致 Intent.data 变成 "package:"（无包名），
      * 系统找不到可处理的 Activity 而抛 ActivityNotFoundException 崩溃。
-     * applicationContext.packageName 永远非空，必要时回退到已知包名。
+     * BuildConfig.APPLICATION_ID 是编译期常量，绝对非空且正确，彻底规避此问题。
      */
     fun allFilesAccessIntent(ctx: Context): Intent {
-        val pkg = ctx.applicationContext.packageName.ifBlank { "com.ayaka7452.daymate" }
+        val pkg = BuildConfig.APPLICATION_ID
+        Log.d("DayMateStorage", "allFilesAccessIntent pkg='$pkg'")
         return Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).apply {
             data = Uri.parse("package:$pkg")
         }
@@ -138,7 +141,8 @@ object StorageConfig {
      * 当系统未提供 MANAGE_ALL_FILES_ACCESS_PERMISSION 设置页（部分定制 ROM）时调用。
      */
     fun openAppDetails(ctx: Context) {
-        val pkg = ctx.applicationContext.packageName.ifBlank { "com.ayaka7452.daymate" }
+        val pkg = BuildConfig.APPLICATION_ID
+        Log.d("DayMateStorage", "openAppDetails pkg='$pkg'")
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.parse("package:$pkg")
         }
