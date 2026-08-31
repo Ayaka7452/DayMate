@@ -86,6 +86,7 @@ import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import com.ayaka7452.daymate.feature.home.AddSheet
 import com.ayaka7452.daymate.feature.home.SelectionDot
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -100,6 +101,10 @@ fun VaultScreen(
 ) {
     val passwordSet by container.settingsRepository.vaultPasswordSet
         .collectAsState(initial = false)
+    // 提升到 VaultScreen 级别的 scope：设密时 passwordSet 翻转会先把 setup 子组合移除，
+    // 若 setup 用自己的 rememberCoroutineScope 跑 onUnlocked()，协程会被取消，
+    // 导致 unlocked 永远置不上、用户设完密码还要再输一遍。用稳定 scope 避免此问题。
+    val scope = rememberCoroutineScope()
     var unlocked by remember { mutableStateOf(false) }
 
     // 退出 Vault 界面时不主动清空密钥：保留会话内解锁态，
@@ -115,6 +120,7 @@ fun VaultScreen(
         )
         !passwordSet -> VaultSetupScreen(
             container,
+            scope = scope,
             onUnlocked = { unlocked = true },
             onExit = handleExit
         )
@@ -129,6 +135,7 @@ fun VaultScreen(
 @Composable
 private fun VaultSetupScreen(
     container: AppContainer,
+    scope: CoroutineScope,
     onUnlocked: () -> Unit,
     onExit: () -> Unit
 ) {
@@ -136,7 +143,6 @@ private fun VaultSetupScreen(
     var confirm by remember { mutableStateOf("") }
     var enableBiometric by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
     VaultScaffold(title = "设置 Vault 密码", onExit = onExit) {
         Text(
