@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.Settings
-import android.util.Log
 import com.ayaka7452.daymate.BuildConfig
 import java.io.File
 
@@ -130,7 +129,6 @@ object StorageConfig {
      */
     fun allFilesAccessIntent(ctx: Context): Intent {
         val pkg = BuildConfig.APPLICATION_ID
-        Log.d("DayMateStorage", "allFilesAccessIntent pkg='$pkg'")
         return Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).apply {
             data = Uri.parse("package:$pkg")
         }
@@ -142,7 +140,6 @@ object StorageConfig {
      */
     fun openAppDetails(ctx: Context) {
         val pkg = BuildConfig.APPLICATION_ID
-        Log.d("DayMateStorage", "openAppDetails pkg='$pkg'")
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.parse("package:$pkg")
         }
