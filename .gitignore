@@ -19,6 +19,10 @@ Thumbs.db
 # Project local data
 .workbuddy/
 
+# Local toolchain downloads (JDK, system images, sdkmanager) — never commit
+.tools/
+.avd/
+
 # Local artifacts & debug helpers (APKs kept locally, never tracked)
 dist/
 

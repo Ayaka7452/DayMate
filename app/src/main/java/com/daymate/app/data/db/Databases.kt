@@ -73,11 +73,22 @@ abstract class DayMateDatabase : RoomDatabase() {
         }
 
         fun build(context: Context, file: File? = null): DayMateDatabase {
-            val builder = Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
+            // 关键修复：不要使用 createFromFile(file)。
+            // Room 2.6.x 的 createFromFile 只是“把已有文件复制到内部默认路径”，
+            // 源文件必须已存在，否则首次选择文件夹（外部还没有 daymate.db）会抛
+            // FileNotFoundException 导致进程崩溃；且它始终把 DB 建在内部存储，
+            // 并不真正落在用户所选目录。
+            //
+            // 这里改为：把外部文件的【绝对路径】直接作为 Room 的数据库名。
+            // Room 会把这个 name 透传给框架 SQLiteOpenHelper，而
+            // Context.getDatabasePath(绝对路径) 会原样返回该绝对路径，
+            // 于是数据库真正创建/打开在用户所选目录，数据真正落盘到外部存储。
+            val name = file?.absolutePath ?: "daymate.db"
+            file?.parentFile?.mkdirs()
+            return Room.databaseBuilder(context, DayMateDatabase::class.java, name)
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
-            return if (file == null) builder.build()
-            else builder.createFromFile(file).build()
+                .build()
         }
     }
 }

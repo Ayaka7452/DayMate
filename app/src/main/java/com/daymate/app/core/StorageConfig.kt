@@ -16,7 +16,8 @@ import java.io.File
  * 设计说明（合理性）：
  * - 内部存储 = 应用沙盒（默认，/data/data/.../databases），无需额外权限；
  * - 外部存储 = 用户通过 SAF 选择的目录，db 文件直接落在所选目录。
- *   现代 Android（作用域存储）下，Room 的 createFromFile 走原始文件 IO，
+ *   实现上把该目录下的 daymate.db 绝对路径作为 Room 的数据库名，
+ *   Room 会原样把数据库建在该绝对路径（真正的外部落盘）。
  *   直接访问共享存储路径必须持有 MANAGE_EXTERNAL_STORAGE（所有文件访问）权限，
  *   否则系统会拒绝。因此切换到外部存储前会引导用户授予该权限。
  * - 用 SharedPreferences（同步读取）保存位置，便于 Application.onCreate 时同步决定数据库路径。

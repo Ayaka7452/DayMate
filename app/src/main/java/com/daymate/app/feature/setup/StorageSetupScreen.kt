@@ -71,15 +71,23 @@ fun StorageSetupBody(
     var showError by remember { mutableStateOf(false) }
 
     fun apply(extPath: String, extUri: String) {
-        // 若目录已有「损坏/非 SQLite」的文件，先清掉，避免 Room.createFromFile 打开失败
+        val app = ctx.applicationContext as DayMateApp
         val dbFile = File(extPath, "daymate.db")
         val vaultFile = File(extPath, "vault.db")
+        // 先关闭当前容器，确保 WAL 已 checkpoint，避免复制到未提交的临时数据
+        app.container.close()
+        // 若目录已有「损坏/非 SQLite」的文件，先清掉，避免 Room 打开失败
         if (dbFile.exists() && !StorageConfig.isReadableSqlite(dbFile)) {
             dbFile.delete()
             vaultFile.delete()
         }
+        // 首次切换到外部存储：把已存在的内部数据库迁移过去，避免丢失现有倒数日/文件夹数据
+        if (!dbFile.exists()) {
+            val internalDb = ctx.getDatabasePath("daymate.db")
+            if (internalDb.exists()) StorageConfig.copyDatabase(internalDb, dbFile)
+        }
         StorageConfig.setExternal(ctx, extUri, extPath)
-        (ctx.applicationContext as DayMateApp).rebuildContainer()
+        app.rebuildContainer()
         StorageConfig.restartToHome(ctx)
     }
 
