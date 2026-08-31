@@ -56,7 +56,7 @@ object StorageBackup {
             // 覆盖前先删除旧文件，避免 SAF 自动重命名为 "daymate.db (1)"
             root.findFile(name)?.delete()
             val target = root.createFile("application/octet-stream", name) ?: continue
-            ctx.contentResolver.openInputStream(src)?.use { input ->
+            src.inputStream().use { input ->
                 ctx.contentResolver.openOutputStream(target.uri)?.use { output ->
                     input.copyTo(output)
                 }
