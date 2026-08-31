@@ -2,8 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    <!-- 外部存储数据库（用户自选目录）需要「所有文件访问」权限，以便 Room.createFromFile 直接读写共享存储路径 -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <application
         android:name=".DayMateApp"
@@ -53,11 +51,6 @@
             android:name=".SettingsActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity"
-            android:theme="@style/Theme.DayMate" />
-
-        <activity
-            android:name=".SetupWizardActivity"
-            android:exported="false"
             android:theme="@style/Theme.DayMate" />
 
         <activity

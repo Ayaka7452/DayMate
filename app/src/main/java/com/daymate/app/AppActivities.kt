@@ -20,7 +20,6 @@ import com.ayaka7452.daymate.feature.about.AboutScreen
 import com.ayaka7452.daymate.feature.create.EventFormScreen
 import com.ayaka7452.daymate.feature.recyclebin.RecycleBinScreen
 import com.ayaka7452.daymate.feature.folder.FolderScreen
-import com.ayaka7452.daymate.feature.setup.StorageSetupBody
 import com.ayaka7452.daymate.feature.home.HomeScreen
 import com.ayaka7452.daymate.feature.settings.SettingsScreen
 import com.ayaka7452.daymate.feature.vault.VaultFolderScreen
@@ -137,23 +136,6 @@ class SettingsActivity : ComposeActivity() {
                 container = container,
                 onBack = { finish() },
                 onOpenAbout = { startActivity(Intent(this@SettingsActivity, AboutActivity::class.java)) }
-            )
-        }
-    }
-}
-
-class SetupWizardActivity : ComposeActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setDayMateContent {
-            StorageSetupBody(
-                title = "DayMate 初始化",
-                intro = "欢迎使用 DayMate。请选择一个文件夹用于存放你的倒数日数据库。\n\n" +
-                    "该文件夹下的 daymate.db / vault.db 即为你的数据文件：\n" +
-                    "• 若文件夹中已有合法的 DayMate 数据库，将直接读取其中数据；\n" +
-                    "• 若没有，将为你创建一份全新的数据库。\n\n" +
-                    "建议选择一个你方便备份的位置（例如内部存储根目录下的 DayMate 文件夹）。",
-                showBack = false
             )
         }
     }

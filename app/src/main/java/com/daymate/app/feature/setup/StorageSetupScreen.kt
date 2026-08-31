@@ -1,13 +1,9 @@
 package com.ayaka7452.daymate.feature.setup
 
-import android.content.ActivityNotFoundException
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -30,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,83 +33,87 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.DayMateApp
+import com.ayaka7452.daymate.core.StorageBackup
 import com.ayaka7452.daymate.core.StorageConfig
-import java.io.File
 
 /**
- * 通用「选择外部存储数据库目录」流程。
+ * 「数据备份」配置界面（路线 A：主库在内部沙盒，用户所选文件夹仅作 SAF 导出/导入备份，
+ * 全程不申请任何存储权限）。
  *
- * 行为（与用户需求一致）：
- *  - 启动前若缺少「所有文件访问」权限，先引导授权；
- *  - 通过 SAF 选择目录后，解析真实路径；
- *  - 若目录中已有合法的 daymate.db（SQLite 文件头校验通过）则直接读取其中数据；
- *  - 若没有（或文件损坏）则创建一份全新的数据库；
- *  - 完成后持久化位置、重建容器并重启回主页。
+ * 行为：
+ *  - 「选择备份文件夹」：用 SAF 选目录，持久化 URI 权限后自动导出当前数据；
+ *  - 「立即备份」：把内部主库复制到所选文件夹；
+ *  - 「从备份恢复」：把所选文件夹的 daymate.db 复制回内部主库（重建容器）；
+ *  - 「清除备份文件夹」：仅清除配置（不删除外部文件）。
+ *
+ * 导出/导入会先 close 容器触发 WAL 落盘，再复制文件，最后 rebuild 容器刷新界面。
  *
  * @param title       顶栏标题
- * @param intro      说明文案
  * @param showBack   是否显示返回按钮（设置页内嵌时显示）
- * @param onBack     返回按钮回调（设置页内嵌时关闭设置页的「更改目录」视图）
+ * @param onBack     返回按钮回调
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StorageSetupBody(
     title: String,
-    intro: String,
     showBack: Boolean = false,
     onBack: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
+    val app = ctx.applicationContext as DayMateApp
 
-    var showPerm by remember { mutableStateOf(false) }
-    var showConfirm by remember { mutableStateOf(false) }
-    var showError by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
 
-    fun apply(extPath: String, extUri: String) {
-        val app = ctx.applicationContext as DayMateApp
-        val dbFile = File(extPath, "daymate.db")
-        val vaultFile = File(extPath, "vault.db")
-        // 先关闭当前容器，确保 WAL 已 checkpoint，避免复制到未提交的临时数据
-        app.container.close()
-        // 若目录已有「损坏/非 SQLite」的文件，先清掉，避免 Room 打开失败
-        if (dbFile.exists() && !StorageConfig.isReadableSqlite(dbFile)) {
-            dbFile.delete()
-            vaultFile.delete()
-        }
-        // 首次切换到外部存储：把已存在的内部数据库迁移过去，避免丢失现有倒数日/文件夹数据
-        if (!dbFile.exists()) {
-            val internalDb = ctx.getDatabasePath("daymate.db")
-            if (internalDb.exists()) StorageConfig.copyDatabase(internalDb, dbFile)
-        }
-        StorageConfig.setExternal(ctx, extUri, extPath)
-        app.rebuildContainer()
-        StorageConfig.restartToHome(ctx)
+    val internalDb = remember { app.getDatabasePath("daymate.db") }
+
+    /** 先关闭容器（触发 WAL checkpoint 落盘），执行 block，再重建容器刷新界面。 */
+    fun withClosedDb(block: () -> Unit) {
+        runCatching { app.container.close() }
+        runCatching(block)
+        runCatching { app.rebuildContainer() }
     }
 
     val treeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val path = StorageConfig.treeUriToPath(uri)
-        if (path == null) {
-            showError = true
-            return@rememberLauncherForActivityResult
-        }
-        apply(path, uri.toString())
+        StorageConfig.setBackupFolder(ctx, uri)
+        busy = true
+        runCatching {
+            withClosedDb { StorageBackup.exportInternal(ctx, internalDb) }
+        }.onSuccess { status = "已设置备份文件夹，并导出当前数据到该位置。" }
+            .onFailure { status = "导出失败：${it.message}" }
+        busy = false
     }
 
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { _ ->
-        if (StorageConfig.hasAllFilesAccess()) showConfirm = true
+    fun backupNow() {
+        if (!StorageConfig.isBackupConfigured(ctx)) { status = "请先选择备份文件夹。"; return }
+        busy = true
+        runCatching {
+            withClosedDb { StorageBackup.exportInternal(ctx, internalDb) }
+        }.onSuccess { status = "已备份到所选文件夹。" }
+            .onFailure { status = "备份失败：${it.message}" }
+        busy = false
     }
 
-    fun onPick() {
-        if (!StorageConfig.hasAllFilesAccess()) {
-            showPerm = true
+    fun restore() {
+        if (!StorageConfig.isBackupConfigured(ctx)) { status = "请先选择备份文件夹。"; return }
+        if (!StorageBackup.isBackupReadable(ctx)) {
+            status = "所选文件夹中没有可用的 DayMate 数据库（daymate.db）。"
             return
         }
-        showConfirm = true
+        busy = true
+        runCatching {
+            withClosedDb { StorageBackup.importExternal(ctx, internalDb) }
+        }.onSuccess { status = "已从备份恢复。" }
+            .onFailure { status = "恢复失败：${it.message}" }
+        busy = false
+    }
+
+    fun clear() {
+        StorageConfig.clearBackupFolder(ctx)
+        status = "已清除备份文件夹设置（外部文件未删除）。"
     }
 
     Scaffold(
@@ -137,95 +135,56 @@ fun StorageSetupBody(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            Text(intro, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "DayMate 的主数据库保存在应用内部（安全、且不需要任何存储权限）。" +
+                    "你可以选择一个文件夹，把数据导出备份到这里，或随时从备份恢复。",
+                style = MaterialTheme.typography.bodyLarge
+            )
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { onPick() }, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = { treeLauncher.launch(null) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy
+            ) {
                 Icon(Icons.Filled.Folder, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("选择文件夹")
+                Text("选择备份文件夹")
             }
-            val cur = StorageConfig.externalPath(ctx)
-            if (cur != null) {
-                Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { backupNow() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy
+            ) { Text("立即备份") }
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { restore() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !busy
+            ) { Text("从备份恢复") }
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = { clear() },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("清除备份文件夹") }
+
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "当前备份位置：${StorageConfig.displayPath(StorageConfig.backupUri(ctx))}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+            if (status != null) {
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    "当前数据库位置：$cur",
+                    status!!,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
-        }
-
-        if (showPerm) {
-            AlertDialog(
-                onDismissRequest = { showPerm = false },
-                title = { Text("需要授权") },
-                text = {
-                    Text(
-                        "DayMate 需要「所有文件访问」权限，才能把数据库直接写入你选择的文件夹。" +
-                            "请在接下来的系统页面中为 DayMate 开启该权限。"
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showPerm = false
-                        val intent = StorageConfig.allFilesAccessIntent(ctx)
-                        try {
-                            if (intent.resolveActivity(ctx.packageManager) != null) {
-                                permLauncher.launch(intent)
-                            } else {
-                                StorageConfig.openAppDetails(ctx)
-                            }
-                        } catch (_: ActivityNotFoundException) {
-                            // 极少数 ROM 即便 resolveActivity 通过也会抛异常，降级到应用详情页
-                            StorageConfig.openAppDetails(ctx)
-                        }
-                    }) { Text("去授权") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showPerm = false }) { Text("取消") }
-                }
-            )
-        }
-
-        if (showConfirm) {
-            AlertDialog(
-                onDismissRequest = { showConfirm = false },
-                title = { Text("使用此文件夹？") },
-                text = {
-                    Text(
-                        "将把数据库存放到该文件夹（daymate.db / vault.db）。" +
-                            "若该文件夹已有合法的 DayMate 数据库，将直接读取其中数据；" +
-                            "否则将创建一份全新的数据库。"
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showConfirm = false
-                        treeLauncher.launch(null)
-                    }) { Text("选择此文件夹") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showConfirm = false }) { Text("取消") }
-                }
-            )
-        }
-
-        if (showError) {
-            AlertDialog(
-                onDismissRequest = { showError = false },
-                title = { Text("无法使用该文件夹") },
-                text = {
-                    Text(
-                        "未能解析你选择的文件夹路径，请换一个位置" +
-                            "（例如内部存储根目录下的某个文件夹）重试。"
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = { showError = false }) { Text("知道了") }
-                }
-            )
         }
     }
 }

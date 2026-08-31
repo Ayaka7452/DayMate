@@ -3,7 +3,6 @@ package com.ayaka7452.daymate
 import android.app.Application
 import android.util.Log
 import com.ayaka7452.daymate.core.AppContainer
-import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.data.db.VaultDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -31,11 +30,12 @@ class DayMateApp : Application() {
      * 若旧文件损坏或读取失败，直接删除，避免脏数据。
      */
     private fun migrateLegacyVault() {
+        // 旧版独立 vault.db 只可能残留在内部沙盒（主库所在目录）；路线 A 下主库恒为内部，
+        // 不再有外部 vault.db 概念，故仅检查内部路径。
         val candidates = mutableListOf<File>()
         runCatching {
             getDatabasePath("daymate.db").parentFile?.let { candidates.add(File(it, "vault.db")) }
         }
-        StorageConfig.mainDbFile(this)?.parentFile?.let { candidates.add(File(it, "vault.db")) }
 
         for (old in candidates.distinct()) {
             if (!old.exists()) continue

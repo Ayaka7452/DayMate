@@ -53,14 +53,11 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
 
-    // 更改数据库目录：复用与首次启动相同的「选择外部文件夹」流程（全屏覆盖）
+    // 数据备份：选择文件夹仅作 SAF 导出/导入目标，不需要任何存储权限（全屏覆盖）
     var showSetup by remember { mutableStateOf(false) }
     if (showSetup) {
         StorageSetupBody(
-            title = "更改数据库目录",
-            intro = "当前数据库位于外部存储的你选择的文件夹。点击下方按钮可更换文件夹：\n\n" +
-                "• 若新文件夹已有合法的 DayMate 数据库，将直接读取其中数据；\n" +
-                "• 若没有，将创建一份全新的数据库（原文件夹中的数据不会自动迁移）。",
+            title = "数据备份",
             showBack = true,
             onBack = { showSetup = false }
         )
@@ -151,14 +148,14 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
-            // ===== 数据库存储位置（仅外部存储） =====
+            // ===== 数据备份（主库在内部，所选文件夹仅作备份目标） =====
             Text(
-                "数据库存储位置",
+                "数据备份",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "数据库位于外部存储的你选择的文件夹（daymate.db / vault.db）。",
+                "主数据库保存在应用内部，安全且无需任何存储权限。可选择一个文件夹用于导出/恢复备份。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
@@ -172,10 +169,10 @@ fun SettingsScreen(
             ) {
                 Icon(Icons.Filled.Folder, contentDescription = null)
                 Spacer(Modifier.width(12.dp))
-                Text("更改数据库目录", style = MaterialTheme.typography.bodyLarge)
+                Text("数据备份", style = MaterialTheme.typography.bodyLarge)
             }
             Text(
-                "当前路径：${StorageConfig.externalPath(ctx) ?: "未设置"}",
+                "当前备份位置：${StorageConfig.displayPath(StorageConfig.backupUri(ctx))}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(start = 8.dp, top = 2.dp)

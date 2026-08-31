@@ -2,7 +2,6 @@ package com.ayaka7452.daymate.core
 
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
-import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.data.db.DayMateDatabase
 import com.ayaka7452.daymate.data.repo.EventRepository
 import com.ayaka7452.daymate.data.repo.FolderRepository
@@ -17,7 +16,7 @@ private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
 
-    private val mainDb = DayMateDatabase.build(appContext, StorageConfig.mainDbFile(appContext))
+    private val mainDb = DayMateDatabase.build(appContext)
 
     val settingsRepository = SettingsRepository(appContext.settingsDataStore)
     val eventRepository = EventRepository(mainDb.eventDao())
