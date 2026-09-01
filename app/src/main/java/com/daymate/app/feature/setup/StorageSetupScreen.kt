@@ -32,7 +32,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -74,7 +76,12 @@ fun StorageSetupBody(
     var conflictUri by remember { mutableStateOf<Uri?>(null) }
     // 「从备份恢复」二次确认
     var showRestoreConfirm by remember { mutableStateOf(false) }
+    // 用当前应用数据覆盖备份前的二次确认（非空表示待确认的目标目录）
+    var overwriteTarget by remember { mutableStateOf<Uri?>(null) }
+    // 备份有数据而当前应用为空：禁止用空数据覆盖备份，弹出警告后仅允许关闭
+    var overwriteBlocked by remember { mutableStateOf(false) }
 
+    val scope = rememberCoroutineScope()
     val internalDb = remember { app.getDatabasePath("daymate.db") }
 
     /** 先关闭容器（触发 WAL checkpoint 落盘），执行 block，再重建容器刷新界面。 */
@@ -122,6 +129,26 @@ fun StorageSetupBody(
         busy = false
     }
 
+    /** 把当前内部主库导出（覆盖）到指定备份文件夹；alsoConfigure 为 true 时一并设为备份文件夹。 */
+    fun doExport(targetUri: Uri, alsoConfigure: Boolean) {
+        busy = true
+        if (alsoConfigure) StorageConfig.setBackupFolder(ctx, targetUri)
+        runCatching {
+            withClosedDb { StorageBackup.exportInternal(ctx, internalDb, targetUri) }
+        }.onSuccess { status = "已备份到所选文件夹。" }
+            .onFailure { status = "备份失败：${it.message}" }
+        busy = false
+    }
+
+    /**
+     * 计算「当前应用数据行数」（倒数日 + 文件夹 + Vault），用于在覆盖备份前判断应用是否为空。
+     * 通过仍在线的 Room 容器读取，结果权威。
+     */
+    suspend fun countAppDataRows(): Int =
+        app.container.eventRepository.countAll() +
+            app.container.folderRepository.countAll() +
+            app.container.vaultRepository.countAll()
+
     val treeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -136,12 +163,21 @@ fun StorageSetupBody(
 
     fun backupNow() {
         if (!StorageConfig.isBackupConfigured(ctx)) { status = "请先选择备份文件夹。"; return }
-        busy = true
-        runCatching {
-            withClosedDb { StorageBackup.exportInternal(ctx, internalDb) }
-        }.onSuccess { status = "已备份到所选文件夹。" }
-            .onFailure { status = "备份失败：${it.message}" }
-        busy = false
+        val backupUri = StorageConfig.backupUri(ctx) ?: return
+        // 该文件夹尚无任何备份：直接导出当前数据作为初始备份（无数据可丢失，无需提示）
+        if (!StorageBackup.exists(ctx)) {
+            doExport(backupUri, alsoConfigure = false)
+            return
+        }
+        // 已有备份：覆盖前先探测。若备份有数据而当前应用为空，禁止用空数据覆盖（会永久丢失备份）
+        scope.launch {
+            val backupRows = StorageBackup.probeBackupDataRows(ctx, backupUri)
+            if (backupRows > 0 && countAppDataRows() == 0) {
+                overwriteBlocked = true
+                return@launch
+            }
+            overwriteTarget = backupUri
+        }
     }
 
     fun restore() {
@@ -273,7 +309,15 @@ fun StorageSetupBody(
                         TextButton(onClick = {
                             val u = conflictUri ?: return@TextButton
                             conflictUri = null
-                            commitFolder(u)
+                            // 覆盖备份前先探测：备份有数据而当前应用为空时禁止操作
+                            scope.launch {
+                                val backupRows = StorageBackup.probeBackupDataRows(ctx, u)
+                                if (backupRows > 0 && countAppDataRows() == 0) {
+                                    overwriteBlocked = true
+                                    return@launch
+                                }
+                                doExport(u, alsoConfigure = true)
+                            }
                         }) { Text(if (canRestore) "覆盖备份" else "用当前数据覆盖") }
                     }
                 },
@@ -302,6 +346,45 @@ fun StorageSetupBody(
                 },
                 dismissButton = {
                     TextButton(onClick = { showRestoreConfirm = false }) { Text("取消") }
+                }
+            )
+        }
+
+        // ===== 用应用数据覆盖备份前的确认 =====
+        if (overwriteTarget != null) {
+            AlertDialog(
+                onDismissRequest = { overwriteTarget = null },
+                title = { Text("覆盖备份？") },
+                text = {
+                    Text("将用当前应用数据覆盖所选文件夹中的备份（替换其中的 daymate.db）。原有备份会被替换，此操作不可撤销。确定继续？")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val u = overwriteTarget ?: return@TextButton
+                        overwriteTarget = null
+                        doExport(u, alsoConfigure = false)
+                    }) { Text("继续") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { overwriteTarget = null }) { Text("取消") }
+                }
+            )
+        }
+
+        // ===== 备份有数据而当前应用为空：禁止用空数据覆盖，弹出警告 =====
+        if (overwriteBlocked) {
+            AlertDialog(
+                onDismissRequest = { overwriteBlocked = false },
+                title = { Text("操作已阻止") },
+                text = {
+                    Text(
+                        "所选备份中含有数据，但当前应用内没有任何数据（倒数日、文件夹与 Vault 均为空）。" +
+                            "若继续，会用空数据覆盖备份，导致备份数据永久丢失。出于安全考虑，已禁止该操作。\n\n" +
+                            "如需取回备份数据，请改用「从备份恢复」；若确实要用当前（空）数据备份，请先在当前应用中创建一些内容。"
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { overwriteBlocked = false }) { Text("我知道了") }
                 }
             )
         }

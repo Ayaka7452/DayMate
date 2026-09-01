@@ -58,6 +58,9 @@ interface EventDao {
 
     @Query("SELECT MAX(sortIndex) FROM events")
     suspend fun maxSortIndex(): Int?
+
+    @Query("SELECT COUNT(*) FROM events")
+    suspend fun countAll(): Int
 }
 
 @Dao
@@ -89,6 +92,9 @@ interface FolderDao {
 
     @Query("DELETE FROM folders WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
+
+    @Query("SELECT COUNT(*) FROM folders")
+    suspend fun countAll(): Int
 }
 
 @Dao
@@ -126,6 +132,9 @@ interface VaultEventDao {
 
     @Query("UPDATE vault_events SET folderId = :folderId WHERE id IN (:ids)")
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?)
+
+    @Query("SELECT COUNT(*) FROM vault_events")
+    suspend fun countAll(): Int
 }
 
 @Dao

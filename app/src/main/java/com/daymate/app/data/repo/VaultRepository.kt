@@ -57,5 +57,7 @@ class VaultRepository(
     /** 清空整个 Vault 事件表（重置密码时调用）。 */
     suspend fun clearAll() = dao.clearAll().also { onChanged() }
 
+    suspend fun countAll(): Int = dao.countAll()
+
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?) = dao.moveToFolder(ids, folderId).also { onChanged() }
 }

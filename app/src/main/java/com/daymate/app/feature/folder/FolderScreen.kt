@@ -302,15 +302,16 @@ fun FolderScreen(
             text = { Text("将把选中的 $totalSelected 项移入回收站，可在「回收站」中恢复或彻底删除。") },
             confirmButton = {
                 TextButton(onClick = {
+                    val ids = selectedEventIds.toList()
                     scope.launch {
-                        if (selectedEventIds.isNotEmpty())
+                        if (ids.isNotEmpty())
                             container.eventRepository.softDeleteByIds(
-                                selectedEventIds.toList(),
+                                ids,
                                 System.currentTimeMillis()
                             )
+                        showDeleteConfirm = false
+                        exitSelection()
                     }
-                    showDeleteConfirm = false
-                    exitSelection()
                 }) { Text("移入回收站") }
             },
             dismissButton = {

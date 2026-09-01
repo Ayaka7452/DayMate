@@ -362,17 +362,19 @@ fun HomeScreen(
             text = { Text("将把 $totalSelected 项移入回收站，可在「回收站」中恢复或彻底删除（清空后不可恢复）。") },
             confirmButton = {
                 TextButton(onClick = {
+                    val eventIds = selectedEventIds.toList()
+                    val folderIds = selectedFolderIds.toList()
                     scope.launch {
                         val ts = System.currentTimeMillis()
-                        if (selectedEventIds.isNotEmpty())
-                            container.eventRepository.softDeleteByIds(selectedEventIds.toList(), ts)
-                        if (selectedFolderIds.isNotEmpty()) {
-                            container.eventRepository.softDeleteByFolders(selectedFolderIds.toList(), ts)
-                            container.folderRepository.softDeleteByIds(selectedFolderIds.toList(), ts)
+                        if (eventIds.isNotEmpty())
+                            container.eventRepository.softDeleteByIds(eventIds, ts)
+                        if (folderIds.isNotEmpty()) {
+                            container.eventRepository.softDeleteByFolders(folderIds, ts)
+                            container.folderRepository.softDeleteByIds(folderIds, ts)
                         }
+                        showDeleteConfirm = false
+                        exitSelection()
                     }
-                    showDeleteConfirm = false
-                    exitSelection()
                 }) { Text("移入回收站") }
             },
             dismissButton = {

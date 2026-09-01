@@ -26,4 +26,6 @@ class FolderRepository(
     suspend fun softDeleteByIds(ids: List<Long>, ts: Long) = dao.softDeleteByIds(ids, ts).also { onChanged() }
 
     suspend fun restoreByIds(ids: List<Long>) = dao.restoreByIds(ids).also { onChanged() }
+
+    suspend fun countAll(): Int = dao.countAll()
 }

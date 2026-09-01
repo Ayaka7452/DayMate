@@ -27,6 +27,8 @@ class EventRepository(
 
     suspend fun deleteByIds(ids: List<Long>) = dao.deleteByIds(ids).also { onChanged() }
 
+    suspend fun countAll(): Int = dao.countAll()
+
     suspend fun softDeleteByIds(ids: List<Long>, ts: Long) = dao.softDeleteByIds(ids, ts).also { onChanged() }
 
     suspend fun restoreByIds(ids: List<Long>) = dao.restoreByIds(ids).also { onChanged() }

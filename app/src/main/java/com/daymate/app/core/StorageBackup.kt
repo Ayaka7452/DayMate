@@ -1,6 +1,7 @@
 package com.ayaka7452.daymate.core
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.ayaka7452.daymate.core.StorageConfig
@@ -122,5 +123,54 @@ object StorageBackup {
             }
         }
         return true
+    }
+
+    /**
+     * 统计一个 SQLite 数据库文件中的用户数据行数（events + folders + vault_events + vault_folders）。
+     * 以只读方式打开，逐表计数（缺表按 0 计），用于判断数据库是否为空（避免用空库覆盖有数据的备份）。
+     */
+    fun countDataRows(dbFile: File): Int {
+        if (!dbFile.exists()) return 0
+        return try {
+            SQLiteDatabase.openDatabase(dbFile.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                listOf("events", "folders", "vault_events", "vault_folders").sumOf { tbl ->
+                    runCatching {
+                        db.compileStatement("SELECT COUNT(*) FROM $tbl").simpleQueryForLong().toInt()
+                    }.getOrDefault(0)
+                }
+            }
+        } catch (_: Throwable) { 0 }
+    }
+
+    /**
+     * 探测备份文件夹中 daymate.db 的数据行数：先把备份（含 -wal / -shm 附属文件）复制到缓存临时文件
+     * 再只读计数（避免直接打开 SAF Content Uri）。计数完成后删除临时文件。备份不存在时返回 0。
+     */
+    fun probeBackupDataRows(ctx: Context, treeUri: Uri?): Int {
+        val uri = treeUri ?: return 0
+        val root = DocumentFile.fromTreeUri(ctx, uri) ?: return 0
+        val src = root.findFile(DB_NAME) ?: return 0
+        val tmp = File(ctx.cacheDir, "daymate_probe.db")
+        val tmpWal = File(ctx.cacheDir, "daymate_probe.db-wal")
+        val tmpShm = File(ctx.cacheDir, "daymate_probe.db-shm")
+        listOf(tmp, tmpWal, tmpShm).forEach { it.delete() }
+        return try {
+            ctx.contentResolver.openInputStream(src.uri)?.use { ins ->
+                tmp.outputStream().use { ins.copyTo(it) }
+            }
+            for (suffix in listOf("-wal", "-shm")) {
+                root.findFile(DB_NAME + suffix)?.let { ext ->
+                    ctx.contentResolver.openInputStream(ext.uri)?.use { ins ->
+                        File(ctx.cacheDir, "daymate_probe.db$suffix").outputStream().use { ins.copyTo(it) }
+                    }
+                }
+            }
+            countDataRows(tmp).also {
+                tmp.delete(); tmpWal.delete(); tmpShm.delete()
+            }
+        } catch (_: Throwable) {
+            tmp.delete(); tmpWal.delete(); tmpShm.delete()
+            0
+        }
     }
 }
