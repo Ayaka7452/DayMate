@@ -72,10 +72,12 @@ fun HomeScreen(
     container: AppContainer,
     onNavigate: (String) -> Unit
 ) {
-    val events by container.eventRepository.observeRoot()
-        .collectAsState(initial = emptyList())
-    val folders by container.folderRepository.observeAll()
-        .collectAsState(initial = emptyList())
+    // 用 remember 固定 Flow 实例，避免每次重组都新建 Flow 导致 collectAsState 底层的
+    // LaunchedEffect 反复取消/重建观察者，从而在从其它 Activity 返回时漏掉 Room 的变更通知。
+    val eventsFlow = remember { container.eventRepository.observeRoot() }
+    val events by eventsFlow.collectAsState(initial = emptyList())
+    val foldersFlow = remember { container.folderRepository.observeAll() }
+    val folders by foldersFlow.collectAsState(initial = emptyList())
     val vaultSet by container.settingsRepository.vaultPasswordSet
         .collectAsState(initial = false)
 

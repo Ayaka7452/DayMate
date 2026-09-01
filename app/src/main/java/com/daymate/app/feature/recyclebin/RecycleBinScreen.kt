@@ -45,10 +45,10 @@ fun RecycleBinScreen(
     container: AppContainer,
     onBack: () -> Unit
 ) {
-    val binEvents by container.eventRepository.observeBin()
-        .collectAsState(initial = emptyList())
-    val binFolders by container.folderRepository.observeBin()
-        .collectAsState(initial = emptyList())
+    val binEventsFlow = remember { container.eventRepository.observeBin() }
+    val binEvents by binEventsFlow.collectAsState(initial = emptyList())
+    val binFoldersFlow = remember { container.folderRepository.observeBin() }
+    val binFolders by binFoldersFlow.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     var confirmTarget by remember { mutableStateOf<BinTarget?>(null) }

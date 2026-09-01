@@ -70,10 +70,11 @@ fun FolderScreen(
     var folder by remember { mutableStateOf<FolderEntity?>(null) }
     LaunchedEffect(folderId) { folder = container.folderRepository.getById(folderId) }
 
-    val events by container.eventRepository.observeByFolder(folderId)
-        .collectAsState(initial = emptyList())
-    val allFolders by container.folderRepository.observeAll()
-        .collectAsState(initial = emptyList())
+    // 用 remember 固定 Flow 实例，避免每次重组重建 collectAsState 观察者导致返回时漏掉变更
+    val eventsFlow = remember(folderId) { container.eventRepository.observeByFolder(folderId) }
+    val events by eventsFlow.collectAsState(initial = emptyList())
+    val allFoldersFlow = remember { container.folderRepository.observeAll() }
+    val allFolders by allFoldersFlow.collectAsState(initial = emptyList())
     val vaultSet by container.settingsRepository.vaultPasswordSet
         .collectAsState(initial = false)
 

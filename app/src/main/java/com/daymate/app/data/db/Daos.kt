@@ -59,7 +59,7 @@ interface EventDao {
     @Query("SELECT MAX(sortIndex) FROM events")
     suspend fun maxSortIndex(): Int?
 
-    @Query("SELECT COUNT(*) FROM events")
+    @Query("SELECT COUNT(*) FROM events WHERE isDeleted = 0")
     suspend fun countAll(): Int
 }
 
@@ -93,7 +93,7 @@ interface FolderDao {
     @Query("DELETE FROM folders WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
 
-    @Query("SELECT COUNT(*) FROM folders")
+    @Query("SELECT COUNT(*) FROM folders WHERE isDeleted = 0")
     suspend fun countAll(): Int
 }
 

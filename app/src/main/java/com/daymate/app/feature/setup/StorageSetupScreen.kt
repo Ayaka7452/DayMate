@@ -149,6 +149,18 @@ fun StorageSetupBody(
             app.container.folderRepository.countAll() +
             app.container.vaultRepository.countAll()
 
+    /**
+     * 判断是否应阻止「用当前应用数据覆盖备份」：
+     * 仅当「应用为空 且 目标文件夹中已有备份 且 备份非空（或探测失败无法确定）」时返回 true。
+     * 采用保守策略——探测失败时一律视为有数据，避免用空数据静默覆盖好备份。
+     */
+    private suspend fun shouldBlockOverwrite(backupUri: Uri): Boolean {
+        if (countAppDataRows() != 0) return false
+        if (!StorageBackup.exists(ctx)) return false
+        val backupRows = runCatching { StorageBackup.probeBackupDataRows(ctx, backupUri) }.getOrDefault(-1)
+        return backupRows != 0
+    }
+
     val treeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -169,10 +181,9 @@ fun StorageSetupBody(
             doExport(backupUri, alsoConfigure = false)
             return
         }
-        // 已有备份：覆盖前先探测。若备份有数据而当前应用为空，禁止用空数据覆盖（会永久丢失备份）
+        // 已有备份：覆盖前先探测。应用为空且备份非空（或不确定）时禁止用空数据覆盖
         scope.launch {
-            val backupRows = StorageBackup.probeBackupDataRows(ctx, backupUri)
-            if (backupRows > 0 && countAppDataRows() == 0) {
+            if (shouldBlockOverwrite(backupUri)) {
                 overwriteBlocked = true
                 return@launch
             }
@@ -309,10 +320,9 @@ fun StorageSetupBody(
                         TextButton(onClick = {
                             val u = conflictUri ?: return@TextButton
                             conflictUri = null
-                            // 覆盖备份前先探测：备份有数据而当前应用为空时禁止操作
+                            // 覆盖备份前先探测：备份有数据（或不确定）而当前应用为空时禁止用空数据覆盖
                             scope.launch {
-                                val backupRows = StorageBackup.probeBackupDataRows(ctx, u)
-                                if (backupRows > 0 && countAppDataRows() == 0) {
+                                if (shouldBlockOverwrite(u)) {
                                     overwriteBlocked = true
                                     return@launch
                                 }

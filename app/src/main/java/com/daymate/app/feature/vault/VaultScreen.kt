@@ -312,10 +312,10 @@ private fun VaultListScreen(
 ) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
-    val events by container.vaultRepository.observeRoot()
-        .collectAsState(initial = emptyList())
-    val folders by container.vaultFolderRepository.observeAll()
-        .collectAsState(initial = emptyList())
+    val eventsFlow = remember { container.vaultRepository.observeRoot() }
+    val events by eventsFlow.collectAsState(initial = emptyList())
+    val foldersFlow = remember { container.vaultFolderRepository.observeAll() }
+    val folders by foldersFlow.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     var isDragging by remember { mutableStateOf(false) }
@@ -640,10 +640,10 @@ fun VaultFolderScreen(
     var folder by remember { mutableStateOf<VaultFolderEntity?>(null) }
     LaunchedEffect(folderId) { folder = container.vaultFolderRepository.getById(folderId) }
 
-    val events by container.vaultRepository.observeByFolder(folderId)
-        .collectAsState(initial = emptyList())
-    val allFolders by container.vaultFolderRepository.observeAll()
-        .collectAsState(initial = emptyList())
+    val eventsFlow = remember(folderId) { container.vaultRepository.observeByFolder(folderId) }
+    val events by eventsFlow.collectAsState(initial = emptyList())
+    val allFoldersFlow = remember { container.vaultFolderRepository.observeAll() }
+    val allFolders by allFoldersFlow.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     var showEventDialog by remember { mutableStateOf(false) }

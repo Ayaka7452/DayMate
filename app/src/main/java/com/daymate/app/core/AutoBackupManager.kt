@@ -59,11 +59,14 @@ class AutoBackupManager(
         if (!internalDb.exists()) return
         val backupUri = StorageConfig.backupUri(context) ?: return
 
-        // 安全护栏：当前应用为空、而备份已有数据时，禁止用空数据覆盖备份（避免静默丢失备份）
+        // 安全护栏：当前应用为空、而备份已有数据时，禁止用空数据覆盖备份（避免静默丢失备份）。
+        // 采用保守策略——探测失败（无法确定）也视为有数据并跳过，杜绝空数据静默覆盖好备份。
         val appRows =
             db.eventDao().countAll() + db.folderDao().countAll() + db.vaultEventDao().countAll()
         if (appRows == 0 && StorageBackup.exists(context)) {
-            if (StorageBackup.probeBackupDataRows(context, backupUri) > 0) return
+            val backupRows =
+                runCatching { StorageBackup.probeBackupDataRows(context, backupUri) }.getOrDefault(-1)
+            if (backupRows != 0) return
         }
 
         // 合并 WAL 进主文件，使复制出的 daymate.db 包含全部已提交数据
