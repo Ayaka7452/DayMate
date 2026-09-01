@@ -81,18 +81,6 @@ fun StorageSetupBody(
         runCatching { app.rebuildContainer() }
     }
 
-    val treeLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        // 先取得对该目录的持久化权限，才能探查其中是否已有备份
-        StorageConfig.takeBackupPermission(ctx, uri)
-        when (StorageBackup.previewBackup(ctx, uri)) {
-            StorageBackup.BackupPreview.None -> commitFolder(uri)   // 无冲突：直接保存并导出当前数据作为初始备份
-            else -> conflictUri = uri                               // 已有备份：交给冲突确认框裁决
-        }
-    }
-
     /** 保存文件夹，并把当前内部数据库导出为该文件夹的备份（覆盖其中的旧备份）。 */
     fun commitFolder(uri: Uri) {
         busy = true
@@ -114,6 +102,18 @@ fun StorageSetupBody(
             status = "已从所选备份恢复数据，并设为备份文件夹。"
         }.onFailure { status = "恢复失败：${it.message}" }
         busy = false
+    }
+
+    val treeLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        // 先取得对该目录的持久化权限，才能探查其中是否已有备份
+        StorageConfig.takeBackupPermission(ctx, uri)
+        when (StorageBackup.previewBackup(ctx, uri)) {
+            StorageBackup.BackupPreview.None -> commitFolder(uri)   // 无冲突：直接保存并导出当前数据作为初始备份
+            else -> conflictUri = uri                               // 已有备份：交给冲突确认框裁决
+        }
     }
 
     fun backupNow() {
