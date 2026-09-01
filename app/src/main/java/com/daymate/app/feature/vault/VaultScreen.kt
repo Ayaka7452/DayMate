@@ -421,8 +421,8 @@ private fun VaultListScreen(
             }
         } else {
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                items(folderList, key = { it.id }) { folder ->
-                    ReorderableItem(reorderableState, key = folder.id) {
+                items(folderList, key = { "f${it.id}" }) { folder ->
+                    ReorderableItem(reorderableState, key = "f${folder.id}") {
                         val handleModifier = Modifier.draggableHandle(
                             onDragStarted = { isDragging = true },
                             onDragStopped = {
@@ -449,7 +449,7 @@ private fun VaultListScreen(
                     }
                     ListItemDivider()
                 }
-                items(events, key = { it.id }) { event ->
+                items(events, key = { "e${it.id}" }) { event ->
                     VaultEventRow(
                         event = event,
                         selectionMode = selectionMode,

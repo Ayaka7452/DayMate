@@ -227,7 +227,7 @@ fun HomeScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                items(folders, key = { it.id }) { folder ->
+                items(folders, key = { "f${it.id}" }) { folder ->
                     FolderRow(
                         folder = folder,
                         selectionMode = selectionMode,
@@ -252,7 +252,7 @@ fun HomeScreen(
                     )
                     ListItemDivider()
                 }
-                items(events, key = { it.id }) { event ->
+                items(events, key = { "e${it.id}" }) { event ->
                     EventRow(
                         event = event,
                         selectionMode = selectionMode,
