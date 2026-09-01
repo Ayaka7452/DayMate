@@ -43,6 +43,13 @@ abstract class ComposeActivity : FragmentActivity() {
         enableEdgeToEdge()
     }
 
+    override fun onPause() {
+        super.onPause()
+        // 页面切到后台或被其它 Activity 盖住时，立即把待防抖的自动备份落盘，
+        // 避免用户创建数据后直接清应用数据 / 强杀进程导致备份丢失。
+        runCatching { container.autoBackup.flush() }
+    }
+
     fun setDayMateContent(content: @Composable () -> Unit) {
         val repo = container.settingsRepository
         setContent {

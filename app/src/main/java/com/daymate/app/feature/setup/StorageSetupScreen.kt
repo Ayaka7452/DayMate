@@ -1,5 +1,7 @@
 package com.ayaka7452.daymate.feature.setup
 
+import android.app.Activity
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.DayMateApp
+import com.ayaka7452.daymate.MainActivity
 import com.ayaka7452.daymate.core.StorageBackup
 import com.ayaka7452.daymate.core.StorageConfig
 
@@ -100,8 +103,23 @@ fun StorageSetupBody(
         }.onSuccess {
             StorageConfig.setBackupFolder(ctx, uri)
             status = "已从所选备份恢复数据，并设为备份文件夹。"
+            finishAndRestartToHome()
         }.onFailure { status = "恢复失败：${it.message}" }
         busy = false
+    }
+
+    /**
+     * 恢复数据后，以全新容器重启回主页。由于 rebuildContainer() 会替换 Application 的
+     * container 实例，而仍在后台的 Home Activity 仍持有旧容器引用（指向已关闭的库），
+     * 直接返回会看到空数据。用 CLEAR_TASK|NEW_TASK 重启主页可确保各在屏页面都使用恢复后的数据库。
+     */
+    fun finishAndRestartToHome() {
+        val act = ctx as? Activity ?: return
+        val intent = Intent(ctx, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(intent)
+        act.finish()
     }
 
     val treeLauncher = rememberLauncherForActivityResult(
@@ -135,8 +153,10 @@ fun StorageSetupBody(
         busy = true
         runCatching {
             withClosedDb { StorageBackup.importExternal(ctx, internalDb) }
-        }.onSuccess { status = "已从备份恢复。" }
-            .onFailure { status = "恢复失败：${it.message}" }
+        }.onSuccess {
+            status = "已从备份恢复。"
+            finishAndRestartToHome()
+        }.onFailure { status = "恢复失败：${it.message}" }
         busy = false
     }
 

@@ -321,8 +321,9 @@ fun HomeScreen(
                         val f = folderDialogTarget!!
                         container.folderRepository.update(f.copy(name = name, icon = icon))
                     }
+                    // 写库完成后再关闭弹窗，否则列表不会立即刷新
+                    showFolderDialog = false
                 }
-                showFolderDialog = false
             },
             onDelete = if (folderDialogTarget != null) {
                 {
@@ -340,9 +341,10 @@ fun HomeScreen(
             onPick = { folderId ->
                 scope.launch {
                     container.eventRepository.moveToFolder(selectedEventIds.toList(), folderId)
+                    // 写库完成后再关闭弹窗并退出选择，否则列表不会立即刷新
+                    showMoveDialog = false
+                    exitSelection()
                 }
-                showMoveDialog = false
-                exitSelection()
             },
             onCreateNew = {
                 showMoveDialog = false

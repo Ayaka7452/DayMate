@@ -43,6 +43,15 @@ class AutoBackupManager(
         }
     }
 
+    /**
+     * 立即（不防抖）执行一次备份。供 Activity onPause / 即将离开应用时调用，
+     * 避免待执行的防抖任务因进程被杀死而丢失最近一次写入的备份。
+     */
+    fun flush() {
+        backupJob?.cancel()
+        scope.launch { runBackup() }
+    }
+
     private suspend fun runBackup() {
         // 开关关闭或未配置备份文件夹时直接跳过
         if (!settings.autoBackupEnabled.first()) return

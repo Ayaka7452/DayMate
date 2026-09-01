@@ -152,8 +152,10 @@ fun EventFormScreen(
                                 )
                             )
                         }
+                        // 必须等写库完成后再关闭页面，否则 Activity 可能在 insert 提交前就被
+                        // finish，Room 失效通知尚未发出，返回首页时列表读到的仍是旧快照（需再次操作才刷新）
+                        onBack()
                     }
-                    onBack()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
