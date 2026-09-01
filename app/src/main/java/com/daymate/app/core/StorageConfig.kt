@@ -30,18 +30,27 @@ object StorageConfig {
     /** 是否已配置备份文件夹。 */
     fun isBackupConfigured(ctx: Context): Boolean = backupUri(ctx) != null
 
+    /** SAF 持久化 URI 权限标志（读写备份目录所需）。 */
+    private val BACKUP_FLAGS =
+        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+
+    /** 向系统申请对所选备份目录的持久化读写权限（SAF 模型核心）。 */
+    fun takeBackupPermission(ctx: Context, uri: Uri) {
+        runCatching { ctx.contentResolver.takePersistableUriPermission(uri, BACKUP_FLAGS) }
+    }
+
+    /** 释放对目录的持久化权限（用户取消选择时使用，避免遗留无用授权）。 */
+    fun releaseBackupPermission(ctx: Context, uri: Uri) {
+        runCatching { ctx.contentResolver.releasePersistableUriPermission(uri, BACKUP_FLAGS) }
+    }
+
     /**
      * 保存备份文件夹 Uri，并向系统申请对该目录的持久化读写权限。
      * 这是 SAF 模型的核心：拿到持久化 URI 权限后即可免存储权限访问该目录，
      * 即使应用重启/卸载重装（在同一份系统授权下）仍能访问。
      */
     fun setBackupFolder(ctx: Context, uri: Uri) {
-        runCatching {
-            ctx.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-        }
+        takeBackupPermission(ctx, uri)
         prefs(ctx).edit().putString(KEY_BACKUP_URI, uri.toString()).apply()
     }
 

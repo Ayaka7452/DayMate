@@ -20,6 +20,34 @@ object StorageBackup {
     private const val DB_NAME = "daymate.db"
     private val SUFFIXES = listOf("", "-wal", "-shm")
 
+    /** 选中文件夹的备份探测结果。 */
+    sealed interface BackupPreview {
+        /** 文件夹中不存在 daymate.db。 */
+        object None : BackupPreview
+        /** 存在且为合法 SQLite 数据库。 */
+        object Valid : BackupPreview
+        /** 存在但非合法 SQLite（损坏或别的文件）。 */
+        object Invalid : BackupPreview
+    }
+
+    /** 探测指定 tree Uri 文件夹中是否已有可用的 DayMate 备份。 */
+    fun previewBackup(ctx: Context, treeUri: Uri?): BackupPreview {
+        val uri = treeUri ?: return BackupPreview.None
+        val root = DocumentFile.fromTreeUri(ctx, uri) ?: return BackupPreview.None
+        val file = root.findFile(DB_NAME) ?: return BackupPreview.None
+        return if (isFileReadableSqlite(ctx, file.uri)) BackupPreview.Valid else BackupPreview.Invalid
+    }
+
+    private fun isFileReadableSqlite(ctx: Context, fileUri: Uri): Boolean {
+        return try {
+            ctx.contentResolver.openInputStream(fileUri)?.use { ins ->
+                val header = ByteArray(16)
+                if (ins.read(header) != 16) return false
+                String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
+            } ?: false
+        } catch (_: Throwable) { false }
+    }
+
     /** 备份文件夹中是否存在 daymate.db。 */
     fun exists(ctx: Context): Boolean {
         val uri = StorageConfig.backupUri(ctx) ?: return false
@@ -46,8 +74,8 @@ object StorageBackup {
      * @param internalDb 内部主库文件（通常 ctx.getDatabasePath("daymate.db")）。
      * 调用前应已 close 容器以保证 WAL 落盘；本函数只负责复制。
      */
-    fun exportInternal(ctx: Context, internalDb: File) {
-        val uri = StorageConfig.backupUri(ctx) ?: return
+    fun exportInternal(ctx: Context, internalDb: File, targetUri: Uri? = StorageConfig.backupUri(ctx)) {
+        val uri = targetUri ?: return
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return
         for (suffix in SUFFIXES) {
             val src = File(internalDb.path + suffix)
@@ -70,8 +98,8 @@ object StorageBackup {
      * 调用前应已 close 容器；本函数只负责复制。导入成功后调用方需 rebuild 容器。
      * @return 是否成功导入（备份文件夹中找不到 daymate.db 时返回 false）。
      */
-    fun importExternal(ctx: Context, internalDb: File): Boolean {
-        val uri = StorageConfig.backupUri(ctx) ?: return false
+    fun importExternal(ctx: Context, internalDb: File, sourceUri: Uri? = StorageConfig.backupUri(ctx)): Boolean {
+        val uri = sourceUri ?: return false
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return false
         val src = root.findFile(DB_NAME) ?: return false
         for (suffix in SUFFIXES) {

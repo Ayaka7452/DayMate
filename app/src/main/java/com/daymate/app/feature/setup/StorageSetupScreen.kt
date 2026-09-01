@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -65,6 +67,10 @@ fun StorageSetupBody(
 
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    // 选择文件夹后若检测到已有备份，则弹出冲突确认；此处保存待裁决的目录 Uri
+    var conflictUri by remember { mutableStateOf<Uri?>(null) }
+    // 「从备份恢复」二次确认
+    var showRestoreConfirm by remember { mutableStateOf(false) }
 
     val internalDb = remember { app.getDatabasePath("daymate.db") }
 
@@ -79,12 +85,34 @@ fun StorageSetupBody(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
+        // 先取得对该目录的持久化权限，才能探查其中是否已有备份
+        StorageConfig.takeBackupPermission(ctx, uri)
+        when (StorageBackup.previewBackup(ctx, uri)) {
+            StorageBackup.BackupPreview.None -> commitFolder(uri)   // 无冲突：直接保存并导出当前数据作为初始备份
+            else -> conflictUri = uri                               // 已有备份：交给冲突确认框裁决
+        }
+    }
+
+    /** 保存文件夹，并把当前内部数据库导出为该文件夹的备份（覆盖其中的旧备份）。 */
+    fun commitFolder(uri: Uri) {
+        busy = true
         StorageConfig.setBackupFolder(ctx, uri)
+        runCatching {
+            withClosedDb { StorageBackup.exportInternal(ctx, internalDb, uri) }
+        }.onSuccess { status = "已设置备份文件夹，并备份当前数据到该位置。" }
+            .onFailure { status = "导出失败：${it.message}" }
+        busy = false
+    }
+
+    /** 以所选文件夹的备份为准：导入到内部库并设为备份目录（不触碰/不删除原备份文件）。 */
+    fun restoreFromSelected(uri: Uri) {
         busy = true
         runCatching {
-            withClosedDb { StorageBackup.exportInternal(ctx, internalDb) }
-        }.onSuccess { status = "已设置备份文件夹，并导出当前数据到该位置。" }
-            .onFailure { status = "导出失败：${it.message}" }
+            withClosedDb { StorageBackup.importExternal(ctx, internalDb, uri) }
+        }.onSuccess {
+            StorageConfig.setBackupFolder(ctx, uri)
+            status = "已从所选备份恢复数据，并设为备份文件夹。"
+        }.onFailure { status = "恢复失败：${it.message}" }
         busy = false
     }
 
@@ -141,7 +169,8 @@ fun StorageSetupBody(
         ) {
             Text(
                 "DayMate 的主数据库保存在应用内部（安全、且不需要任何存储权限）。" +
-                    "你可以选择一个文件夹，把数据导出备份到这里，或随时从备份恢复。",
+                    "你可以选择一个文件夹，把数据导出备份到这里，或随时从备份恢复。" +
+                    "若所选文件夹中已有备份，会先询问你要「以备份为准」还是「覆盖备份」，避免误删已有备份。",
                 style = MaterialTheme.typography.bodyLarge
             )
             Spacer(Modifier.height(16.dp))
@@ -162,7 +191,14 @@ fun StorageSetupBody(
             ) { Text("立即备份") }
             Spacer(Modifier.height(8.dp))
             Button(
-                onClick = { restore() },
+                onClick = {
+                    if (!StorageConfig.isBackupConfigured(ctx)) { status = "请先选择备份文件夹。"; return@Button }
+                    if (!StorageBackup.isBackupReadable(ctx)) {
+                        status = "所选文件夹中没有可用的 DayMate 数据库（daymate.db）。"
+                        return@Button
+                    }
+                    showRestoreConfirm = true
+                },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy
             ) { Text("从备份恢复") }
@@ -186,6 +222,68 @@ fun StorageSetupBody(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+        }
+
+        // ===== 选择文件夹时的冲突确认：目标目录已有备份 =====
+        if (conflictUri != null) {
+            val canRestore = StorageBackup.previewBackup(ctx, conflictUri) == StorageBackup.BackupPreview.Valid
+            AlertDialog(
+                onDismissRequest = {
+                    conflictUri?.let { StorageConfig.releaseBackupPermission(ctx, it) }
+                    conflictUri = null
+                },
+                title = { Text("文件夹中已有备份数据") },
+                text = {
+                    Text(
+                        if (canRestore)
+                            "所选文件夹已存在可用的 DayMate 备份（daymate.db）。若不确认就直接写入，会覆盖并丢失该备份。请选择处理方式："
+                        else
+                            "所选文件夹已存在 daymate.db，但它不是有效的 DayMate 数据库。建议用当前数据覆盖，或取消选择。"
+                    )
+                },
+                confirmButton = {
+                    Row {
+                        if (canRestore) {
+                            TextButton(onClick = {
+                                val u = conflictUri ?: return@TextButton
+                                conflictUri = null
+                                restoreFromSelected(u)
+                            }) { Text("以备份为准") }
+                        }
+                        TextButton(onClick = {
+                            val u = conflictUri ?: return@TextButton
+                            conflictUri = null
+                            commitFolder(u)
+                        }) { Text(if (canRestore) "覆盖备份" else "用当前数据覆盖") }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        conflictUri?.let { StorageConfig.releaseBackupPermission(ctx, it) }
+                        conflictUri = null
+                    }) { Text("取消") }
+                }
+            )
+        }
+
+        // ===== 「从备份恢复」二次确认：将用备份替换当前应用数据 =====
+        if (showRestoreConfirm) {
+            AlertDialog(
+                onDismissRequest = { showRestoreConfirm = false },
+                title = { Text("从备份恢复") },
+                text = {
+                    Text("将用所选文件夹的备份数据替换当前应用内的全部数据（倒数日、Vault 等）。此操作不可撤销，确定继续？")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showRestoreConfirm = false
+                        restore()
+                    }) { Text("继续") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRestoreConfirm = false }) { Text("取消") }
+                }
+            )
         }
     }
 }
