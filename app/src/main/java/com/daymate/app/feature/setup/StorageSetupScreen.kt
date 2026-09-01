@@ -84,6 +84,20 @@ fun StorageSetupBody(
         runCatching { app.rebuildContainer() }
     }
 
+    /**
+     * 恢复数据后，以全新容器重启回主页。由于 rebuildContainer() 会替换 Application 的
+     * container 实例，而仍在后台的 Home Activity 仍持有旧容器引用（指向已关闭的库），
+     * 直接返回会看到空数据。用 CLEAR_TASK|NEW_TASK 重启主页可确保各在屏页面都使用恢复后的数据库。
+     */
+    fun finishAndRestartToHome() {
+        val act = ctx as? Activity ?: return
+        val intent = Intent(ctx, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(intent)
+        act.finish()
+    }
+
     /** 保存文件夹，并把当前内部数据库导出为该文件夹的备份（覆盖其中的旧备份）。 */
     fun commitFolder(uri: Uri) {
         busy = true
@@ -106,20 +120,6 @@ fun StorageSetupBody(
             finishAndRestartToHome()
         }.onFailure { status = "恢复失败：${it.message}" }
         busy = false
-    }
-
-    /**
-     * 恢复数据后，以全新容器重启回主页。由于 rebuildContainer() 会替换 Application 的
-     * container 实例，而仍在后台的 Home Activity 仍持有旧容器引用（指向已关闭的库），
-     * 直接返回会看到空数据。用 CLEAR_TASK|NEW_TASK 重启主页可确保各在屏页面都使用恢复后的数据库。
-     */
-    fun finishAndRestartToHome() {
-        val act = ctx as? Activity ?: return
-        val intent = Intent(ctx, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        ctx.startActivity(intent)
-        act.finish()
     }
 
     val treeLauncher = rememberLauncherForActivityResult(
