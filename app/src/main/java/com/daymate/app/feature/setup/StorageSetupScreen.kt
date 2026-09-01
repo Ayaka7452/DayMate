@@ -154,7 +154,7 @@ fun StorageSetupBody(
      * 仅当「应用为空 且 目标文件夹中已有备份 且 备份非空（或探测失败无法确定）」时返回 true。
      * 采用保守策略——探测失败时一律视为有数据，避免用空数据静默覆盖好备份。
      */
-    private suspend fun shouldBlockOverwrite(backupUri: Uri): Boolean {
+    suspend fun shouldBlockOverwrite(backupUri: Uri): Boolean {
         if (countAppDataRows() != 0) return false
         if (!StorageBackup.exists(ctx)) return false
         val backupRows = runCatching { StorageBackup.probeBackupDataRows(ctx, backupUri) }.getOrDefault(-1)
