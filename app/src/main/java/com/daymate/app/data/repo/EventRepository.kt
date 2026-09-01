@@ -55,11 +55,8 @@ class EventRepository(
     suspend fun restoreByIds(ids: List<Long>) =
         dao.restoreByIds(ids).also { onChanged(); refreshSignal.tryEmit(Unit) }
 
-    suspend fun softDeleteByFolders(folderIds: List<Long>, ts: Long) {
-        dao.softDeleteByFolders(folderIds, ts)
-        onChanged()
-        refreshSignal.tryEmit(Unit)
-    }
+    suspend fun unparentByFolders(folderIds: List<Long>) =
+        dao.unparentByFolders(folderIds).also { onChanged(); refreshSignal.tryEmit(Unit) }
 
     suspend fun restoreByFolders(folderIds: List<Long>) =
         dao.restoreByFolders(folderIds).also { onChanged(); refreshSignal.tryEmit(Unit) }

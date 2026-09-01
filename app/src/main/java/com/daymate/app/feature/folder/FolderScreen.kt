@@ -85,6 +85,7 @@ fun FolderScreen(
     val selectedEventIds = remember { mutableStateListOf<Long>() }
     var showMoveDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showFolderDeleteConfirm by remember { mutableStateOf(false) }
 
     var vaultConfirmBatch by remember { mutableStateOf(false) }
     var vaultNeedSetup by remember { mutableStateOf(false) }
@@ -163,20 +164,7 @@ fun FolderScreen(
                                     text = { Text("移入回收站") },
                                     onClick = {
                                         menuExpanded = false
-                                        scope.launch {
-                                            folder?.let {
-                                                val ts = System.currentTimeMillis()
-                                                container.eventRepository.softDeleteByFolders(
-                                                    listOf(it.id),
-                                                    ts
-                                                )
-                                                container.folderRepository.softDeleteByIds(
-                                                    listOf(it.id),
-                                                    ts
-                                                )
-                                            }
-                                            onBack()
-                                        }
+                                        showFolderDeleteConfirm = true
                                     }
                                 )
                             }
@@ -317,6 +305,34 @@ fun FolderScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showFolderDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showFolderDeleteConfirm = false },
+            title = { Text("移入回收站？") },
+            text = {
+                Text("文件夹「${folder?.name ?: ""}」内的文件将移回主空间（不再属于该文件夹），仅文件夹本身会被移入回收站。")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        folder?.let {
+                            container.eventRepository.unparentByFolders(listOf(it.id))
+                            container.folderRepository.softDeleteByIds(
+                                listOf(it.id),
+                                System.currentTimeMillis()
+                            )
+                        }
+                    }
+                    showFolderDeleteConfirm = false
+                    onBack()
+                }) { Text("移入回收站") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFolderDeleteConfirm = false }) { Text("取消") }
             }
         )
     }

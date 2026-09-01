@@ -77,4 +77,7 @@ class VaultRepository(
 
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?) =
         dao.moveToFolder(ids, folderId).also { onChanged(); refreshSignal.tryEmit(Unit) }
+
+    suspend fun unparentByFolders(folderIds: List<Long>) =
+        dao.unparentByFolders(folderIds).also { onChanged(); refreshSignal.tryEmit(Unit) }
 }

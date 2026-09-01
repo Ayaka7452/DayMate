@@ -91,6 +91,8 @@ fun HomeScreen(
     val selectedFolderIds = remember { mutableStateListOf<Long>() }
     var showMoveDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showFolderDeleteConfirm by remember { mutableStateOf(false) }
+    var folderToDelete by remember { mutableStateOf<FolderEntity?>(null) }
 
     // Vault 移入相关弹窗状态
     var vaultConfirmEventId by remember { mutableStateOf<Long?>(null) }
@@ -243,11 +245,8 @@ fun HomeScreen(
                             }
                         },
                         onMoveToRecycleBin = {
-                            scope.launch {
-                                val ts = System.currentTimeMillis()
-                                container.eventRepository.softDeleteByFolders(listOf(folder.id), ts)
-                                container.folderRepository.softDeleteByIds(listOf(folder.id), ts)
-                            }
+                            folderToDelete = folder
+                            showFolderDeleteConfirm = true
                         }
                     )
                     ListItemDivider()
@@ -361,7 +360,19 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("移入回收站？") },
-            text = { Text("将把 $totalSelected 项移入回收站，可在「回收站」中恢复或彻底删除（清空后不可恢复）。") },
+            text = {
+                Column {
+                    Text("将把 $totalSelected 项移入回收站，可在「回收站」中恢复或彻底删除（清空后不可恢复）。")
+                    if (selectedFolderIds.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "注意：被删除文件夹内的文件将移回主空间（不再属于该文件夹），仅文件夹本身进入回收站。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     val eventIds = selectedEventIds.toList()
@@ -371,7 +382,7 @@ fun HomeScreen(
                         if (eventIds.isNotEmpty())
                             container.eventRepository.softDeleteByIds(eventIds, ts)
                         if (folderIds.isNotEmpty()) {
-                            container.eventRepository.softDeleteByFolders(folderIds, ts)
+                            container.eventRepository.unparentByFolders(folderIds)
                             container.folderRepository.softDeleteByIds(folderIds, ts)
                         }
                         showDeleteConfirm = false
@@ -381,6 +392,36 @@ fun HomeScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showFolderDeleteConfirm && folderToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showFolderDeleteConfirm = false; folderToDelete = null },
+            title = { Text("移入回收站？") },
+            text = {
+                Text("文件夹「${folderToDelete!!.name}」内的文件将移回主空间（不再属于该文件夹），仅文件夹本身会被移入回收站。")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val fid = folderToDelete!!.id
+                    scope.launch {
+                        container.eventRepository.unparentByFolders(listOf(fid))
+                        container.folderRepository.softDeleteByIds(
+                            listOf(fid),
+                            System.currentTimeMillis()
+                        )
+                    }
+                    showFolderDeleteConfirm = false
+                    folderToDelete = null
+                }) { Text("移入回收站") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showFolderDeleteConfirm = false
+                    folderToDelete = null
+                }) { Text("取消") }
             }
         )
     }

@@ -41,8 +41,8 @@ interface EventDao {
     @Query("UPDATE events SET isDeleted = 0, deletedAt = 0 WHERE id IN (:ids)")
     suspend fun restoreByIds(ids: List<Long>)
 
-    @Query("UPDATE events SET isDeleted = 1, deletedAt = :ts WHERE folderId IN (:folderIds)")
-    suspend fun softDeleteByFolders(folderIds: List<Long>, ts: Long)
+    @Query("UPDATE events SET folderId = NULL WHERE folderId IN (:folderIds) AND isDeleted = 0")
+    suspend fun unparentByFolders(folderIds: List<Long>)
 
     @Query("UPDATE events SET isDeleted = 0, deletedAt = 0 WHERE folderId IN (:folderIds)")
     suspend fun restoreByFolders(folderIds: List<Long>)
@@ -132,6 +132,9 @@ interface VaultEventDao {
 
     @Query("UPDATE vault_events SET folderId = :folderId WHERE id IN (:ids)")
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?)
+
+    @Query("UPDATE vault_events SET folderId = NULL WHERE folderId IN (:folderIds)")
+    suspend fun unparentByFolders(folderIds: List<Long>)
 
     @Query("SELECT COUNT(*) FROM vault_events")
     suspend fun countAll(): Int

@@ -560,10 +560,12 @@ private fun VaultListScreen(
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
+                        if (selectedFolderIds.isNotEmpty()) {
+                            container.vaultRepository.unparentByFolders(selectedFolderIds.toList())
+                            container.vaultFolderRepository.deleteByIds(selectedFolderIds.toList())
+                        }
                         if (selectedEventIds.isNotEmpty())
                             container.vaultRepository.deleteByIds(selectedEventIds.toList())
-                        if (selectedFolderIds.isNotEmpty())
-                            container.vaultFolderRepository.deleteByIds(selectedFolderIds.toList())
                     }
                     showDeleteConfirm = false
                     exitSelection()
@@ -656,6 +658,7 @@ fun VaultFolderScreen(
     val selectedEventIds = remember { mutableStateListOf<Long>() }
     var showMoveDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showFolderDeleteConfirm by remember { mutableStateOf(false) }
 
     val totalSelected = selectedEventIds.size
 
@@ -691,12 +694,7 @@ fun VaultFolderScreen(
             )
             DropdownMenuItem(
                 text = { Text("删除文件夹") },
-                onClick = {
-                    scope.launch {
-                        folder?.let { container.vaultFolderRepository.delete(it) }
-                        onBack()
-                    }
-                }
+                onClick = { showFolderDeleteConfirm = true }
             )
         },
         fab = {
@@ -814,6 +812,31 @@ fun VaultFolderScreen(
                 }) { Text("删除") }
             },
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } }
+        )
+    }
+
+    if (showFolderDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showFolderDeleteConfirm = false },
+            title = { Text("删除文件夹？") },
+            text = {
+                Text("文件夹「${folder?.name ?: ""}」内的事件会移出到 Vault 根目录，仅文件夹本身被删除。此操作不可撤销。")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        folder?.let {
+                            container.vaultRepository.unparentByFolders(listOf(it.id))
+                            container.vaultFolderRepository.delete(it)
+                        }
+                    }
+                    showFolderDeleteConfirm = false
+                    onBack()
+                }) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFolderDeleteConfirm = false }) { Text("取消") }
+            }
         )
     }
 }
