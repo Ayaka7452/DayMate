@@ -14,6 +14,7 @@ object ReorderActions {
     const val UP = "up"
     const val DOWN = "down"
     const val TOP = "top"
+    const val BOTTOM = "bottom"
 }
 
 /**
