@@ -1,6 +1,8 @@
 package com.ayaka7452.daymate.feature.create
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -54,6 +58,7 @@ fun EventFormScreen(
     var note by remember { mutableStateOf("") }
     var epochDay by remember { mutableStateOf(LocalDate.now().plusDays(7).toEpochDay()) }
     var refDaysText by remember { mutableStateOf("") }
+    var displayUnit by remember { mutableStateOf(CountdownCalculator.UNIT_DAY) }
     var loaded by remember { mutableStateOf<EventEntity?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -66,11 +71,18 @@ fun EventFormScreen(
                 note = e.note ?: ""
                 epochDay = e.targetDateEpochDay
                 refDaysText = e.refDays?.toString() ?: ""
+                displayUnit = e.displayUnit ?: CountdownCalculator.UNIT_DAY
             }
         }
     }
 
     val isEdit = loaded != null
+    // 对照值的单位跟随「倒计时显示单位」：按月显示时对照值即「月数」，其余同理。
+    val refUnitLabel = when (displayUnit) {
+        CountdownCalculator.UNIT_MONTH -> "月数"
+        CountdownCalculator.UNIT_YEAR -> "年数"
+        else -> "天数"
+    }
 
     val datePickerState = rememberDatePickerState()
     LaunchedEffect(epochDay) {
@@ -130,14 +142,41 @@ fun EventFormScreen(
                 )
             }
 
+            Spacer(Modifier.height(16.dp))
+
+            Text("倒计时显示单位", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = displayUnit == CountdownCalculator.UNIT_DAY,
+                    onClick = { displayUnit = CountdownCalculator.UNIT_DAY },
+                    label = { Text("天数") }
+                )
+                FilterChip(
+                    selected = displayUnit == CountdownCalculator.UNIT_MONTH,
+                    onClick = { displayUnit = CountdownCalculator.UNIT_MONTH },
+                    label = { Text("月数") }
+                )
+                FilterChip(
+                    selected = displayUnit == CountdownCalculator.UNIT_YEAR,
+                    onClick = { displayUnit = CountdownCalculator.UNIT_YEAR },
+                    label = { Text("年数") }
+                )
+            }
+            Text(
+                "随时可更改；按月/按年不足一个完整单位时自动改用更小的单位显示",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+
             Spacer(Modifier.height(12.dp))
 
             OutlinedTextField(
                 value = refDaysText,
                 onValueChange = { refDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
-                label = { Text("对照天数（可选）") },
+                label = { Text("对照${refUnitLabel}（可选）") },
                 placeholder = { Text("例如：8") },
-                supportingText = { Text("目标日期已过去时，显示为「已过 X/N 天」，如 2/8") },
+                supportingText = { Text("目标日期已过去时，显示为「已过 X/N $refUnitLabel」，如 2/8；切换显示单位后请按新单位填写") },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                 ),
@@ -158,7 +197,8 @@ fun EventFormScreen(
                                     title = title.ifBlank { "未命名事件" },
                                     note = noteValue,
                                     targetDateEpochDay = epochDay,
-                                    refDays = refValue
+                                    refDays = refValue,
+                                    displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY }
                                 )
                             )
                         } else {
@@ -168,6 +208,7 @@ fun EventFormScreen(
                                     note = noteValue,
                                     targetDateEpochDay = epochDay,
                                     refDays = refValue,
+                                    displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
                                     folderId = folderId
                                 )
                             )

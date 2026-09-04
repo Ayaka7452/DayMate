@@ -43,6 +43,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -853,8 +854,17 @@ private fun VaultEventDialog(
         mutableStateOf(existing?.targetDateEpochDay ?: LocalDate.now().plusDays(7).toEpochDay())
     }
     var refDaysText by remember { mutableStateOf(existing?.refDays?.toString() ?: "") }
+    var displayUnit by remember {
+        mutableStateOf(existing?.displayUnit ?: CountdownCalculator.UNIT_DAY)
+    }
     var showDatePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    // 对照值的单位跟随「倒计时显示单位」：按月显示时对照值即「月数」，其余同理。
+    val refUnitLabel = when (displayUnit) {
+        CountdownCalculator.UNIT_MONTH -> "月数"
+        CountdownCalculator.UNIT_YEAR -> "年数"
+        else -> "天数"
+    }
     val datePickerState = rememberDatePickerState()
     LaunchedEffect(epochDay) {
         datePickerState.selectedDateMillis = LocalDate.ofEpochDay(epochDay)
@@ -873,6 +883,7 @@ private fun VaultEventDialog(
                                 title = title.ifBlank { "未命名" },
                                 targetDateEpochDay = epochDay,
                                 refDays = refValue,
+                                displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
                                 folderId = folderId
                             )
                         )
@@ -881,7 +892,8 @@ private fun VaultEventDialog(
                             existing.copy(
                                 title = title.ifBlank { "未命名" },
                                 targetDateEpochDay = epochDay,
-                                refDays = refValue
+                                refDays = refValue,
+                                displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY }
                             )
                         )
                     }
@@ -911,12 +923,39 @@ private fun VaultEventDialog(
                     )
                 }
                 Spacer(Modifier.height(12.dp))
+
+                Text("倒计时显示单位", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = displayUnit == CountdownCalculator.UNIT_DAY,
+                        onClick = { displayUnit = CountdownCalculator.UNIT_DAY },
+                        label = { Text("天数") }
+                    )
+                    FilterChip(
+                        selected = displayUnit == CountdownCalculator.UNIT_MONTH,
+                        onClick = { displayUnit = CountdownCalculator.UNIT_MONTH },
+                        label = { Text("月数") }
+                    )
+                    FilterChip(
+                        selected = displayUnit == CountdownCalculator.UNIT_YEAR,
+                        onClick = { displayUnit = CountdownCalculator.UNIT_YEAR },
+                        label = { Text("年数") }
+                    )
+                }
+                Text(
+                    "随时可更改；按月/按年不足一个完整单位时自动改用更小的单位显示",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(Modifier.height(12.dp))
+
                 OutlinedTextField(
                     value = refDaysText,
                     onValueChange = { refDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
-                    label = { Text("对照天数（可选）") },
+                    label = { Text("对照${refUnitLabel}（可选）") },
                     placeholder = { Text("例如：8") },
-                    supportingText = { Text("目标日期已过去时，显示为「已过 X/N 天」，如 2/8") },
+                    supportingText = { Text("目标日期已过去时，显示为「已过 X/N $refUnitLabel」，如 2/8；切换显示单位后请按新单位填写") },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                     ),
@@ -954,11 +993,11 @@ private fun VaultEventRow(
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
-    val text = when {
-        isFuture -> "还有 $days 天"
-        event.refDays != null && event.refDays > 0 -> "已过 ${-days}/${event.refDays} 天"
-        else -> "已过 ${-days} 天"
-    }
+    val text = CountdownCalculator.formatCountdown(
+        event.targetDateEpochDay,
+        event.displayUnit,
+        event.refDays
+    )
     var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier

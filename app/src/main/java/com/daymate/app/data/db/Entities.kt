@@ -38,8 +38,13 @@ data class EventEntity(
     val note: String? = null,
     val color: Int? = null,
     val folderId: Long? = null,
-    /** 对照天数：可选。仅当目标日期已过去时用于显示「已过 X/N 天」（如 X/N = 2/8）。 */
+    /**
+     * 对照数值：可选。目标日期已过去时显示「已过 X/N」。
+     * 单位跟随 displayUnit（按天显示时是天数，按月/按年显示时即月数/年数），由表单保证。
+     */
     val refDays: Int? = null,
+    /** 倒计时显示单位：DAY/MONTH/YEAR，null 视为 DAY（按天）。随时可在编辑页更改。 */
+    val displayUnit: String? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val isDeleted: Boolean = false,
@@ -68,8 +73,13 @@ data class VaultEventEntity(
     val note: String? = null,
     val color: Int? = null,
     val folderId: Long? = null,
-    /** 对照天数：可选。仅当目标日期已过去时用于显示「已过 X/N 天」（如 X/N = 2/8）。 */
+    /**
+     * 对照数值：可选。目标日期已过去时显示「已过 X/N」。
+     * 单位跟随 displayUnit（按天显示时是天数，按月/按年显示时即月数/年数），由表单保证。
+     */
     val refDays: Int? = null,
+    /** 倒计时显示单位：DAY/MONTH/YEAR，null 视为 DAY（按天）。随时可在编辑页更改。 */
+    val displayUnit: String? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

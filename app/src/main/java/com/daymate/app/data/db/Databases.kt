@@ -13,7 +13,7 @@ import androidx.room.migration.Migration
         VaultEventEntity::class,
         VaultFolderEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -71,12 +71,38 @@ abstract class DayMateDatabase : RoomDatabase() {
             }
         }
 
-        /** v3 -> v4：事件与 Vault 事件新增「对照天数」refDays（可空，用于已过日期显示 X/N）。 */
+        /**
+         * v3 -> v4：事件与 Vault 事件新增「对照天数」refDays（可空）。
+         * 注意：历史版本发布包漏把 version 升到 4，导致部分设备的 v3 库已带 refDays 列，
+         * 故此处必须幂等——列已存在时跳过，否则 ALTER TABLE 会因重复列名而崩溃。
+         */
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE events ADD COLUMN refDays INTEGER")
-                db.execSQL("ALTER TABLE vault_events ADD COLUMN refDays INTEGER")
+                addColumnIfMissing(db, "events", "refDays", "ALTER TABLE events ADD COLUMN refDays INTEGER")
+                addColumnIfMissing(db, "vault_events", "refDays", "ALTER TABLE vault_events ADD COLUMN refDays INTEGER")
             }
+        }
+
+        /** v4 -> v5：事件与 Vault 事件新增「显示单位」displayUnit（可空，DAY/MONTH/YEAR，null 按天）。 */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                addColumnIfMissing(db, "events", "displayUnit", "ALTER TABLE events ADD COLUMN displayUnit TEXT")
+                addColumnIfMissing(db, "vault_events", "displayUnit", "ALTER TABLE vault_events ADD COLUMN displayUnit TEXT")
+            }
+        }
+
+        /** 幂等加列：列已存在时跳过（防重复 ALTER TABLE 崩溃）。 */
+        private fun addColumnIfMissing(
+            db: androidx.sqlite.db.SupportSQLiteDatabase,
+            table: String,
+            column: String,
+            ddl: String
+        ) {
+            val existing = mutableListOf<String>()
+            db.query("PRAGMA table_info($table)").use { c ->
+                while (c.moveToNext()) existing.add(c.getString(1))
+            }
+            if (column !in existing) db.execSQL(ddl)
         }
 
         fun build(context: Context): DayMateDatabase {
@@ -85,7 +111,7 @@ abstract class DayMateDatabase : RoomDatabase() {
             // 用户数据「备份到自选文件夹」由 StorageBackup 通过 SAF 持久化 URI 完成，
             // 与 Room 主库的物理位置解耦。
             return Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build()
         }
