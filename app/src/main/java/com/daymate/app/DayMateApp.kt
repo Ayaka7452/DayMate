@@ -41,7 +41,8 @@ class DayMateApp : Application() {
             if (!old.exists()) continue
             // 旧库 schema 与当前 Room 实体不保证一致（实体可能新增列），用裸 SQL 只读读取，
             // 避免 Room schema 校验失败；先读文件夹再读事件（保持外键引用有效）。
-            val migrated = runCatching {
+            val migrated: Pair<List<com.ayaka7452.daymate.data.db.VaultFolderEntity>, List<com.ayaka7452.daymate.data.db.VaultEventEntity>> =
+                runCatching {
                 SQLiteDatabase.openDatabase(old.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                     val folders = mutableListOf<com.ayaka7452.daymate.data.db.VaultFolderEntity>()
                     db.rawQuery(
@@ -91,7 +92,10 @@ class DayMateApp : Application() {
                     folders to events
                 }
             }.onFailure { Log.w("DayMateMigrate", "legacy vault read failed", it) }
-                .getOrDefault(emptyList<com.ayaka7452.daymate.data.db.VaultFolderEntity>() to emptyList())
+                .getOrDefault(
+                    emptyList<com.ayaka7452.daymate.data.db.VaultFolderEntity>() to
+                        emptyList<com.ayaka7452.daymate.data.db.VaultEventEntity>()
+                )
 
             val (folders, events) = migrated
             if (folders.isNotEmpty() || events.isNotEmpty()) {
