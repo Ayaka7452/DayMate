@@ -14,9 +14,9 @@ import java.io.File
  * 凭借系统授予的持久化 URI 权限读写，不需要申请任何存储权限（含 MANAGE_EXTERNAL_STORAGE）。
  *
  * 注意：SQLite 在数据库打开时会使用 WAL（-wal / -shm 文件）。导出 [exportInternal] 前调用方
- * 应对在线容器执行 wal_checkpoint(TRUNCATE) 让数据落盘到主文件（容器保持打开）；导入
- * [importExternal] 前应确保主库已关闭（close 容器），再复制文件、最后 rebuild 容器。
- * 本工具只负责文件的复制，不再额外维护 WAL 状态。
+ * 应对在线容器执行 wal_checkpoint(TRUNCATE) 让数据落盘到主文件（容器保持打开），因此备份
+ * 只含单个 daymate.db；导入 [importExternal] 前应确保主库已关闭（close 容器），再复制文件、
+ * 最后 rebuild 容器。导入兼容旧版三文件式备份（-wal / -shm 可选）。
  */
 object StorageBackup {
     private const val DB_NAME = "daymate.db"
@@ -72,25 +72,27 @@ object StorageBackup {
     }
 
     /**
-     * 把内部主库导出到已配置的备份文件夹。
+     * 把内部主库导出到已配置的备份文件夹（只写单个 daymate.db 文件）。
      * @param internalDb 内部主库文件（通常 ctx.getDatabasePath("daymate.db")）。
-     * 调用前应已 close 容器以保证 WAL 落盘；本函数只负责复制。
+     * 调用前调用方应已对在线容器执行 wal_checkpoint(TRUNCATE)——数据已全部合并进主文件，
+     * 故 -wal / -shm 附属文件无需导出；目标文件夹中旧版三文件式导出残留的附属文件会一并清理。
      */
     fun exportInternal(ctx: Context, internalDb: File, targetUri: Uri? = StorageConfig.backupUri(ctx)) {
         val uri = targetUri ?: return
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return
-        for (suffix in SUFFIXES) {
-            val src = File(internalDb.path + suffix)
-            if (!src.exists()) continue
-            val name = DB_NAME + suffix
-            // 覆盖前先删除旧文件，避免 SAF 自动重命名为 "daymate.db (1)"
-            root.findFile(name)?.delete()
-            val target = root.createFile("application/octet-stream", name) ?: continue
-            src.inputStream().use { input ->
-                ctx.contentResolver.openOutputStream(target.uri)?.use { output ->
-                    input.copyTo(output)
-                }
+        val src = File(internalDb.path)
+        if (!src.exists()) return
+        // 覆盖前先删除旧文件，避免 SAF 自动重命名为 "daymate.db (1)"
+        root.findFile(DB_NAME)?.delete()
+        val target = root.createFile("application/octet-stream", DB_NAME) ?: return
+        src.inputStream().use { input ->
+            ctx.contentResolver.openOutputStream(target.uri)?.use { output ->
+                input.copyTo(output)
             }
+        }
+        // 复制成功后清掉旧版导出残留的 -wal / -shm（其内容早已在 checkpoint 时合并进主文件）
+        for (suffix in listOf("-wal", "-shm")) {
+            root.findFile(DB_NAME + suffix)?.delete()
         }
     }
 
