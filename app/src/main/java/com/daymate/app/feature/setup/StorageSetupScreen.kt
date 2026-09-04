@@ -54,7 +54,8 @@ import com.ayaka7452.daymate.core.StorageConfig
  *  - 「从备份恢复」：把所选文件夹的 daymate.db 复制回内部主库（重建容器）；
  *  - 「清除备份文件夹」：仅清除配置（不删除外部文件）。
  *
- * 导出/导入会先 close 容器触发 WAL 落盘，再复制文件，最后 rebuild 容器刷新界面。
+ * 导出（备份）只做 WAL 落盘、容器保持在线；导入/恢复才会 close + rebuild 容器，并以
+ * CLEAR_TASK 重启回主页（确保所有页面用上新容器）。
  *
  * @param title       顶栏标题
  * @param showBack   是否显示返回按钮（设置页内嵌时显示）
@@ -84,11 +85,23 @@ fun StorageSetupBody(
     val scope = rememberCoroutineScope()
     val internalDb = remember { app.getDatabasePath("daymate.db") }
 
-    /** 先关闭容器（触发 WAL checkpoint 落盘），执行 block，再重建容器刷新界面。 */
+    /** 先关闭容器（触发 WAL checkpoint 落盘），执行 block，再重建容器刷新界面。
+     *  仅用于「导入/恢复」这类真正替换数据库文件的场景，且随后必须重启回主页。 */
     fun withClosedDb(block: () -> Unit) {
         runCatching { app.container.close() }
         runCatching(block)
         runCatching { app.rebuildContainer() }
+    }
+
+    /**
+     * 导出（备份）前把 WAL 落盘即可，**不关闭、不重建容器**：
+     * rebuildContainer() 会替换 Application 的 container，而在屏页面（主页等）remember 住的
+     * Flow 仍指向旧容器里的旧库——旧库被关闭后将永远收不到变更通知，表现为「新建事件后列表
+     * 不刷新，直到重启应用」。导出不改变应用数据，库保持在线即可（与自动备份同策略）。
+     */
+    fun withCheckpoint(block: () -> Unit) {
+        runCatching { app.container.checkpointWal() }
+        runCatching(block)
     }
 
     /**
@@ -110,7 +123,7 @@ fun StorageSetupBody(
         busy = true
         StorageConfig.setBackupFolder(ctx, uri)
         runCatching {
-            withClosedDb { StorageBackup.exportInternal(ctx, internalDb, uri) }
+            withCheckpoint { StorageBackup.exportInternal(ctx, internalDb, uri) }
         }.onSuccess { status = "已设置备份文件夹，并备份当前数据到该位置。" }
             .onFailure { status = "导出失败：${it.message}" }
         busy = false
@@ -134,7 +147,7 @@ fun StorageSetupBody(
         busy = true
         if (alsoConfigure) StorageConfig.setBackupFolder(ctx, targetUri)
         runCatching {
-            withClosedDb { StorageBackup.exportInternal(ctx, internalDb, targetUri) }
+            withCheckpoint { StorageBackup.exportInternal(ctx, internalDb, targetUri) }
         }.onSuccess { status = "已备份到所选文件夹。" }
             .onFailure { status = "备份失败：${it.message}" }
         busy = false
@@ -156,8 +169,11 @@ fun StorageSetupBody(
      */
     suspend fun shouldBlockOverwrite(backupUri: Uri): Boolean {
         if (countAppDataRows() != 0) return false
-        if (!StorageBackup.exists(ctx)) return false
-        val backupRows = runCatching { StorageBackup.probeBackupDataRows(ctx, backupUri) }.getOrDefault(-1)
+        // 注意：不能用 StorageBackup.exists(ctx)（读的是「已配置」的备份目录）——
+        // 冲突弹窗阶段新选的目录尚未写入配置，exists 会误判为「无备份」而直接放行，
+        // 导致空数据静默覆盖有数据的备份（连确认弹窗都跳过）。此处直接探测传入的目录。
+        // probeBackupDataRows：0=无备份文件或确认为空；>0=有数据；-1=复制/读库失败（无法判定）。
+        val backupRows = StorageBackup.probeBackupDataRows(ctx, backupUri)
         return backupRows != 0
     }
 
