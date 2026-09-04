@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -48,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.Routes
 import com.ayaka7452.daymate.core.AppContainer
@@ -55,9 +57,18 @@ import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
+import com.ayaka7452.daymate.feature.common.ReorderActions
+import com.ayaka7452.daymate.feature.common.SortModes
+import com.ayaka7452.daymate.feature.common.eventDaysUntil
+import com.ayaka7452.daymate.feature.common.moveItem
+import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
+import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import com.ayaka7452.daymate.feature.home.EventRow
 import com.ayaka7452.daymate.feature.home.SelectionDot
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +102,63 @@ fun FolderScreen(
     var vaultNeedSetup by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val totalSelected = selectedEventIds.size
+
+    // 排序模式：manual 才允许手动调整顺序
+    val defaultSort by container.settingsRepository.defaultSort
+        .collectAsState(initial = SortModes.REMAINING_ASC)
+    val manualSort = defaultSort == SortModes.MANUAL
+
+    // 拖拽排序用的可变镜像列表（拖拽中不同步，避免跳动）
+    var isDragging by remember { mutableStateOf(false) }
+    val eventList = remember { mutableStateListOf<EventEntity>() }
+    LaunchedEffect(events) {
+        if (!isDragging) {
+            eventList.clear()
+            eventList.addAll(events)
+        }
+    }
+
+    // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
+    val displayEvents = remember(eventList.toList(), defaultSort) {
+        sortEventsForDisplay(eventList.toList(), defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    }
+
+    val listState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+        val fk = from.key.toString()
+        val tk = to.key.toString()
+        if (fk.startsWith("e") && tk.startsWith("e")) {
+            val fi = eventList.indexOfFirst { "e${it.id}" == fk }
+            val ti = eventList.indexOfFirst { "e${it.id}" == tk }
+            if (fi >= 0 && ti >= 0) eventList.moveItem(fi, ti)
+        }
+    }
+
+    fun persistEventOrder() {
+        scope.launch {
+            eventList.forEachIndexed { index, e ->
+                container.eventRepository.update(e.copy(sortIndex = index))
+            }
+        }
+    }
+
+    fun moveEvent(event: EventEntity, action: String) {
+        if (!manualSort) {
+            Toast.makeText(
+                context,
+                "当前排序模式不支持手动调整，请在「设置 → 默认排序」中切换为手动排序",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val index = eventList.indexOfFirst { it.id == event.id }
+        if (index >= 0) {
+            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
+            persistEventOrder()
+        }
+    }
 
     fun toggleEvent(id: Long) {
         if (id in selectedEventIds) selectedEventIds.remove(id) else selectedEventIds.add(id)
@@ -197,35 +264,49 @@ fun FolderScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                items(events, key = { it.id }) { event ->
-                    EventRow(
-                        event = event,
-                        selectionMode = selectionMode,
-                        selected = event.id in selectedEventIds,
-                        onClick = {
-                            if (selectionMode) toggleEvent(event.id)
-                            else onNavigate("event_form?eventId=${event.id}")
-                        },
-                        onMoveToVault = {
-                            if (vaultSet) {
-                                scope.launch { container.vaultBridge.moveEventToVault(event.id) }
-                            } else {
-                                vaultNeedSetup = true
-                            }
-                        },
-                        onMoveToRecycleBin = {
-                            scope.launch {
-                                container.eventRepository.softDeleteByIds(
-                                    listOf(event.id),
-                                    System.currentTimeMillis()
-                                )
-                            }
-                        }
-                    )
+                items(displayEvents, key = { "e${it.id}" }) { event ->
+                    ReorderableItem(reorderableState, key = "e${event.id}") {
+                        val handle = if (selectionMode && manualSort) {
+                            Modifier.draggableHandle(
+                                onDragStarted = { isDragging = true },
+                                onDragStopped = {
+                                    isDragging = false
+                                    persistEventOrder()
+                                }
+                            )
+                        } else null
+                        EventRow(
+                            event = event,
+                            selectionMode = selectionMode,
+                            selected = event.id in selectedEventIds,
+                            onClick = {
+                                if (selectionMode) toggleEvent(event.id)
+                                else onNavigate("event_form?eventId=${event.id}")
+                            },
+                            onMoveToVault = {
+                                if (vaultSet) {
+                                    scope.launch { container.vaultBridge.moveEventToVault(event.id) }
+                                } else {
+                                    vaultNeedSetup = true
+                                }
+                            },
+                            onMoveToRecycleBin = {
+                                scope.launch {
+                                    container.eventRepository.softDeleteByIds(
+                                        listOf(event.id),
+                                        System.currentTimeMillis()
+                                    )
+                                }
+                            },
+                            onReorder = { action -> moveEvent(event, action) },
+                            dragHandle = handle
+                        )
+                    }
                     Box(
                         Modifier
                             .fillMaxWidth()

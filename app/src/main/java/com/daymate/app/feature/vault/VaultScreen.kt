@@ -85,6 +85,13 @@ import com.ayaka7452.daymate.data.db.VaultEventEntity
 import com.ayaka7452.daymate.data.db.VaultFolderEntity
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
+import com.ayaka7452.daymate.feature.common.ReorderActions
+import com.ayaka7452.daymate.feature.common.SortModes
+import com.ayaka7452.daymate.feature.common.eventDaysUntil
+import com.ayaka7452.daymate.feature.common.moveItem
+import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
+import com.ayaka7452.daymate.feature.common.targetIndexForAction
+import android.widget.Toast
 import com.ayaka7452.daymate.feature.home.AddSheet
 import com.ayaka7452.daymate.feature.home.SelectionDot
 import kotlinx.coroutines.CoroutineScope
@@ -321,6 +328,7 @@ private fun VaultListScreen(
 
     var isDragging by remember { mutableStateOf(false) }
     val folderList = remember { mutableStateListOf<VaultFolderEntity>() }
+    val eventList = remember { mutableStateListOf<VaultEventEntity>() }
     val listState = rememberLazyListState()
     LaunchedEffect(folders) {
         if (!isDragging) {
@@ -328,12 +336,37 @@ private fun VaultListScreen(
             folderList.addAll(folders)
         }
     }
+    LaunchedEffect(events) {
+        if (!isDragging) {
+            eventList.clear()
+            eventList.addAll(events)
+        }
+    }
+
+    // 排序模式：manual 才允许手动调整顺序
+    val defaultSort by container.settingsRepository.defaultSort
+        .collectAsState(initial = SortModes.REMAINING_ASC)
+    val manualSort = defaultSort == SortModes.MANUAL
+
+    // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
+    val displayEvents = remember(eventList.toList(), defaultSort) {
+        sortEventsForDisplay(eventList.toList(), defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    }
+
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-        if (folderList.isEmpty()) return@rememberReorderableLazyListState
-        val toIndex = to.index.coerceIn(0, folderList.lastIndex)
-        if (from.index in folderList.indices) {
-            val item = folderList.removeAt(from.index)
-            folderList.add(toIndex, item)
+        val fk = from.key.toString()
+        val tk = to.key.toString()
+        when {
+            fk.startsWith("f") && tk.startsWith("f") -> {
+                val fi = folderList.indexOfFirst { "f${it.id}" == fk }
+                val ti = folderList.indexOfFirst { "f${it.id}" == tk }
+                if (fi >= 0 && ti >= 0) folderList.moveItem(fi, ti)
+            }
+            fk.startsWith("e") && tk.startsWith("e") -> {
+                val fi = eventList.indexOfFirst { "e${it.id}" == fk }
+                val ti = eventList.indexOfFirst { "e${it.id}" == tk }
+                if (fi >= 0 && ti >= 0) eventList.moveItem(fi, ti)
+            }
         }
     }
     fun persistFolderOrder() {
@@ -341,6 +374,43 @@ private fun VaultListScreen(
             folderList.forEachIndexed { index, f ->
                 container.vaultFolderRepository.update(f.copy(sortIndex = index))
             }
+        }
+    }
+    fun persistEventOrder() {
+        scope.launch {
+            eventList.forEachIndexed { index, e ->
+                container.vaultRepository.update(e.copy(sortIndex = index))
+            }
+        }
+    }
+    fun moveVaultEvent(event: VaultEventEntity, action: String) {
+        if (!manualSort) {
+            Toast.makeText(
+                context,
+                "当前排序模式不支持手动调整，请在「设置 → 默认排序」中切换为手动排序",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val index = eventList.indexOfFirst { it.id == event.id }
+        if (index >= 0) {
+            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
+            persistEventOrder()
+        }
+    }
+    fun moveVaultFolder(folder: VaultFolderEntity, action: String) {
+        if (!manualSort) {
+            Toast.makeText(
+                context,
+                "当前排序模式不支持手动调整，请在「设置 → 默认排序」中切换为手动排序",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val index = folderList.indexOfFirst { it.id == folder.id }
+        if (index >= 0) {
+            folderList.moveItem(index, targetIndexForAction(index, folderList.size, action))
+            persistFolderOrder()
         }
     }
 
@@ -424,13 +494,15 @@ private fun VaultListScreen(
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
-                        val handleModifier = Modifier.draggableHandle(
-                            onDragStarted = { isDragging = true },
-                            onDragStopped = {
-                                isDragging = false
-                                persistFolderOrder()
-                            }
-                        )
+                        val handleModifier = if (!selectionMode && manualSort) {
+                            Modifier.draggableHandle(
+                                onDragStarted = { isDragging = true },
+                                onDragStopped = {
+                                    isDragging = false
+                                    persistFolderOrder()
+                                }
+                            )
+                        } else null
                         VaultFolderRow(
                             folder = folder,
                             selectionMode = selectionMode,
@@ -445,27 +517,41 @@ private fun VaultListScreen(
                                     showFolderDialog = true
                                 }
                             },
-                            dragHandle = if (!selectionMode) handleModifier else null
+                            dragHandle = handleModifier,
+                            onReorder = { action -> moveVaultFolder(folder, action) }
                         )
                     }
                     ListItemDivider()
                 }
-                items(events, key = { "e${it.id}" }) { event ->
-                    VaultEventRow(
-                        event = event,
-                        selectionMode = selectionMode,
-                        selected = event.id in selectedEventIds,
-                        onClick = {
-                            if (selectionMode) toggleEvent(event.id)
-                            else {
-                                editingEvent = event
-                                showEventDialog = true
-                            }
-                        },
-                        onMoveToMain = {
-                            scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
-                        }
-                    )
+                items(displayEvents, key = { "e${it.id}" }) { event ->
+                    ReorderableItem(reorderableState, key = "e${event.id}") {
+                        val handleModifier = if (selectionMode && manualSort) {
+                            Modifier.draggableHandle(
+                                onDragStarted = { isDragging = true },
+                                onDragStopped = {
+                                    isDragging = false
+                                    persistEventOrder()
+                                }
+                            )
+                        } else null
+                        VaultEventRow(
+                            event = event,
+                            selectionMode = selectionMode,
+                            selected = event.id in selectedEventIds,
+                            onClick = {
+                                if (selectionMode) toggleEvent(event.id)
+                                else {
+                                    editingEvent = event
+                                    showEventDialog = true
+                                }
+                            },
+                            onMoveToMain = {
+                                scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
+                            },
+                            onReorder = { action -> moveVaultEvent(event, action) },
+                            dragHandle = handleModifier
+                        )
+                    }
                     ListItemDivider()
                 }
             }
@@ -648,6 +734,62 @@ fun VaultFolderScreen(
     val allFoldersFlow = remember { container.vaultFolderRepository.observeAll() }
     val allFolders by allFoldersFlow.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    val folderContext = LocalContext.current
+
+    // 排序模式：manual 才允许手动调整顺序
+    val defaultSort by container.settingsRepository.defaultSort
+        .collectAsState(initial = SortModes.REMAINING_ASC)
+    val manualSort = defaultSort == SortModes.MANUAL
+
+    // 拖拽排序用的可变镜像列表（拖拽中不同步，避免跳动）
+    var isDraggingEvents by remember { mutableStateOf(false) }
+    val eventList = remember { mutableStateListOf<VaultEventEntity>() }
+    LaunchedEffect(events) {
+        if (!isDraggingEvents) {
+            eventList.clear()
+            eventList.addAll(events)
+        }
+    }
+
+    // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
+    val displayEvents = remember(eventList.toList(), defaultSort) {
+        sortEventsForDisplay(eventList.toList(), defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    }
+
+    val folderListState = rememberLazyListState()
+    val folderReorderableState = rememberReorderableLazyListState(folderListState) { from, to ->
+        val fk = from.key.toString()
+        val tk = to.key.toString()
+        if (fk.startsWith("e") && tk.startsWith("e")) {
+            val fi = eventList.indexOfFirst { "e${it.id}" == fk }
+            val ti = eventList.indexOfFirst { "e${it.id}" == tk }
+            if (fi >= 0 && ti >= 0) eventList.moveItem(fi, ti)
+        }
+    }
+
+    fun persistVaultFolderEventOrder() {
+        scope.launch {
+            eventList.forEachIndexed { index, e ->
+                container.vaultRepository.update(e.copy(sortIndex = index))
+            }
+        }
+    }
+
+    fun moveVaultFolderEvent(event: VaultEventEntity, action: String) {
+        if (!manualSort) {
+            Toast.makeText(
+                folderContext,
+                "当前排序模式不支持手动调整，请在「设置 → 默认排序」中切换为手动排序",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val index = eventList.indexOfFirst { it.id == event.id }
+        if (index >= 0) {
+            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
+            persistVaultFolderEventOrder()
+        }
+    }
 
     var showEventDialog by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<VaultEventEntity?>(null) }
@@ -720,23 +862,36 @@ fun VaultFolderScreen(
                 )
             }
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(events, key = { it.id }) { event ->
-                    VaultEventRow(
-                        event = event,
-                        selectionMode = selectionMode,
-                        selected = event.id in selectedEventIds,
-                        onClick = {
-                            if (selectionMode) toggleEvent(event.id)
-                            else {
-                                editingEvent = event
-                                showEventDialog = true
-                            }
-                        },
-                        onMoveToMain = {
-                            scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
-                        }
-                    )
+            LazyColumn(state = folderListState, modifier = Modifier.fillMaxSize()) {
+                items(displayEvents, key = { "e${it.id}" }) { event ->
+                    ReorderableItem(folderReorderableState, key = "e${event.id}") {
+                        val handleModifier = if (selectionMode && manualSort) {
+                            Modifier.draggableHandle(
+                                onDragStarted = { isDraggingEvents = true },
+                                onDragStopped = {
+                                    isDraggingEvents = false
+                                    persistVaultFolderEventOrder()
+                                }
+                            )
+                        } else null
+                        VaultEventRow(
+                            event = event,
+                            selectionMode = selectionMode,
+                            selected = event.id in selectedEventIds,
+                            onClick = {
+                                if (selectionMode) toggleEvent(event.id)
+                                else {
+                                    editingEvent = event
+                                    showEventDialog = true
+                                }
+                            },
+                            onMoveToMain = {
+                                scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
+                            },
+                            onReorder = { action -> moveVaultFolderEvent(event, action) },
+                            dragHandle = handleModifier
+                        )
+                    }
                     ListItemDivider()
                 }
             }
@@ -989,7 +1144,9 @@ private fun VaultEventRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
-    onMoveToMain: (() -> Unit)? = null
+    onMoveToMain: (() -> Unit)? = null,
+    onReorder: ((String) -> Unit)? = null,
+    dragHandle: Modifier? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
@@ -1021,6 +1178,15 @@ private fun VaultEventRow(
             color = if (isFuture) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.secondary
         )
+        if (dragHandle != null) {
+            IconButton(modifier = dragHandle, onClick = {}) {
+                Text(
+                    "⠿",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
         if (!selectionMode && onMoveToMain != null) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -1030,6 +1196,20 @@ private fun VaultEventRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
+                    if (onReorder != null) {
+                        DropdownMenuItem(
+                            text = { Text("上移") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.UP) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("下移") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.DOWN) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("移到顶部") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("移出到主空间") },
                         onClick = {
@@ -1050,7 +1230,8 @@ private fun VaultFolderRow(
     selected: Boolean = false,
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
-    dragHandle: Modifier? = null
+    dragHandle: Modifier? = null,
+    onReorder: ((String) -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -1073,6 +1254,31 @@ private fun VaultFolderRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )
+        if (!selectionMode && onReorder != null) {
+            var menuExpanded by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("上移") },
+                        onClick = { menuExpanded = false; onReorder(ReorderActions.UP) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("下移") },
+                        onClick = { menuExpanded = false; onReorder(ReorderActions.DOWN) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("移到顶部") },
+                        onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
+                    )
+                }
+            }
+        }
         if (dragHandle != null) {
             IconButton(modifier = dragHandle, onClick = {}) {
                 Text(

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -55,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.Routes
@@ -64,7 +67,17 @@ import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
+import com.ayaka7452.daymate.feature.common.ReorderActions
+import com.ayaka7452.daymate.feature.common.SortModes
+import com.ayaka7452.daymate.feature.common.eventDaysUntil
+import com.ayaka7452.daymate.feature.common.moveItem
+import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
+import com.ayaka7452.daymate.feature.common.targetIndexForAction
+import com.ayaka7452.daymate.feature.home.SelectionDot
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +113,92 @@ fun HomeScreen(
     var vaultNeedSetup by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // 排序模式：remaining_asc/remaining_desc/manual（manual 才允许手动调整顺序）
+    val defaultSort by container.settingsRepository.defaultSort
+        .collectAsState(initial = SortModes.REMAINING_ASC)
+    val manualSort = defaultSort == SortModes.MANUAL
+
+    // 拖拽排序用的可变镜像列表：Flow 更新时同步（拖拽中不同步，避免跳动）
+    var isDragging by remember { mutableStateOf(false) }
+    val folderList = remember { mutableStateListOf<FolderEntity>() }
+    val eventList = remember { mutableStateListOf<EventEntity>() }
+    LaunchedEffect(folders) {
+        if (!isDragging) {
+            folderList.clear()
+            folderList.addAll(folders)
+        }
+    }
+    LaunchedEffect(events) {
+        if (!isDragging) {
+            eventList.clear()
+            eventList.addAll(events)
+        }
+    }
+
+    // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
+    val displayEvents = remember(eventList.toList(), defaultSort) {
+        sortEventsForDisplay(eventList.toList(), defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    }
+
+    val listState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+        val fk = from.key.toString()
+        val tk = to.key.toString()
+        when {
+            fk.startsWith("f") && tk.startsWith("f") -> {
+                val fi = folderList.indexOfFirst { "f${it.id}" == fk }
+                val ti = folderList.indexOfFirst { "f${it.id}" == tk }
+                if (fi >= 0 && ti >= 0) folderList.moveItem(fi, ti)
+            }
+            fk.startsWith("e") && tk.startsWith("e") -> {
+                val fi = eventList.indexOfFirst { "e${it.id}" == fk }
+                val ti = eventList.indexOfFirst { "e${it.id}" == tk }
+                if (fi >= 0 && ti >= 0) eventList.moveItem(fi, ti)
+            }
+        }
+    }
+
+    fun persistFolderOrder() {
+        scope.launch {
+            folderList.forEachIndexed { index, f ->
+                container.folderRepository.update(f.copy(sortIndex = index))
+            }
+        }
+    }
+
+    fun persistEventOrder() {
+        scope.launch {
+            eventList.forEachIndexed { index, e ->
+                container.eventRepository.update(e.copy(sortIndex = index))
+            }
+        }
+    }
+
+    fun requireManualThen(action: () -> Unit) {
+        if (manualSort) action() else Toast.makeText(
+            context,
+            "当前排序模式不支持手动调整，请在「设置 → 默认排序」中切换为手动排序",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    fun moveEvent(event: EventEntity, action: String) = requireManualThen {
+        val index = eventList.indexOfFirst { it.id == event.id }
+        if (index >= 0) {
+            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
+            persistEventOrder()
+        }
+    }
+
+    fun moveFolder(folder: FolderEntity, action: String) = requireManualThen {
+        val index = folderList.indexOfFirst { it.id == folder.id }
+        if (index >= 0) {
+            folderList.moveItem(index, targetIndexForAction(index, folderList.size, action))
+            persistFolderOrder()
+        }
+    }
 
     val totalSelected = selectedEventIds.size + selectedFolderIds.size
 
@@ -225,53 +324,80 @@ fun HomeScreen(
             )
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                items(folders, key = { "f${it.id}" }) { folder ->
-                    FolderRow(
-                        folder = folder,
-                        selectionMode = selectionMode,
-                        selected = folder.id in selectedFolderIds,
-                        onClick = {
-                            if (selectionMode) toggleFolder(folder.id)
-                            else onNavigate("folder/${folder.id}")
-                        },
-                        onLongClick = {
-                            if (!selectionMode) {
-                                folderDialogTarget = folder
-                                showFolderDialog = true
-                            }
-                        },
-                        onMoveToRecycleBin = {
-                            folderToDelete = folder
-                            showFolderDeleteConfirm = true
-                        }
-                    )
+                items(folderList, key = { "f${it.id}" }) { folder ->
+                    ReorderableItem(reorderableState, key = "f${folder.id}") {
+                        val handle = if (selectionMode && manualSort) {
+                            Modifier.draggableHandle(
+                                onDragStarted = { isDragging = true },
+                                onDragStopped = {
+                                    isDragging = false
+                                    persistFolderOrder()
+                                }
+                            )
+                        } else null
+                        FolderRow(
+                            folder = folder,
+                            selectionMode = selectionMode,
+                            selected = folder.id in selectedFolderIds,
+                            onClick = {
+                                if (selectionMode) toggleFolder(folder.id)
+                                else onNavigate("folder/${folder.id}")
+                            },
+                            onLongClick = {
+                                if (!selectionMode) {
+                                    folderDialogTarget = folder
+                                    showFolderDialog = true
+                                }
+                            },
+                            onMoveToRecycleBin = {
+                                folderToDelete = folder
+                                showFolderDeleteConfirm = true
+                            },
+                            onReorder = { action -> moveFolder(folder, action) },
+                            dragHandle = handle
+                        )
+                    }
                     ListItemDivider()
                 }
-                items(events, key = { "e${it.id}" }) { event ->
-                    EventRow(
-                        event = event,
-                        selectionMode = selectionMode,
-                        selected = event.id in selectedEventIds,
-                        onClick = {
-                            if (selectionMode) toggleEvent(event.id)
-                            else onNavigate("event_form?eventId=${event.id}")
-                        },
-                        onMoveToVault = {
-                            if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
-                        },
-                        onMoveToRecycleBin = {
-                            scope.launch {
-                                container.eventRepository.softDeleteByIds(
-                                    listOf(event.id),
-                                    System.currentTimeMillis()
-                                )
-                            }
-                        }
-                    )
+                items(displayEvents, key = { "e${it.id}" }) { event ->
+                    ReorderableItem(reorderableState, key = "e${event.id}") {
+                        val handle = if (selectionMode && manualSort) {
+                            Modifier.draggableHandle(
+                                onDragStarted = { isDragging = true },
+                                onDragStopped = {
+                                    isDragging = false
+                                    persistEventOrder()
+                                }
+                            )
+                        } else null
+                        EventRow(
+                            event = event,
+                            selectionMode = selectionMode,
+                            selected = event.id in selectedEventIds,
+                            onClick = {
+                                if (selectionMode) toggleEvent(event.id)
+                                else onNavigate("event_form?eventId=${event.id}")
+                            },
+                            onMoveToVault = {
+                                if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
+                            },
+                            onMoveToRecycleBin = {
+                                scope.launch {
+                                    container.eventRepository.softDeleteByIds(
+                                        listOf(event.id),
+                                        System.currentTimeMillis()
+                                    )
+                                }
+                            },
+                            onReorder = { action -> moveEvent(event, action) },
+                            dragHandle = handle
+                        )
+                    }
                     ListItemDivider()
                 }
             }
@@ -485,7 +611,9 @@ fun EventRow(
     selected: Boolean = false,
     onClick: () -> Unit = {},
     onMoveToVault: (() -> Unit)? = null,
-    onMoveToRecycleBin: (() -> Unit)? = null
+    onMoveToRecycleBin: (() -> Unit)? = null,
+    onReorder: ((String) -> Unit)? = null,
+    dragHandle: Modifier? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
@@ -537,6 +665,15 @@ fun EventRow(
             color = if (isFuture) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.secondary
         )
+        if (dragHandle != null) {
+            IconButton(modifier = dragHandle, onClick = {}) {
+                Text(
+                    "⠿",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
         if (!selectionMode && onMoveToVault != null) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -546,6 +683,20 @@ fun EventRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
+                    if (onReorder != null) {
+                        DropdownMenuItem(
+                            text = { Text("上移") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.UP) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("下移") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.DOWN) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("移到顶部") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("移入 Vault") },
                         onClick = {
@@ -573,7 +724,9 @@ fun FolderRow(
     selected: Boolean = false,
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
-    onMoveToRecycleBin: (() -> Unit)? = null
+    onMoveToRecycleBin: (() -> Unit)? = null,
+    onReorder: ((String) -> Unit)? = null,
+    dragHandle: Modifier? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Row(
@@ -600,6 +753,15 @@ fun FolderRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )
+        if (dragHandle != null) {
+            IconButton(modifier = dragHandle, onClick = {}) {
+                Text(
+                    "⠿",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
         if (!selectionMode) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -609,6 +771,20 @@ fun FolderRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
+                    if (onReorder != null) {
+                        DropdownMenuItem(
+                            text = { Text("上移") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.UP) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("下移") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.DOWN) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("移到顶部") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("移入回收站") },
                         onClick = {
