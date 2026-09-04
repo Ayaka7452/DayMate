@@ -144,7 +144,7 @@ private fun VaultSetupScreen(
     var enableBiometric by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    VaultScaffold(title = "设置 Vault 密码", onExit = onExit) {
+    VaultScaffold(title = "设置 Vault 密码", onExit = onExit, showMenu = false) {
         Text(
             "首次进入，请设置密码（至少 6 位）。请牢记，此密码无法找回。",
             style = MaterialTheme.typography.bodyMedium,
@@ -243,7 +243,7 @@ private fun VaultUnlockScreen(
         prompt.authenticate(info)
     }
 
-    VaultScaffold(title = "Vault", onExit = onExit) {
+    VaultScaffold(title = "Vault", onExit = onExit, showMenu = false) {
         Text("输入密码解锁", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(16.dp))
         OutlinedTextField(
@@ -1077,6 +1077,7 @@ private fun VaultScaffold(
     onDelete: (() -> Unit)? = null,
     fab: @Composable (() -> Unit)? = null,
     menuItems: @Composable ColumnScope.() -> Unit = {},
+    showMenu: Boolean = true,
     content: @Composable () -> Unit
 ) {
     Scaffold(
@@ -1110,15 +1111,17 @@ private fun VaultScaffold(
                         }
                     },
                     actions = {
-                        var menuExpanded by remember { mutableStateOf(false) }
-                        Box {
-                            IconButton(onClick = { menuExpanded = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "菜单")
+                        if (showMenu) {
+                            var menuExpanded by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { menuExpanded = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "菜单")
+                                }
+                                DropdownMenu(
+                                    expanded = menuExpanded,
+                                    onDismissRequest = { menuExpanded = false }
+                                ) { menuItems() }
                             }
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false }
-                            ) { menuItems() }
                         }
                         TextButton(onClick = onExit) { Text("退出") }
                     }
