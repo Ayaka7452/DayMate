@@ -53,6 +53,7 @@ fun EventFormScreen(
     var title by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var epochDay by remember { mutableStateOf(LocalDate.now().plusDays(7).toEpochDay()) }
+    var refDaysText by remember { mutableStateOf("") }
     var loaded by remember { mutableStateOf<EventEntity?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -64,6 +65,7 @@ fun EventFormScreen(
                 title = e.title
                 note = e.note ?: ""
                 epochDay = e.targetDateEpochDay
+                refDaysText = e.refDays?.toString() ?: ""
             }
         }
     }
@@ -128,18 +130,35 @@ fun EventFormScreen(
                 )
             }
 
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = refDaysText,
+                onValueChange = { refDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
+                label = { Text("对照天数（可选）") },
+                placeholder = { Text("例如：8") },
+                supportingText = { Text("目标日期已过去时，显示为「已过 X/N 天」，如 2/8") },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                ),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
             Spacer(Modifier.height(24.dp))
 
             Button(
                 onClick = {
                     scope.launch {
                         val noteValue = note.takeIf { it.isNotBlank() }
+                        val refValue = refDaysText.toIntOrNull()?.takeIf { it > 0 }
                         if (isEdit) {
                             container.eventRepository.update(
                                 loaded!!.copy(
                                     title = title.ifBlank { "未命名事件" },
                                     note = noteValue,
-                                    targetDateEpochDay = epochDay
+                                    targetDateEpochDay = epochDay,
+                                    refDays = refValue
                                 )
                             )
                         } else {
@@ -148,6 +167,7 @@ fun EventFormScreen(
                                     title = title.ifBlank { "未命名事件" },
                                     note = noteValue,
                                     targetDateEpochDay = epochDay,
+                                    refDays = refValue,
                                     folderId = folderId
                                 )
                             )

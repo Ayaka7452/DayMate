@@ -852,6 +852,7 @@ private fun VaultEventDialog(
     var epochDay by remember {
         mutableStateOf(existing?.targetDateEpochDay ?: LocalDate.now().plusDays(7).toEpochDay())
     }
+    var refDaysText by remember { mutableStateOf(existing?.refDays?.toString() ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val datePickerState = rememberDatePickerState()
@@ -865,11 +866,13 @@ private fun VaultEventDialog(
         confirmButton = {
             TextButton(onClick = {
                 scope.launch {
+                    val refValue = refDaysText.toIntOrNull()?.takeIf { it > 0 }
                     if (existing == null) {
                         container.vaultRepository.add(
                             VaultEventEntity(
                                 title = title.ifBlank { "未命名" },
                                 targetDateEpochDay = epochDay,
+                                refDays = refValue,
                                 folderId = folderId
                             )
                         )
@@ -877,7 +880,8 @@ private fun VaultEventDialog(
                         container.vaultRepository.update(
                             existing.copy(
                                 title = title.ifBlank { "未命名" },
-                                targetDateEpochDay = epochDay
+                                targetDateEpochDay = epochDay,
+                                refDays = refValue
                             )
                         )
                     }
@@ -906,6 +910,19 @@ private fun VaultEventDialog(
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = refDaysText,
+                    onValueChange = { refDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
+                    label = { Text("对照天数（可选）") },
+                    placeholder = { Text("例如：8") },
+                    supportingText = { Text("目标日期已过去时，显示为「已过 X/N 天」，如 2/8") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     )
@@ -937,7 +954,11 @@ private fun VaultEventRow(
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
-    val text = if (isFuture) "还有 $days 天" else "已过 ${-days} 天"
+    val text = when {
+        isFuture -> "还有 $days 天"
+        event.refDays != null && event.refDays > 0 -> "已过 ${-days}/${event.refDays} 天"
+        else -> "已过 ${-days} 天"
+    }
     var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier

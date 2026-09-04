@@ -38,6 +38,8 @@ data class EventEntity(
     val note: String? = null,
     val color: Int? = null,
     val folderId: Long? = null,
+    /** 对照天数：可选。仅当目标日期已过去时用于显示「已过 X/N 天」（如 X/N = 2/8）。 */
+    val refDays: Int? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val isDeleted: Boolean = false,
@@ -66,6 +68,8 @@ data class VaultEventEntity(
     val note: String? = null,
     val color: Int? = null,
     val folderId: Long? = null,
+    /** 对照天数：可选。仅当目标日期已过去时用于显示「已过 X/N 天」（如 X/N = 2/8）。 */
+    val refDays: Int? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

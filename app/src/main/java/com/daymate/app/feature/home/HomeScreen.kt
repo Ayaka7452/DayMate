@@ -489,7 +489,11 @@ fun EventRow(
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
-    val text = if (isFuture) "还有 $days 天" else "已过 ${-days} 天"
+    val text = when {
+        isFuture -> "还有 $days 天"
+        event.refDays != null && event.refDays > 0 -> "已过 ${-days}/${event.refDays} 天"
+        else -> "已过 ${-days} 天"
+    }
 
     var menuExpanded by remember { mutableStateOf(false) }
 

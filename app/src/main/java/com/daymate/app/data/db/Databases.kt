@@ -5,7 +5,6 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
-import java.io.File
 
 @Database(
     entities = [
@@ -72,36 +71,21 @@ abstract class DayMateDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 -> v4：事件与 Vault 事件新增「对照天数」refDays（可空，用于已过日期显示 X/N）。 */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE events ADD COLUMN refDays INTEGER")
+                db.execSQL("ALTER TABLE vault_events ADD COLUMN refDays INTEGER")
+            }
+        }
+
         fun build(context: Context): DayMateDatabase {
             // 路线 A：主库永远建在应用内部沙盒（getDatabasePath("daymate.db")），
             // 不直接碰外部存储路径，因此不需要 MANAGE_EXTERNAL_STORAGE 等任何存储权限。
             // 用户数据「备份到自选文件夹」由 StorageBackup 通过 SAF 持久化 URI 完成，
             // 与 Room 主库的物理位置解耦。
             return Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                .fallbackToDestructiveMigration()
-                .build()
-        }
-    }
-}
-
-/**
- * 仅用于「旧版独立 vault.db」的一次性明文迁移读取（[com.ayaka7452.daymate.DayMateApp] 启动时）。
- * 合并后正常运行不再使用本类；其 schema 必须与历史 vault.db 一致。
- */
-@Database(
-    entities = [VaultEventEntity::class, VaultFolderEntity::class],
-    version = 2,
-    exportSchema = false
-)
-abstract class VaultDatabase : RoomDatabase() {
-    abstract fun vaultEventDao(): VaultEventDao
-    abstract fun vaultFolderDao(): VaultFolderDao
-
-    companion object {
-        fun buildForMigration(context: Context, file: File): VaultDatabase {
-            return Room.databaseBuilder(context, VaultDatabase::class.java, "vault_migration_tmp")
-                .createFromFile(file)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
         }

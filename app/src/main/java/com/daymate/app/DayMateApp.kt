@@ -1,9 +1,9 @@
 package com.ayaka7452.daymate
 
 import android.app.Application
+import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 import com.ayaka7452.daymate.core.AppContainer
-import com.ayaka7452.daymate.data.db.VaultDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -39,18 +39,69 @@ class DayMateApp : Application() {
 
         for (old in candidates.distinct()) {
             if (!old.exists()) continue
-            runCatching {
-                runBlocking(Dispatchers.IO) {
-                    val legacy = VaultDatabase.buildForMigration(this@DayMateApp, old)
-                    val events = legacy.vaultEventDao().getAll()
-                    val folders = legacy.vaultFolderDao().getAll()
-                    legacy.close()
-                    if (events.isNotEmpty() || folders.isNotEmpty()) {
-                        container.vaultRepository.addAll(events)
-                        container.vaultFolderRepository.addAll(folders)
+            // 旧库 schema 与当前 Room 实体不保证一致（实体可能新增列），用裸 SQL 只读读取，
+            // 避免 Room schema 校验失败；先读文件夹再读事件（保持外键引用有效）。
+            val migrated = runCatching {
+                SQLiteDatabase.openDatabase(old.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                    val folders = mutableListOf<com.ayaka7452.daymate.data.db.VaultFolderEntity>()
+                    db.rawQuery(
+                        "SELECT id, name, icon, color, sortIndex, isPinned, createdAt FROM vault_folders",
+                        null
+                    ).use { c ->
+                        while (c.moveToNext()) {
+                            folders.add(
+                                com.ayaka7452.daymate.data.db.VaultFolderEntity(
+                                    id = c.getLong(0),
+                                    name = c.getString(1),
+                                    icon = c.getString(2),
+                                    color = if (c.isNull(3)) null else c.getInt(3),
+                                    sortIndex = c.getInt(4),
+                                    isPinned = c.getInt(5) != 0,
+                                    createdAt = c.getLong(6)
+                                )
+                            )
+                        }
                     }
+                    val folderIds = folders.map { it.id }.toSet()
+                    val events = mutableListOf<com.ayaka7452.daymate.data.db.VaultEventEntity>()
+                    db.rawQuery(
+                        "SELECT id, title, targetDateEpochDay, repeatYearly, note, color, folderId, " +
+                            "sortIndex, isPinned, createdAt, updatedAt FROM vault_events",
+                        null
+                    ).use { c ->
+                        while (c.moveToNext()) {
+                            val fid = c.getLong(6)
+                            events.add(
+                                com.ayaka7452.daymate.data.db.VaultEventEntity(
+                                    id = c.getLong(0),
+                                    title = c.getString(1),
+                                    targetDateEpochDay = c.getLong(2),
+                                    repeatYearly = c.getInt(3) != 0,
+                                    note = c.getString(4),
+                                    color = if (c.isNull(5)) null else c.getInt(5),
+                                    folderId = if (c.isNull(6) || fid !in folderIds) null else fid,
+                                    sortIndex = c.getInt(7),
+                                    isPinned = c.getInt(8) != 0,
+                                    createdAt = c.getLong(9),
+                                    updatedAt = c.getLong(10)
+                                )
+                            )
+                        }
+                    }
+                    folders to events
                 }
-            }.onFailure { Log.w("DayMateMigrate", "legacy vault migrate failed", it) }
+            }.onFailure { Log.w("DayMateMigrate", "legacy vault read failed", it) }
+                .getOrDefault(emptyList<com.ayaka7452.daymate.data.db.VaultFolderEntity>() to emptyList())
+
+            val (folders, events) = migrated
+            if (folders.isNotEmpty() || events.isNotEmpty()) {
+                runCatching {
+                    runBlocking(Dispatchers.IO) {
+                        container.vaultFolderRepository.addAll(folders)
+                        container.vaultRepository.addAll(events)
+                    }
+                }.onFailure { Log.w("DayMateMigrate", "legacy vault import failed", it) }
+            }
             runCatching { old.delete() }
         }
     }
