@@ -179,7 +179,7 @@ fun HomeScreen(
     fun requireManualThen(action: () -> Unit) {
         if (manualSort) action() else Toast.makeText(
             context,
-            "当前排序模式不支持手动调整，请在「设置 → 默认排序」中切换为手动排序",
+            "请先在设置中切换为手动排序",
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -696,6 +696,10 @@ fun EventRow(
                             text = { Text("移到顶部") },
                             onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
                         )
+                        DropdownMenuItem(
+                            text = { Text("移到底部") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.BOTTOM) }
+                        )
                     }
                     DropdownMenuItem(
                         text = { Text("移入 Vault") },
@@ -783,6 +787,10 @@ fun FolderRow(
                         DropdownMenuItem(
                             text = { Text("移到顶部") },
                             onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("移到底部") },
+                            onClick = { menuExpanded = false; onReorder(ReorderActions.BOTTOM) }
                         )
                     }
                     DropdownMenuItem(

@@ -27,11 +27,12 @@ fun <T> MutableList<T>.moveItem(from: Int, to: Int) {
     add(target, removeAt(from))
 }
 
-/** 按「上移/下移/移到顶部」动作计算目标下标。 */
+/** 按「上移/下移/移到顶部/移到底部」动作计算目标下标。 */
 fun targetIndexForAction(index: Int, size: Int, action: String): Int = when (action) {
     ReorderActions.UP -> index - 1
     ReorderActions.DOWN -> index + 1
     ReorderActions.TOP -> 0
+    ReorderActions.BOTTOM -> size - 1
     else -> index
 }.coerceIn(0, (size - 1).coerceAtLeast(0))
 
