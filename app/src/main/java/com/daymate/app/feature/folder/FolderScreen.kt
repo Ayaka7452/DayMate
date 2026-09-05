@@ -25,7 +25,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.activity.compose.BackHandler
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -112,11 +112,6 @@ fun FolderScreen(
         searchActive = false
         searchQuery = ""
     }
-    val query = searchQuery.trim()
-    val shownEvents = remember(displayEvents, query) {
-        if (query.isEmpty()) displayEvents
-        else displayEvents.filter { matchesQuery(it.title, it.note, query) }
-    }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -140,6 +135,13 @@ fun FolderScreen(
     // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
     val displayEvents = remember(eventList.toList(), defaultSort) {
         sortEventsForDisplay(eventList.toList(), defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    }
+
+    // 页内搜索过滤（标题 + 备注）
+    val query = searchQuery.trim()
+    val shownEvents = remember(displayEvents, query) {
+        if (query.isEmpty()) displayEvents
+        else displayEvents.filter { matchesQuery(it.title, it.note, query) }
     }
 
     val listState = rememberLazyListState()

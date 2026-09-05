@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面小组件（迷你 2×1）：紧凑单行卡片 -->
+<!-- 桌面小组件（迷你 2×1）：紧凑单行卡片
+     字阶：标题 13sp / 日期 10sp / 数字 24sp + 单位 11sp（同行基线对齐） -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -43,6 +44,7 @@
                 android:id="@+id/widget_subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:textSize="10sp"
@@ -50,11 +52,12 @@
                 android:text="暂无倒数日" />
         </LinearLayout>
 
+        <!-- 数字与单位同行、基线对齐 -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="bottom|center_horizontal"
+            android:baselineAligned="true"
             android:layout_marginStart="8dp">
 
             <TextView
@@ -62,7 +65,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
-                android:textSize="22sp"
+                android:textSize="24sp"
                 android:textColor="#1E78D0"
                 android:text="" />
 
@@ -70,9 +73,8 @@
                 android:id="@+id/widget_days_unit"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="1dp"
-                android:layout_marginBottom="3dp"
-                android:textSize="10sp"
+                android:layout_marginStart="2dp"
+                android:textSize="11sp"
                 android:textColor="#7A7570"
                 android:text="" />
         </LinearLayout>

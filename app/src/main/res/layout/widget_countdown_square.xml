@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面小组件（方形 2×2）：标题在上，大号天数居中，日期在下 -->
+<!-- 桌面小组件（方形 2×2）：标题在上，数字+单位居中（同行基线对齐），日期在下
+     字阶：标题 14sp / 数字 38sp + 单位 13sp / 日期 11sp -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -30,27 +31,36 @@
             android:ellipsize="end"
             android:gravity="center"
             android:fontFamily="sans-serif-medium"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:textColor="#1C1B1F"
             android:text="DayMate" />
 
-        <TextView
-            android:id="@+id/widget_days_number"
+        <!-- 数字与单位同行、基线对齐 -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:fontFamily="sans-serif-medium"
-            android:textSize="46sp"
-            android:textColor="#1E78D0"
-            android:text="" />
+            android:orientation="horizontal"
+            android:baselineAligned="true"
+            android:layout_marginTop="4dp">
 
-        <TextView
-            android:id="@+id/widget_days_unit"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="#7A7570"
-            android:text="" />
+            <TextView
+                android:id="@+id/widget_days_number"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:textSize="38sp"
+                android:textColor="#1E78D0"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/widget_days_unit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:textSize="13sp"
+                android:textColor="#7A7570"
+                android:text="" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/widget_subtitle"
@@ -60,7 +70,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:gravity="center"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:textColor="#7A7570"
             android:text="暂无倒数日" />
     </LinearLayout>

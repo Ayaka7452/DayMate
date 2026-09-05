@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面小组件（标准 3×1）：底层圆角卡片（独立层，可控透明度/深浅色）+ 上层内容 -->
+<!-- 桌面小组件（标准 3×1）：底层圆角卡片（独立层，可控透明度/深浅色）+ 上层内容
+     字阶：标题 14sp / 日期 11sp / 数字 32sp + 单位 13sp（同行基线对齐） -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -19,8 +20,8 @@
         android:gravity="center_vertical"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp">
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -35,7 +36,7 @@
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textColor="#1C1B1F"
                 android:text="DayMate" />
 
@@ -43,18 +44,20 @@
                 android:id="@+id/widget_subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textColor="#7A7570"
                 android:text="暂无倒数日" />
         </LinearLayout>
 
+        <!-- 数字与单位同行、基线对齐，避免单位孤行或比例失衡 -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
+            android:orientation="horizontal"
+            android:baselineAligned="true"
             android:layout_marginStart="12dp">
 
             <TextView
@@ -62,7 +65,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
-                android:textSize="34sp"
+                android:textSize="32sp"
                 android:textColor="#1E78D0"
                 android:text="" />
 
@@ -70,7 +73,8 @@
                 android:id="@+id/widget_days_unit"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="12sp"
+                android:layout_marginStart="3dp"
+                android:textSize="13sp"
                 android:textColor="#7A7570"
                 android:text="" />
         </LinearLayout>
