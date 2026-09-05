@@ -14,7 +14,7 @@ import kotlin.math.abs
 
 /**
  * 2×2 方形小组件「自动」模式的多事件列表数据源：
- * 显示距离今天最近的若干个事件（未到期优先、过去事件按远近混排），点击打开应用。
+ * 显示距离今天最近的若干个事件（未到期优先、过去事件按远近混排），点击行直达对应事件详情。
  */
 class CountdownWidgetListService : RemoteViewsService() {
 
@@ -26,7 +26,7 @@ class CountdownWidgetListService : RemoteViewsService() {
         intent: Intent
     ) : RemoteViewsFactory {
 
-        private data class Row(val title: String, val daysText: String, val isPast: Boolean)
+        private data class Row(val title: String, val daysText: String, val isPast: Boolean, val eventId: Long)
 
         @Suppress("unused")
         private val appWidgetId: Int =
@@ -58,7 +58,8 @@ class CountdownWidgetListService : RemoteViewsService() {
                         Row(
                             title = e.title,
                             daysText = if (diff >= 0) "还有 $diff 天" else "已过 ${-diff} 天",
-                            isPast = diff < 0
+                            isPast = diff < 0,
+                            eventId = e.id
                         )
                     )
                 }
@@ -83,8 +84,11 @@ class CountdownWidgetListService : RemoteViewsService() {
             views.setTextViewText(R.id.row_days, row.daysText)
             views.setTextColor(R.id.row_title, titleColor)
             views.setTextColor(R.id.row_days, if (row.isPast) titleColor else accentColor)
-            // 配合渲染层的 PendingIntentTemplate，实现整行点击打开应用
-            views.setOnClickFillInIntent(R.id.row_root, Intent())
+            // 配合渲染层的 PendingIntentTemplate：整行点击携带 eventId 打开事件详情
+            views.setOnClickFillInIntent(
+                R.id.row_root,
+                Intent().putExtra("eventId", row.eventId)
+            )
             return views
         }
 

@@ -49,7 +49,7 @@
                 android:ellipsize="end"
                 android:textSize="11sp"
                 android:textColor="#7A7570"
-                android:text="暂无倒数日" />
+                android:text="2026/12/19 · 还有" />
         </LinearLayout>
 
         <!-- 数字与单位同行、基线对齐 -->
@@ -67,7 +67,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:textSize="30sp"
                 android:textColor="#1E78D0"
-                android:text="" />
+                android:text="105" />
 
             <TextView
                 android:id="@+id/widget_days_unit"
@@ -76,7 +76,7 @@
                 android:layout_marginStart="2dp"
                 android:textSize="13sp"
                 android:textColor="#7A7570"
-                android:text="" />
+                android:text="天" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>
