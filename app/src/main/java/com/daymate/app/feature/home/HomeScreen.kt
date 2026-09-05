@@ -102,6 +102,12 @@ fun HomeScreen(
     val folders by foldersFlow.collectAsState(initial = emptyList())
     val vaultSet by container.settingsRepository.vaultPasswordSet
         .collectAsState(initial = false)
+    // 主页顶部卡片模式：festival（默认）/ event / off
+    val homeTopCard by container.settingsRepository.homeTopCard
+        .collectAsState(initial = "festival")
+    // 「最近倒数日」卡片数据源：含各文件夹内的事件（observeRoot 不够）
+    val allEventsFlow = remember { container.eventRepository.observeAll() }
+    val allEvents by allEventsFlow.collectAsState(initial = emptyList())
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
@@ -493,24 +499,53 @@ fun HomeScreen(
                         )
                     }
                 }
-                item(key = "festival_card") {
-                    com.ayaka7452.daymate.feature.common.FestivalCountdownCard(
-                        hasData = festivalHasData,
-                        festival = nextFestival,
-                        onClick = {
-                            if (!festivalHasData) {
-                                onNavigate(Routes.SETTINGS)
-                            } else if (nextFestival != null) {
-                                val f = nextFestival!!
-                                onNavigate(
-                                    "event_form?festivalName=" +
-                                        android.net.Uri.encode(f.name) +
-                                        "&festivalEpochDay=" + f.date.toEpochDay()
+                // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）
+                when (homeTopCard) {
+                    "festival" -> item(key = "festival_card") {
+                        com.ayaka7452.daymate.feature.common.FestivalCountdownCard(
+                            hasData = festivalHasData,
+                            festival = nextFestival,
+                            onClick = {
+                                if (!festivalHasData) {
+                                    onNavigate(Routes.SETTINGS)
+                                } else if (nextFestival != null) {
+                                    val f = nextFestival!!
+                                    onNavigate(
+                                        "event_form?festivalName=" +
+                                            android.net.Uri.encode(f.name) +
+                                            "&festivalEpochDay=" + f.date.toEpochDay()
+                                    )
+                                }
+                            },
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    "event" -> {
+                        // 最近倒数日：优先取剩余天数最少的未过期事件；全部已过期则取最近过期的
+                        val today = java.time.LocalDate.now().toEpochDay()
+                        val nearest = allEvents
+                            .filter { it.targetDateEpochDay >= today }
+                            .minByOrNull { it.targetDateEpochDay }
+                        val pastNearest = allEvents
+                            .filter { it.targetDateEpochDay < today }
+                            .maxByOrNull { it.targetDateEpochDay }
+                        val show = nearest ?: pastNearest
+                        val isPast = nearest == null
+                        if (show != null) {
+                            item(key = "event_card") {
+                                val dateStr = java.time.LocalDate.ofEpochDay(show.targetDateEpochDay)
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("M月d日"))
+                                com.ayaka7452.daymate.feature.common.EventCountdownCard(
+                                    title = show.title,
+                                    dateStr = dateStr,
+                                    days = kotlin.math.abs(show.targetDateEpochDay - today).toInt(),
+                                    past = isPast,
+                                    onClick = { onNavigate("event_form?eventId=${show.id}") },
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
-                        },
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                        }
+                    }
                 }
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {

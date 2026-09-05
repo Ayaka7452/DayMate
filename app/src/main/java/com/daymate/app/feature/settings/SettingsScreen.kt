@@ -62,6 +62,8 @@ fun SettingsScreen(
         .collectAsState(initial = "system")
     val defaultSort by container.settingsRepository.defaultSort
         .collectAsState(initial = "remaining_asc")
+    val homeTopCard by container.settingsRepository.homeTopCard
+        .collectAsState(initial = "festival")
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
 
@@ -98,6 +100,11 @@ fun SettingsScreen(
         "remaining_asc" to "剩余天数升序",
         "remaining_desc" to "剩余天数降序",
         "manual" to "手动排序"
+    )
+    val homeCardOptions = listOf(
+        "festival" to "下一个节假日（默认）",
+        "event" to "最近的倒数日",
+        "off" to "关闭"
     )
 
     Scaffold(
@@ -169,6 +176,46 @@ fun SettingsScreen(
                     Text(label, style = MaterialTheme.typography.bodyLarge)
                 }
             }
+
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
+            // ===== 主页顶部卡片 =====
+            Text(
+                "主页顶部卡片",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            Text(
+                "控制主页列表顶部的卡片显示内容。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            homeCardOptions.forEach { (value, label) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            scope.launch { container.settingsRepository.setHomeTopCard(value) }
+                        }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = homeTopCard == value,
+                        onClick = {
+                            scope.launch { container.settingsRepository.setHomeTopCard(value) }
+                        }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            TextButton(onClick = {
+                scope.launch { container.settingsRepository.setHomeTopCard("festival") }
+                Toast.makeText(ctx, "已恢复默认（下一个节假日）", Toast.LENGTH_SHORT).show()
+            }) { Text("恢复默认") }
 
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()

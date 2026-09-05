@@ -17,6 +17,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val VAULT_BIOMETRIC = booleanPreferencesKey("vault_biometric_enabled")
         private val DEFAULT_SORT = stringPreferencesKey("default_sort")        // remaining_asc 等
         private val AUTO_BACKUP = booleanPreferencesKey("auto_backup_enabled")  // 修改后自动备份，默认开启
+        private val HOME_TOP_CARD = stringPreferencesKey("home_top_card")       // festival / event / off
     }
 
     val themeMode: Flow<String> = dataStore.data.map { it[THEME] ?: "system" }
@@ -37,6 +38,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     /** 是否在每次数据库修改后自动备份到已配置的 SAF 备份文件夹（默认开启）。 */
     val autoBackupEnabled: Flow<Boolean> = dataStore.data.map { it[AUTO_BACKUP] ?: true }
+
+    /** 主页顶部卡片内容：festival=下一个节假日（默认）/ event=最近的倒数日 / off=关闭。 */
+    val homeTopCard: Flow<String> = dataStore.data.map { it[HOME_TOP_CARD] ?: "festival" }
 
     suspend fun setThemeMode(mode: String) {
         dataStore.edit { it[THEME] = mode }
@@ -69,5 +73,10 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     /** 设置「修改后自动备份」开关。 */
     suspend fun setAutoBackupEnabled(enabled: Boolean) {
         dataStore.edit { it[AUTO_BACKUP] = enabled }
+    }
+
+    /** 设置主页顶部卡片显示内容。 */
+    suspend fun setHomeTopCard(mode: String) {
+        dataStore.edit { it[HOME_TOP_CARD] = mode }
     }
 }

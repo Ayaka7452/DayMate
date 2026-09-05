@@ -159,3 +159,65 @@ fun FestivalCountdownCard(
         }
     }
 }
+
+/**
+ * 最近的倒数日卡片（主页顶部卡片可切换为该模式）：
+ * 显示最近的（剩余天数最少的未过期）倒数事件，点击进入编辑。
+ * @param past true 表示没有任何未过期事件，此时展示最近一个已过去的事件。
+ */
+@Composable
+fun EventCountdownCard(
+    title: String,
+    dateStr: String,
+    days: Int,
+    past: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (past) "最近的倒数日（已过期）" else "最近的倒数日",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Text(
+                    "$title · $dateStr",
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text(
+                    "点击查看事件",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+            Row(horizontalArrangement = Arrangement.End) {
+                Text(
+                    days.toString(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = if (past) MaterialTheme.colorScheme.secondary
+                    else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.alignByBaseline()
+                )
+                Text(
+                    "天",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.alignByBaseline()
+                )
+            }
+        }
+    }
+}
