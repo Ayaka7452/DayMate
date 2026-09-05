@@ -32,6 +32,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,10 @@ fun EventFormScreen(
 ) {
     var title by remember { mutableStateOf(prefillTitle ?: "") }
     var note by remember { mutableStateOf("") }
+    // 所在文件夹：新建时预置入口传入的 folderId（主页=null 根目录，文件夹页=当前文件夹）；编辑时从事件加载
+    var folderIdSel by remember { mutableStateOf<Long?>(folderId) }
+    var showFolderPicker by remember { mutableStateOf(false) }
+    val folders by container.folderRepository.observeAll().collectAsState(initial = emptyList())
     var epochDay by remember {
         mutableStateOf(prefillEpochDay ?: LocalDate.now().plusDays(7).toEpochDay())
     }
@@ -87,6 +92,7 @@ fun EventFormScreen(
                 displayUnit = e.displayUnit ?: CountdownCalculator.UNIT_DAY
                 repeatRule = e.repeatRule
                 linkedFestival = e.linkedFestival
+                folderIdSel = e.folderId
                 // 跟随节日的事件不用 repeatRule（节日锚定优先），加载时归零保持数据一致
                 if (e.linkedFestival != null) repeatRule = null
             }
@@ -148,6 +154,23 @@ fun EventFormScreen(
                 maxLines = 5,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(Modifier.height(16.dp))
+
+            // ===== 所在文件夹：可随时切换根目录/任意文件夹 =====
+            Text("所在文件夹", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(6.dp))
+            TextButton(onClick = { showFolderPicker = true }) {
+                val currentFolder = folders.firstOrNull { it.id == folderIdSel }
+                Text("📂  ${currentFolder?.name ?: "主空间（根目录）"}")
+            }
+            if (folders.isEmpty()) {
+                Text(
+                    "还没有文件夹，事件将保存在主空间；主页可创建文件夹并批量移入",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
 
@@ -294,7 +317,8 @@ fun EventFormScreen(
                                     refDays = refValue,
                                     displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
                                     repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
-                                    linkedFestival = linkedFestival
+                                    linkedFestival = linkedFestival,
+                                    folderId = folderIdSel
                                 )
                             )
                         } else {
@@ -307,7 +331,7 @@ fun EventFormScreen(
                                     displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
                                     repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
                                     linkedFestival = linkedFestival,
-                                    folderId = folderId
+                                    folderId = folderIdSel
                                 )
                             )
                         }
@@ -380,6 +404,18 @@ fun EventFormScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showFolderPicker) {
+        com.ayaka7452.daymate.feature.common.PickFolderDialog(
+            title = "选择所在文件夹",
+            folders = folders.map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
+            onDismiss = { showFolderPicker = false },
+            onPick = { picked ->
+                folderIdSel = picked
+                showFolderPicker = false
             }
         )
     }

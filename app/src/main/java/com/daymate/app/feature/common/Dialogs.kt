@@ -128,6 +128,7 @@ fun FolderDialog(
 fun PickFolderDialog(
     folders: List<Pair<Long, String>>,
     showRoot: Boolean = true,
+    title: String = "移动到",
     onDismiss: () -> Unit,
     onPick: (folderId: Long?) -> Unit,
     onCreateNew: (() -> Unit)? = null
@@ -135,7 +136,7 @@ fun PickFolderDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
-        title = { Text("移动到") },
+        title = { Text(title) },
         text = {
             LazyColumn {
                 if (showRoot) {

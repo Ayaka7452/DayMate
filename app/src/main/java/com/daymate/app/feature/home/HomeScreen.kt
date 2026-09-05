@@ -644,6 +644,8 @@ fun HomeScreen(
     if (showMoveDialog) {
         PickFolderDialog(
             folders = folders.map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
+            // 主页本身就是根目录，「根目录」选项无意义，不显示
+            showRoot = false,
             onDismiss = { showMoveDialog = false },
             onPick = { folderId ->
                 scope.launch {
