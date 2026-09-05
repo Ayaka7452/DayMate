@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DayMate</string>
+    <string name="widget_description">显示最近的倒数日事件</string>
 </resources>

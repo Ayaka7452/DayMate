@@ -11,13 +11,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
+import com.ayaka7452.daymate.feature.common.matchesQuery
 import kotlinx.coroutines.launch
 
 private data class BinTarget(val id: Long, val type: String) // type: "event" | "folder"
@@ -54,6 +58,23 @@ fun RecycleBinScreen(
     var confirmTarget by remember { mutableStateOf<BinTarget?>(null) }
     var clearConfirm by remember { mutableStateOf(false) }
 
+    // 回收站搜索：过滤已删除的事件（标题/备注）与文件夹（名称）
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    BackHandler(enabled = searchActive) {
+        searchActive = false
+        searchQuery = ""
+    }
+    val query = searchQuery.trim()
+    val shownFolders = remember(binFolders, query) {
+        if (query.isEmpty()) binFolders
+        else binFolders.filter { it.name.lowercase().contains(query.lowercase()) }
+    }
+    val shownEvents = remember(binEvents, query) {
+        if (query.isEmpty()) binEvents
+        else binEvents.filter { matchesQuery(it.title, it.note, query) }
+    }
+
     val hasItems = binEvents.isNotEmpty() || binFolders.isNotEmpty()
 
     Scaffold(
@@ -67,6 +88,12 @@ fun RecycleBinScreen(
                 },
                 actions = {
                     if (hasItems) {
+                        IconButton(onClick = {
+                            searchActive = !searchActive
+                            if (!searchActive) searchQuery = ""
+                        }) {
+                            Icon(Icons.Default.Search, contentDescription = "搜索")
+                        }
                         TextButton(onClick = { clearConfirm = true }) { Text("清空回收站") }
                     }
                 }
@@ -91,36 +118,68 @@ fun RecycleBinScreen(
                 )
             }
         } else {
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                items(binFolders, key = { "f${it.id}" }) { folder ->
-                    BinRow(
-                        title = "${folder.icon ?: "📁"}  ${folder.name}",
-                        subtitle = "文件夹",
-                        onRestore = {
-                            scope.launch {
-                                val ts = System.currentTimeMillis()
-                                container.eventRepository.restoreByFolders(listOf(folder.id))
-                                container.folderRepository.restoreByIds(listOf(folder.id))
-                            }
-                        },
-                        onDelete = { confirmTarget = BinTarget(folder.id, "folder") }
+                if (searchActive) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("搜索标题、备注或文件夹名") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
                     )
                 }
-                items(binEvents, key = { "e${it.id}" }) { event ->
-                    BinRow(
-                        title = event.title,
-                        subtitle = if (event.note.isNullOrBlank()) null else event.note,
-                        onRestore = {
-                            scope.launch {
-                                container.eventRepository.restoreByIds(listOf(event.id))
-                            }
-                        },
-                        onDelete = { confirmTarget = BinTarget(event.id, "event") }
-                    )
+                if (searchActive && query.isNotEmpty() &&
+                    shownFolders.isEmpty() && shownEvents.isEmpty()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "未找到相关内容",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(shownFolders, key = { "f${it.id}" }) { folder ->
+                            BinRow(
+                                title = "${folder.icon ?: "📁"}  ${folder.name}",
+                                subtitle = "文件夹",
+                                onRestore = {
+                                    scope.launch {
+                                        val ts = System.currentTimeMillis()
+                                        container.eventRepository.restoreByFolders(listOf(folder.id))
+                                        container.folderRepository.restoreByIds(listOf(folder.id))
+                                    }
+                                },
+                                onDelete = { confirmTarget = BinTarget(folder.id, "folder") }
+                            )
+                        }
+                        items(shownEvents, key = { "e${it.id}" }) { event ->
+                            BinRow(
+                                title = event.title,
+                                subtitle = if (event.note.isNullOrBlank()) null else event.note,
+                                onRestore = {
+                                    scope.launch {
+                                        container.eventRepository.restoreByIds(listOf(event.id))
+                                    }
+                                },
+                                onDelete = { confirmTarget = BinTarget(event.id, "event") }
+                            )
+                        }
+                    }
                 }
             }
         }

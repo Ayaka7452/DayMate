@@ -173,6 +173,11 @@ fun HomeScreen(
             .filter { matchesQuery(it.title, it.note, searchQuery) }
             .sortedBy { eventDaysUntil(it.targetDateEpochDay) }
     }
+    // 文件夹名也参与匹配，命中文件夹排在事件结果前面
+    val searchFolderResults = remember(folders, searchQuery) {
+        if (searchQuery.isBlank()) emptyList()
+        else folders.filter { it.name.lowercase().contains(searchQuery.trim().lowercase()) }
+    }
 
     val listState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
@@ -386,7 +391,7 @@ fun HomeScreen(
     ) { padding ->
         when {
             searchActive && searchQuery.isNotBlank() -> {
-                if (searchResults.isEmpty()) {
+                if (searchResults.isEmpty() && searchFolderResults.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -406,6 +411,21 @@ fun HomeScreen(
                         contentPadding = padding,
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
+                        items(searchFolderResults, key = { "sf${it.id}" }) { folder ->
+                            FolderRow(
+                                folder = folder,
+                                onClick = { onNavigate("folder/${folder.id}") },
+                                onLongClick = {
+                                    folderDialogTarget = folder
+                                    showFolderDialog = true
+                                },
+                                onMoveToRecycleBin = {
+                                    folderToDelete = folder
+                                    showFolderDeleteConfirm = true
+                                }
+                            )
+                            ListItemDivider()
+                        }
                         items(searchResults, key = { "e${it.id}" }) { event ->
                             EventRow(
                                 event = event,

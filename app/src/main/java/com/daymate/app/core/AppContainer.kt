@@ -20,10 +20,17 @@ class AppContainer(context: Context) {
 
     val settingsRepository = SettingsRepository(appContext.settingsDataStore)
     val autoBackup = AutoBackupManager(appContext, mainDb, settingsRepository)
-    val eventRepository = EventRepository(mainDb.eventDao(), autoBackup::onDataChanged)
-    val folderRepository = FolderRepository(mainDb.folderDao(), autoBackup::onDataChanged)
-    val vaultRepository = VaultRepository(mainDb.vaultEventDao(), autoBackup::onDataChanged)
-    val vaultFolderRepository = VaultFolderRepository(mainDb.vaultFolderDao(), autoBackup::onDataChanged)
+
+    // 数据变更统一通知：触发自动备份计时 + 刷新桌面小组件
+    private fun notifyDataChanged() {
+        autoBackup.onDataChanged()
+        runCatching { com.ayaka7452.daymate.widget.CountdownWidgetProvider.refreshAll(appContext) }
+    }
+
+    val eventRepository = EventRepository(mainDb.eventDao(), ::notifyDataChanged)
+    val folderRepository = FolderRepository(mainDb.folderDao(), ::notifyDataChanged)
+    val vaultRepository = VaultRepository(mainDb.vaultEventDao(), ::notifyDataChanged)
+    val vaultFolderRepository = VaultFolderRepository(mainDb.vaultFolderDao(), ::notifyDataChanged)
     val vaultBridge = VaultBridge(eventRepository, vaultRepository)
 
     /**
