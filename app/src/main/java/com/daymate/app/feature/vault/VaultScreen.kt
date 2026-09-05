@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
@@ -72,6 +74,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -88,7 +91,10 @@ import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import com.ayaka7452.daymate.feature.common.ReorderActions
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
+import com.ayaka7452.daymate.feature.common.highlightedText
+import com.ayaka7452.daymate.feature.common.matchesQuery
 import com.ayaka7452.daymate.feature.common.moveItem
+import com.ayaka7452.daymate.feature.common.noteHitOnly
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import android.widget.Toast
@@ -428,6 +434,23 @@ private fun VaultListScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
 
+    // 搜索状态：仅在已解锁的 Vault 页内可用；字段加密，故取全量解密后内存过滤
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val allVaultEventsFlow = remember { container.vaultRepository.observeAll() }
+    val allVaultEvents by allVaultEventsFlow.collectAsState(initial = emptyList())
+    val vaultFolderNameById = remember(folders) { folders.associate { it.id to it.name } }
+    val vaultSearchResults = remember(allVaultEvents, searchQuery) {
+        if (searchQuery.isBlank()) emptyList()
+        else allVaultEvents
+            .filter { matchesQuery(it.title, it.note, searchQuery) }
+            .sortedBy { eventDaysUntil(it.targetDateEpochDay) }
+    }
+    BackHandler(enabled = searchActive) {
+        searchActive = false
+        searchQuery = ""
+    }
+
     val totalSelected = selectedEventIds.size + selectedFolderIds.size
 
     fun toggleEvent(id: Long) {
@@ -470,28 +493,93 @@ private fun VaultListScreen(
                 onClick = { showResetConfirm = true }
             )
         },
+        extraActions = {
+            IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
+                Icon(
+                    if (searchActive) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.Search,
+                    contentDescription = "搜索"
+                )
+            }
+        },
         fab = {
             FloatingActionButton(onClick = { showAddSheet = true }) {
                 Icon(Icons.Default.Add, contentDescription = "新建")
             }
         }
     ) {
-        if (events.isEmpty() && folders.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text("🔒", style = MaterialTheme.typography.displayMedium)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Vault 是空的，点击 + 添加",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+        if (searchActive) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("搜索 Vault 事件标题或备注") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        when {
+            searchActive && searchQuery.isBlank() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "输入关键词搜索 Vault 内的事件",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
             }
-        } else {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+            searchActive && searchQuery.isNotBlank() -> {
+                if (vaultSearchResults.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "未找到相关事件",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                } else {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        items(vaultSearchResults, key = { "e${it.id}" }) { event ->
+                            VaultEventRow(
+                                event = event,
+                                onClick = {
+                                    editingEvent = event
+                                    showEventDialog = true
+                                },
+                                onMoveToMain = {
+                                    scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
+                                },
+                                searchQuery = searchQuery,
+                                folderBadge = event.folderId?.let { vaultFolderNameById[it] },
+                                noteHit = noteHitOnly(event.title, event.note, searchQuery)
+                            )
+                            ListItemDivider()
+                        }
+                    }
+                }
+            }
+            events.isEmpty() && folders.isEmpty() -> {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text("🔒", style = MaterialTheme.typography.displayMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Vault 是空的，点击 + 添加",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+            else -> {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
                         val handleModifier = if (!selectionMode && manualSort) {
@@ -553,6 +641,7 @@ private fun VaultListScreen(
                         )
                     }
                     ListItemDivider()
+                }
                 }
             }
         }
@@ -1146,7 +1235,10 @@ private fun VaultEventRow(
     onClick: () -> Unit = {},
     onMoveToMain: (() -> Unit)? = null,
     onReorder: ((String) -> Unit)? = null,
-    dragHandle: Modifier? = null
+    dragHandle: Modifier? = null,
+    searchQuery: String = "",
+    folderBadge: String? = null,
+    noteHit: Boolean = false
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
@@ -1167,17 +1259,49 @@ private fun VaultEventRow(
             SelectionDot(selected = selected)
             Spacer(Modifier.width(10.dp))
         }
-        Text(
-            text = event.title,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (searchQuery.isBlank()) AnnotatedString(event.title)
+                else highlightedText(event.title, searchQuery),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            if (searchQuery.isNotBlank() && !event.note.isNullOrBlank()) {
+                Text(
+                    text = highlightedText(event.note, searchQuery),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (noteHit) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "命中备注",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
             color = if (isFuture) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.secondary
         )
+        if (folderBadge != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = folderBadge,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
         if (dragHandle != null) {
             IconButton(modifier = dragHandle, onClick = {}) {
                 Text(
@@ -1331,6 +1455,7 @@ private fun VaultScaffold(
     fab: @Composable (() -> Unit)? = null,
     menuItems: @Composable ColumnScope.() -> Unit = {},
     showMenu: Boolean = true,
+    extraActions: @Composable () -> Unit = {},
     content: @Composable () -> Unit
 ) {
     Scaffold(
@@ -1364,6 +1489,7 @@ private fun VaultScaffold(
                         }
                     },
                     actions = {
+                        extraActions()
                         if (showMenu) {
                             var menuExpanded by remember { mutableStateOf(false) }
                             Box {

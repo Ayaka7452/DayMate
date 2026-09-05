@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,6 +43,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -56,8 +59,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.Routes
@@ -70,7 +76,10 @@ import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import com.ayaka7452.daymate.feature.common.ReorderActions
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
+import com.ayaka7452.daymate.feature.common.highlightedText
+import com.ayaka7452.daymate.feature.common.matchesQuery
 import com.ayaka7452.daymate.feature.common.moveItem
+import com.ayaka7452.daymate.feature.common.noteHitOnly
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import com.ayaka7452.daymate.feature.home.SelectionDot
@@ -98,6 +107,18 @@ fun HomeScreen(
     var showFolderDialog by remember { mutableStateOf(false) }
     var folderDialogTarget by remember { mutableStateOf<FolderEntity?>(null) }
     var pendingMoveAfterCreate by remember { mutableStateOf(false) }
+
+    // 搜索状态：顶栏放大镜展开为搜索框，输入即搜（内存过滤，含各文件夹内的事件）
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val searchFocus = remember { FocusRequester() }
+    LaunchedEffect(searchActive) {
+        if (searchActive) searchFocus.requestFocus()
+    }
+    fun closeSearch() {
+        searchActive = false
+        searchQuery = ""
+    }
 
     var selectionMode by remember { mutableStateOf(false) }
     val selectedEventIds = remember { mutableStateListOf<Long>() }
@@ -140,6 +161,17 @@ fun HomeScreen(
     // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
     val displayEvents = remember(eventList.toList(), defaultSort) {
         sortEventsForDisplay(eventList.toList(), defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    }
+
+    // 搜索数据源：全部未删除事件（含文件夹内的）；结果按剩余天数升序
+    val allEventsFlow = remember { container.eventRepository.observeAll() }
+    val allEvents by allEventsFlow.collectAsState(initial = emptyList())
+    val folderNameById = remember(folders) { folders.associate { it.id to it.name } }
+    val searchResults = remember(allEvents, searchQuery) {
+        if (searchQuery.isBlank()) emptyList()
+        else allEvents
+            .filter { matchesQuery(it.title, it.note, searchQuery) }
+            .sortedBy { eventDaysUntil(it.targetDateEpochDay) }
     }
 
     val listState = rememberLazyListState()
@@ -222,8 +254,8 @@ fun HomeScreen(
         selectionMode = false
     }
 
-    BackHandler(enabled = selectionMode) {
-        exitSelection()
+    BackHandler(enabled = searchActive || selectionMode) {
+        if (searchActive) closeSearch() else exitSelection()
     }
 
     Scaffold(
@@ -257,10 +289,46 @@ fun HomeScreen(
                         ) { Text("移入回收站") }
                     }
                 )
+            } else if (searchActive) {
+                TopAppBar(
+                    title = {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("搜索事件标题或备注") },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchFocus)
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { closeSearch() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "退出搜索"
+                            )
+                        }
+                    },
+                    actions = {
+                        if (searchQuery.isNotBlank()) {
+                            TextButton(onClick = { searchQuery = "" }) { Text("清空") }
+                        }
+                    }
+                )
             } else {
                 TopAppBar(
                     title = { Text("DayMate", fontFamily = FontFamily.Cursive) },
                     actions = {
+                        IconButton(onClick = { searchActive = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "搜索")
+                        }
                         var menuExpanded by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {
@@ -316,14 +384,61 @@ fun HomeScreen(
             }
         }
     ) { padding ->
-        if (events.isEmpty() && folders.isEmpty()) {
-            EmptyState(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            )
-        } else {
-            LazyColumn(
+        when {
+            searchActive && searchQuery.isNotBlank() -> {
+                if (searchResults.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "未找到相关事件",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = padding,
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        items(searchResults, key = { "e${it.id}" }) { event ->
+                            EventRow(
+                                event = event,
+                                onClick = { onNavigate("event_form?eventId=${event.id}") },
+                                onMoveToVault = {
+                                    if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
+                                },
+                                onMoveToRecycleBin = {
+                                    scope.launch {
+                                        container.eventRepository.softDeleteByIds(
+                                            listOf(event.id),
+                                            System.currentTimeMillis()
+                                        )
+                                    }
+                                },
+                                searchQuery = searchQuery,
+                                folderBadge = event.folderId?.let { folderNameById[it] },
+                                noteHit = noteHitOnly(event.title, event.note, searchQuery)
+                            )
+                            ListItemDivider()
+                        }
+                    }
+                }
+            }
+            events.isEmpty() && folders.isEmpty() -> {
+                EmptyState(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                )
+            }
+            else -> {
+                LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
@@ -399,6 +514,7 @@ fun HomeScreen(
                         )
                     }
                     ListItemDivider()
+                }
                 }
             }
         }
@@ -613,7 +729,10 @@ fun EventRow(
     onMoveToVault: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
     onReorder: ((String) -> Unit)? = null,
-    dragHandle: Modifier? = null
+    dragHandle: Modifier? = null,
+    searchQuery: String = "",
+    folderBadge: String? = null,
+    noteHit: Boolean = false
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
@@ -646,12 +765,14 @@ fun EventRow(
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = event.title,
+                text = if (searchQuery.isBlank()) AnnotatedString(event.title)
+                else highlightedText(event.title, searchQuery),
                 style = MaterialTheme.typography.bodyLarge
             )
             if (!event.note.isNullOrBlank()) {
                 Text(
-                    text = event.note,
+                    text = if (searchQuery.isBlank()) AnnotatedString(event.note)
+                    else highlightedText(event.note, searchQuery),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -659,12 +780,33 @@ fun EventRow(
                 )
             }
         }
+        if (noteHit) {
+            Text(
+                text = "命中备注",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(6.dp))
+        }
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
             color = if (isFuture) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.secondary
         )
+        if (folderBadge != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = folderBadge,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
         if (dragHandle != null) {
             IconButton(modifier = dragHandle, onClick = {}) {
                 Text(
