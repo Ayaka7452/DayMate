@@ -13,7 +13,7 @@ import androidx.room.migration.Migration
         VaultEventEntity::class,
         VaultFolderEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -91,6 +91,14 @@ abstract class DayMateDatabase : RoomDatabase() {
             }
         }
 
+        /** v5 -> v6：事件与 Vault 事件新增「循环规则」repeatRule（可空，WEEKLY/MONTHLY/YEARLY，null 不循环）。 */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                addColumnIfMissing(db, "events", "repeatRule", "ALTER TABLE events ADD COLUMN repeatRule TEXT")
+                addColumnIfMissing(db, "vault_events", "repeatRule", "ALTER TABLE vault_events ADD COLUMN repeatRule TEXT")
+            }
+        }
+
         /** 幂等加列：列已存在时跳过（防重复 ALTER TABLE 崩溃）。 */
         private fun addColumnIfMissing(
             db: androidx.sqlite.db.SupportSQLiteDatabase,
@@ -111,7 +119,7 @@ abstract class DayMateDatabase : RoomDatabase() {
             // 用户数据「备份到自选文件夹」由 StorageBackup 通过 SAF 持久化 URI 完成，
             // 与 Room 主库的物理位置解耦。
             return Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build()
         }

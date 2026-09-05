@@ -31,6 +31,7 @@
             android:ellipsize="end"
             android:gravity="center"
             android:fontFamily="sans-serif-medium"
+            android:textStyle="bold"
             android:textSize="16sp"
             android:textColor="#1C1B1F"
             android:text="DayMate" />
@@ -70,7 +71,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:gravity="center"
-            android:textSize="12sp"
+            android:textSize="14sp"
             android:textColor="#7A7570"
             android:text="2026/12/19 · 还有" />
     </LinearLayout>

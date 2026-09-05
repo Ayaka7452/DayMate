@@ -59,8 +59,10 @@ fun EventFormScreen(
     var epochDay by remember { mutableStateOf(LocalDate.now().plusDays(7).toEpochDay()) }
     var refDaysText by remember { mutableStateOf("") }
     var displayUnit by remember { mutableStateOf(CountdownCalculator.UNIT_DAY) }
+    var repeatRule by remember { mutableStateOf<String?>(null) }
     var loaded by remember { mutableStateOf<EventEntity?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(eventId) {
@@ -72,6 +74,7 @@ fun EventFormScreen(
                 epochDay = e.targetDateEpochDay
                 refDaysText = e.refDays?.toString() ?: ""
                 displayUnit = e.displayUnit ?: CountdownCalculator.UNIT_DAY
+                repeatRule = e.repeatRule
             }
         }
     }
@@ -134,13 +137,54 @@ fun EventFormScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            TextButton(onClick = { showDatePicker = true }) {
-                val date = LocalDate.ofEpochDay(epochDay)
-                Text(
-                    "目标日期：${date.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))}",
-                    style = MaterialTheme.typography.bodyLarge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                TextButton(onClick = { showDatePicker = true }) {
+                    val date = LocalDate.ofEpochDay(epochDay)
+                    Text(
+                        "目标日期：${date.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))}",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+                TextButton(onClick = { showResetConfirm = true }) {
+                    Text("重置为今天")
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Text("循环", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = repeatRule == null,
+                    onClick = { repeatRule = null },
+                    label = { Text("不循环") }
+                )
+                FilterChip(
+                    selected = repeatRule == CountdownCalculator.REPEAT_WEEKLY,
+                    onClick = { repeatRule = CountdownCalculator.REPEAT_WEEKLY },
+                    label = { Text("每周") }
+                )
+                FilterChip(
+                    selected = repeatRule == CountdownCalculator.REPEAT_MONTHLY,
+                    onClick = { repeatRule = CountdownCalculator.REPEAT_MONTHLY },
+                    label = { Text("每月") }
+                )
+                FilterChip(
+                    selected = repeatRule == CountdownCalculator.REPEAT_YEARLY,
+                    onClick = { repeatRule = CountdownCalculator.REPEAT_YEARLY },
+                    label = { Text("每年") }
                 )
             }
+            Text(
+                "目标日期过后自动锚定到下一周期：每周同一星期几、每月同一日、每年同月同日",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
 
             Spacer(Modifier.height(16.dp))
 
@@ -198,7 +242,8 @@ fun EventFormScreen(
                                     note = noteValue,
                                     targetDateEpochDay = epochDay,
                                     refDays = refValue,
-                                    displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY }
+                                    displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
+                                    repeatRule = repeatRule
                                 )
                             )
                         } else {
@@ -209,6 +254,7 @@ fun EventFormScreen(
                                     targetDateEpochDay = epochDay,
                                     refDays = refValue,
                                     displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
+                                    repeatRule = repeatRule,
                                     folderId = folderId
                                 )
                             )
@@ -247,5 +293,42 @@ fun EventFormScreen(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showResetConfirm) {
+        val current = LocalDate.ofEpochDay(epochDay)
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("重置目标日期") },
+            text = {
+                Text(
+                    "是否把目标日期重置为今天？\n当前：${current.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))}"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResetConfirm = false
+                    val today = LocalDate.now().toEpochDay()
+                    if (isEdit) {
+                        // 编辑模式：立即写库（只改日期，不动表单里未保存的其他修改），
+                        // 并同步表单状态，随后按「保存」会以此日期为准
+                        scope.launch {
+                            loaded?.let { e ->
+                                val updated = e.copy(
+                                    targetDateEpochDay = today,
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                                container.eventRepository.update(updated)
+                                loaded = updated
+                            }
+                        }
+                    }
+                    epochDay = today
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("取消") }
+            }
+        )
     }
 }

@@ -45,6 +45,8 @@ data class EventEntity(
     val refDays: Int? = null,
     /** 倒计时显示单位：DAY/MONTH/YEAR，null 视为 DAY（按天）。随时可在编辑页更改。 */
     val displayUnit: String? = null,
+    /** 循环规则：WEEKLY/MONTHLY/YEARLY，null = 不循环。目标日期过后自动锚定到下一周期同日。 */
+    val repeatRule: String? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val isDeleted: Boolean = false,
@@ -80,6 +82,8 @@ data class VaultEventEntity(
     val refDays: Int? = null,
     /** 倒计时显示单位：DAY/MONTH/YEAR，null 视为 DAY（按天）。随时可在编辑页更改。 */
     val displayUnit: String? = null,
+    /** 循环规则：WEEKLY/MONTHLY/YEARLY，null = 不循环。与主表 events.repeatRule 同义。 */
+    val repeatRule: String? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

@@ -36,6 +36,7 @@
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
+                android:textStyle="bold"
                 android:textSize="15sp"
                 android:textColor="#1C1B1F"
                 android:text="DayMate" />
@@ -47,7 +48,7 @@
                 android:layout_marginTop="1dp"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textSize="11sp"
+                android:textSize="13sp"
                 android:textColor="#7A7570"
                 android:text="2026/12/19 · 还有" />
         </LinearLayout>

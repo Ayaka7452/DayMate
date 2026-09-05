@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 import com.ayaka7452.daymate.core.AppContainer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.PrintWriter
@@ -21,6 +22,10 @@ class DayMateApp : Application() {
         container = AppContainer(this)
         migrateLegacyVault()
         installCrashHandler()
+        // 应用启动时滚动循环事件：把目标日期已过的循环事件锚定到下一周期（周/月/年）
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            runCatching { container.eventRepository.rollForwardRepeating() }
+        }
         // 小组件跨天精确刷新：应用起来后续订下一个午夜的刷新闹钟
         runCatching {
             com.ayaka7452.daymate.widget.WidgetRefreshScheduler.scheduleNextMidnight(this)

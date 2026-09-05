@@ -61,6 +61,10 @@ interface EventDao {
 
     @Query("SELECT COUNT(*) FROM events WHERE isDeleted = 0")
     suspend fun countAll(): Int
+
+    /** 循环事件里目标日期已过的（供自动锚定下一周期）。 */
+    @Query("SELECT * FROM events WHERE isDeleted = 0 AND repeatRule IS NOT NULL AND targetDateEpochDay < :todayEpochDay")
+    suspend fun getRepeatingPast(todayEpochDay: Long): List<EventEntity>
 }
 
 @Dao

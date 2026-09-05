@@ -14,6 +14,35 @@ object CountdownCalculator {
     /** 显示单位：按年。 */
     const val UNIT_YEAR = "YEAR"
 
+    /** 循环规则：每周同一天（如每周五）。 */
+    const val REPEAT_WEEKLY = "WEEKLY"
+
+    /** 循环规则：每月同一天。 */
+    const val REPEAT_MONTHLY = "MONTHLY"
+
+    /** 循环规则：每年同月同日。 */
+    const val REPEAT_YEARLY = "YEARLY"
+
+    /**
+     * 循环事件的日期锚定：目标日期已过（< today）时，按规则滚动到下一个周期的同位日期。
+     * - WEEKLY：锚定同一星期几（如原定周五，过期后顺延到下一个周五）；
+     * - MONTHLY：锚定同一「日」（1月31日过期后 → 2月28/29日，再往后为每月 28/29/30/31 自动取月末）；
+     * - YEARLY：锚定同一月日（月日与上年相同；闰年 2月29日 在平年落地为 2月28日）。
+     * 目标日期在今天或未来、规则未知时不滚动，返回 null。
+     */
+    fun nextOccurrence(targetEpochDay: Long, rule: String?, today: LocalDate = LocalDate.now()): LocalDate? {
+        if (rule == null) return null
+        var date = LocalDate.ofEpochDay(targetEpochDay)
+        if (date >= today) return null
+        when (rule) {
+            REPEAT_WEEKLY -> while (date < today) date = date.plusWeeks(1)
+            REPEAT_MONTHLY -> while (date < today) date = date.plusMonths(1)
+            REPEAT_YEARLY -> while (date < today) date = date.plusYears(1)
+            else -> return null
+        }
+        return date
+    }
+
     /** 目标日期相对今天还有多少天；负数表示已过。 */
     fun daysUntil(targetEpochDay: Long, today: LocalDate = LocalDate.now()): Long =
         targetEpochDay - today.toEpochDay()

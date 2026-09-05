@@ -71,4 +71,32 @@ class EventRepository(
     }
 
     suspend fun nextSortIndex(): Int = (dao.maxSortIndex() ?: -1) + 1
+
+    /**
+     * 循环事件自动锚定：把目标日期已过的循环事件（WEEKLY/MONTHLY/YEARLY）滚动到
+     * 下一周期的同位日期。返回滚动的事件数；有滚动时通知界面与小组件刷新。
+     * 在应用启动、跨天午夜刷新等时机调用；重复调用安全（已滚动的日期不再是「已过」）。
+     */
+    suspend fun rollForwardRepeating(): Int {
+        val todayEpochDay = java.time.LocalDate.now().toEpochDay()
+        val stale = dao.getRepeatingPast(todayEpochDay)
+        if (stale.isEmpty()) return 0
+        var count = 0
+        for (e in stale) {
+            val next = com.ayaka7452.daymate.core.util.CountdownCalculator
+                .nextOccurrence(e.targetDateEpochDay, e.repeatRule) ?: continue
+            dao.update(
+                e.copy(
+                    targetDateEpochDay = next.toEpochDay(),
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            count++
+        }
+        if (count > 0) {
+            onChanged()
+            refreshSignal.tryEmit(Unit)
+        }
+        return count
+    }
 }

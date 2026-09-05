@@ -96,6 +96,9 @@ object WidgetRenderer {
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val manager = AppWidgetManager.getInstance(appContext)
+                // 先滚动循环事件（跨天午夜/开机路径依赖此调用把已过的循环日期锚定到下一周期）
+                val container = (appContext as? DayMateApp)?.container
+                container?.eventRepository?.rollForwardRepeating()
                 for ((cls, style) in providers) {
                     val ids = manager.getAppWidgetIds(ComponentName(appContext, cls))
                     if (ids.isNotEmpty()) renderAll(appContext, manager, ids, style)
