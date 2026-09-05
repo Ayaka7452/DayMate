@@ -5,7 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <View
+    <!-- RemoteViews 布局白名单不含裸 <View>，卡片背景层必须用 FrameLayout -->
+    <FrameLayout
         android:id="@+id/widget_card"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
