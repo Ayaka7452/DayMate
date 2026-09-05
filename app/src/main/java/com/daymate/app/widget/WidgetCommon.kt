@@ -142,8 +142,9 @@ object WidgetRenderer {
         if (style == Style.SQUARE && !bound) {
             return buildListViews(context) to true
         }
-        val model = pickEvent(events, context, appWidgetId)?.let { buildModel(it) }
-        return buildViews(context, model, style) to false
+        val picked = pickEvent(events, context, appWidgetId)
+        val model = picked?.let { buildModel(it) }
+        return buildViews(context, model, style, picked?.id) to false
     }
 
     /** 事件选取优先级：小组件绑定 > 全局默认 > 自动（最近未到期，否则最近已过）。 */
@@ -194,12 +195,19 @@ object WidgetRenderer {
         (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
 
-    private fun openAppPendingIntent(context: Context): PendingIntent {
+    /**
+     * 点击小组件打开对应事件详情：
+     *  - eventId > 0 时携带 extra（MainActivity 深链转跳 event_form 详情页）；
+     *  - 无事件（空状态）时仅打开主页。
+     * requestCode 用 eventId 区分，避免不同事件的 PendingIntent 相互覆盖。
+     */
+    private fun openEventPendingIntent(context: Context, eventId: Long?): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (eventId != null && eventId > 0) putExtra("eventId", eventId)
         }
         return PendingIntent.getActivity(
-            context, 0, intent,
+            context, (eventId ?: 0L).toInt(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
@@ -215,12 +223,12 @@ object WidgetRenderer {
         views.setFloat(R.id.widget_card, "setAlpha", WidgetPrefs.opacity(context) / 100f)
         views.setTextColor(R.id.widget_empty, if (dark) 0xFF9B9498.toInt() else 0xFF7A7570.toInt())
         views.setEmptyView(R.id.widget_list, R.id.widget_empty)
-        // 行点击：模板 PendingIntent + 工厂里的 FillInIntent
-        views.setPendingIntentTemplate(R.id.widget_list, openAppPendingIntent(context))
+        // 行点击：模板 PendingIntent + 工厂里的 FillInIntent（各行携带自己的 eventId）
+        views.setPendingIntentTemplate(R.id.widget_list, openEventPendingIntent(context, null))
         return views
     }
 
-    private fun buildViews(context: Context, model: WidgetModel?, style: Style): RemoteViews {
+    private fun buildViews(context: Context, model: WidgetModel?, style: Style, eventId: Long? = null): RemoteViews {
         val layout = when (style) {
             Style.WIDE -> R.layout.widget_countdown
             Style.SMALL -> R.layout.widget_countdown_small
@@ -255,7 +263,8 @@ object WidgetRenderer {
             views.setTextViewText(R.id.widget_days_unit, model.unit)
         }
 
-        views.setOnClickPendingIntent(R.id.widget_root, openAppPendingIntent(context))
+        // 整卡点击直达当前显示事件的详情页
+        views.setOnClickPendingIntent(R.id.widget_root, openEventPendingIntent(context, eventId))
         return views
     }
 }
