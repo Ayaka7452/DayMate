@@ -69,6 +69,10 @@ interface EventDao {
     /** 跟随节日的事件里目标日期已过的（供自动锚定到节日下一次日期）。 */
     @Query("SELECT * FROM events WHERE isDeleted = 0 AND linkedFestival IS NOT NULL AND targetDateEpochDay < :todayEpochDay")
     suspend fun getFestivalLinkedPast(todayEpochDay: Long): List<EventEntity>
+
+    /** 全部跟随节日的事件（含未来的，供数据下载后校正预估日期）。 */
+    @Query("SELECT * FROM events WHERE isDeleted = 0 AND linkedFestival IS NOT NULL")
+    suspend fun getFestivalLinkedAll(): List<EventEntity>
 }
 
 @Dao

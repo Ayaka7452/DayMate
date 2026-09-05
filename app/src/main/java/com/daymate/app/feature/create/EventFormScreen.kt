@@ -207,8 +207,9 @@ fun EventFormScreen(
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
                 TextButton(onClick = {
-                    // 打开弹窗时加载接下来可快选的节日（来自已下载的节假日缓存）
-                    festivalOptions = container.festivalRepository.upcomingOffDays(LocalDate.now())
+                    // 打开弹窗时加载可快选的节日：跨年取各节日下一次日期，
+                    // 数据源还没发布新年份的（如明年春节）按「+1年」预估并标注「约」
+                    festivalOptions = container.festivalRepository.pickerFestivals(LocalDate.now())
                     showFestivalDialog = true
                 }) { Text("跟随节日…") }
                 if (linkedFestival != null) {
@@ -405,7 +406,11 @@ fun EventFormScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(f.name, style = MaterialTheme.typography.bodyLarge)
                                     Text(
-                                        f.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日")),
+                                        if (f.isEstimate) {
+                                            "约 ${f.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))}（暂按去年推算，下载新数据后自动校正）"
+                                        } else {
+                                            f.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
+                                        },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.outline
                                     )

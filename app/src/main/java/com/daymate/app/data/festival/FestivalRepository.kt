@@ -10,8 +10,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDate
 
-/** 单个节假日条目：name 节日名（调休上班日为「调休上班（XX）」），isOffDay true=放假 / false=调休上班。 */
-data class FestivalDay(val name: String, val date: LocalDate, val isOffDay: Boolean)
+/** 单个节假日条目：name 节日名（调休上班日为「调休上班（XX）」），isOffDay true=放假 / false=调休上班。
+ *  isEstimate 仅用于表单快选的「预估日期」（缓存里没有该节日未来日期时按上次日期+1年推算，
+ *  农历节日可能不准），下载到新一年数据后会自动校正，不会持久化到缓存。 */
+data class FestivalDay(
+    val name: String,
+    val date: LocalDate,
+    val isOffDay: Boolean,
+    val isEstimate: Boolean = false
+)
 
 /** 一次在线更新的结果：okYears 成功缓存的年份，failedYears 失败年份。 */
 data class FestivalUpdateResult(val okYears: List<Int>, val failedYears: List<Int>) {
@@ -119,6 +126,32 @@ class FestivalRepository(private val appContext: Context) {
             .filter { seen.add(it.name) }
             .take(limit)
     }
+
+    /**
+     * 表单「跟随节日」快选：跨年列出所有已知节日（按名称去重），各取下一次日期——
+     * 不以「今年」为界：今年已过的节日（如元旦、春节）也选得到，锚定到数据中的下一次。
+     * 缓存里没有未来日期的节日（官方尚未发布新年份数据），以「最近一次日期 + 1 年」
+     * 预估并标记 isEstimate=true（农历节日可能偏差），下载新数据后自动校正。
+     */
+    fun pickerFestivals(from: LocalDate, limit: Int = 20): List<FestivalDay> {
+        val days = allDays()
+        val names = days.filter { it.isOffDay }.map { it.name }.distinct()
+        val list = mutableListOf<FestivalDay>()
+        for (name in names) {
+            val next = days.firstOrNull { it.name == name && it.date >= from && it.isOffDay }
+            if (next != null) {
+                list.add(next)
+            } else {
+                val last = days.last { it.name == name && it.isOffDay }
+                list.add(last.copy(date = last.date.plusYears(1), isEstimate = true))
+            }
+        }
+        return list.sortedWith(compareBy({ it.isEstimate }, { it.date })).take(limit)
+    }
+
+    /** 指定节日在缓存中的全部日期（升序）。供下载后校正「预估日期」时判断某日期是否真实存在。 */
+    fun occurrencesOf(name: String): List<LocalDate> =
+        allDays().filter { it.name == name }.map { it.date }
 
     // ---------- 在线下载（App 自行拉取并解析） ----------
 

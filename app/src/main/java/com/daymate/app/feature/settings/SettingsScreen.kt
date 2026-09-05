@@ -328,7 +328,9 @@ fun SettingsScreen(
                             festivalStatus = festivalRepo.dataStatusText()
                             Toast.makeText(ctx, result.summaryText(), Toast.LENGTH_SHORT).show()
                             if (result.success) {
-                                // 下载成功后立即滚动「跟随节日」的事件并刷新小组件
+                                // 下载成功后：先校正快选时按「+1年」预估的节日日期，
+                                // 再滚动已过期的跟随事件，最后刷新小组件
+                                container.eventRepository.reanchorFestivalEstimates(festivalRepo)
                                 container.eventRepository.rollForwardRepeating(festivalRepo)
                                 WidgetRenderer.refreshAll(ctx)
                             }

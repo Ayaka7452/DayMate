@@ -118,4 +118,38 @@ class EventRepository(
         }
         return count
     }
+
+    /**
+     * 校正「预估日期」：快选节日时若数据源尚未发布新年份（如农历春节 2027），
+     * 会以「上次日期 + 1 年」预估。下载到新数据后调用本方法，把目标日期与任何真实
+     * 节日日期都对不上的事件（即预估产物）修正为数据中该节日的下一次日期。
+     * 用户手动设到真实节日日期上的事件不会被改动。返回校正的事件数。
+     */
+    suspend fun reanchorFestivalEstimates(
+        festivalRepo: com.ayaka7452.daymate.data.festival.FestivalRepository
+    ): Int {
+        val today = java.time.LocalDate.now()
+        var count = 0
+        for (e in dao.getFestivalLinkedAll()) {
+            val name = e.linkedFestival ?: continue
+            val next = festivalRepo.nextOccurrenceOf(name, today) ?: continue
+            if (next.toEpochDay() == e.targetDateEpochDay) continue
+            val matchesRealOccurrence = festivalRepo.occurrencesOf(name)
+                .any { it.toEpochDay() == e.targetDateEpochDay }
+            if (!matchesRealOccurrence) {
+                dao.update(
+                    e.copy(
+                        targetDateEpochDay = next.toEpochDay(),
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                count++
+            }
+        }
+        if (count > 0) {
+            onChanged()
+            refreshSignal.tryEmit(Unit)
+        }
+        return count
+    }
 }
