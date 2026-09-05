@@ -102,6 +102,9 @@ fun FolderScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showFolderDeleteConfirm by remember { mutableStateOf(false) }
 
+    // 单事件「...」菜单 → 移动到文件夹（可选根目录移出）
+    var singleMoveEventId by remember { mutableStateOf<Long?>(null) }
+
     var vaultConfirmBatch by remember { mutableStateOf(false) }
     var vaultNeedSetup by remember { mutableStateOf(false) }
 
@@ -366,6 +369,7 @@ fun FolderScreen(
                                     vaultNeedSetup = true
                                 }
                             },
+                            onMoveToFolder = { singleMoveEventId = event.id },
                             onMoveToRecycleBin = {
                                 scope.launch {
                                     container.eventRepository.softDeleteByIds(
@@ -433,6 +437,26 @@ fun FolderScreen(
                 showMoveDialog = false
                 pendingMoveAfterCreate = true
                 showFolderDialog = true
+            }
+        )
+    }
+
+    if (singleMoveEventId != null) {
+        PickFolderDialog(
+            title = "移动到",
+            folders = allFolders
+                .filter { it.id != folderId }
+                .map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
+            // 根目录选项保留：可把事件移出当前文件夹
+            showRoot = true,
+            onDismiss = { singleMoveEventId = null },
+            onPick = { targetFolderId ->
+                scope.launch {
+                    singleMoveEventId?.let {
+                        container.eventRepository.moveToFolder(listOf(it), targetFolderId)
+                    }
+                    singleMoveEventId = null
+                }
             }
         )
     }

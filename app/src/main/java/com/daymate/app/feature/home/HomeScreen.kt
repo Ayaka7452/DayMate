@@ -133,6 +133,9 @@ fun HomeScreen(
     var vaultConfirmBatch by remember { mutableStateOf(false) }
     var vaultNeedSetup by remember { mutableStateOf(false) }
 
+    // 单事件「...」菜单 → 移动到文件夹
+    var singleMoveEventId by remember { mutableStateOf<Long?>(null) }
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -449,6 +452,7 @@ fun HomeScreen(
                                 onMoveToVault = {
                                     if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
                                 },
+                                onMoveToFolder = { singleMoveEventId = event.id },
                                 onMoveToRecycleBin = {
                                     scope.launch {
                                         container.eventRepository.softDeleteByIds(
@@ -565,6 +569,7 @@ fun HomeScreen(
                             onMoveToVault = {
                                 if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
                             },
+                            onMoveToFolder = { singleMoveEventId = event.id },
                             onMoveToRecycleBin = {
                                 scope.launch {
                                     container.eventRepository.softDeleteByIds(
@@ -660,6 +665,24 @@ fun HomeScreen(
                 folderDialogTarget = null
                 pendingMoveAfterCreate = true
                 showFolderDialog = true
+            }
+        )
+    }
+
+    if (singleMoveEventId != null) {
+        PickFolderDialog(
+            title = "移动到",
+            folders = folders.map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
+            // 主页的事件都在根目录，这里只提供文件夹目标
+            showRoot = false,
+            onDismiss = { singleMoveEventId = null },
+            onPick = { targetFolderId ->
+                scope.launch {
+                    singleMoveEventId?.let {
+                        container.eventRepository.moveToFolder(listOf(it), targetFolderId)
+                    }
+                    singleMoveEventId = null
+                }
             }
         )
     }
@@ -793,6 +816,7 @@ fun EventRow(
     selected: Boolean = false,
     onClick: () -> Unit = {},
     onMoveToVault: (() -> Unit)? = null,
+    onMoveToFolder: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
     onReorder: ((String) -> Unit)? = null,
     dragHandle: Modifier? = null,
@@ -907,6 +931,15 @@ fun EventRow(
                         DropdownMenuItem(
                             text = { Text("移到底部") },
                             onClick = { menuExpanded = false; onReorder(ReorderActions.BOTTOM) }
+                        )
+                    }
+                    if (onMoveToFolder != null) {
+                        DropdownMenuItem(
+                            text = { Text("移动到文件夹…") },
+                            onClick = {
+                                menuExpanded = false
+                                onMoveToFolder.invoke()
+                            }
                         )
                     }
                     DropdownMenuItem(
