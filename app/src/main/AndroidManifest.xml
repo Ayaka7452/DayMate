@@ -73,6 +73,10 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <!-- 系统深浅色切换后立即重绘（此广播在豁免清单中，静态注册有效） -->
                 <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+                <!-- 开机后续订跨天刷新闹钟（豁免清单内） -->
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- 每天午夜跨天刷新（应用内自定闹钟广播） -->
+                <action android:name="com.ayaka7452.daymate.widget.MIDNIGHT_REFRESH" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

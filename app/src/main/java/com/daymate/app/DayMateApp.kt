@@ -21,6 +21,10 @@ class DayMateApp : Application() {
         container = AppContainer(this)
         migrateLegacyVault()
         installCrashHandler()
+        // 小组件跨天精确刷新：应用起来后续订下一个午夜的刷新闹钟
+        runCatching {
+            com.ayaka7452.daymate.widget.WidgetRefreshScheduler.scheduleNextMidnight(this)
+        }
     }
 
     /**
