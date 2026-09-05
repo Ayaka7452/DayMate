@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 桌面小组件（方形 2×2）：标题在上，数字+单位居中（同行基线对齐），日期在下
-     字阶：标题 14sp / 数字 38sp + 单位 13sp / 日期 11sp -->
+     字阶：标题 16sp / 数字 48sp + 单位 15sp / 日期 12sp -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -31,7 +31,7 @@
             android:ellipsize="end"
             android:gravity="center"
             android:fontFamily="sans-serif-medium"
-            android:textSize="14sp"
+            android:textSize="16sp"
             android:textColor="#1C1B1F"
             android:text="DayMate" />
 
@@ -48,7 +48,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
-                android:textSize="38sp"
+                android:textSize="48sp"
                 android:textColor="#1E78D0"
                 android:text="" />
 
@@ -57,7 +57,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="3dp"
-                android:textSize="13sp"
+                android:textSize="15sp"
                 android:textColor="#7A7570"
                 android:text="" />
         </LinearLayout>
@@ -70,7 +70,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:gravity="center"
-            android:textSize="11sp"
+            android:textSize="12sp"
             android:textColor="#7A7570"
             android:text="暂无倒数日" />
     </LinearLayout>

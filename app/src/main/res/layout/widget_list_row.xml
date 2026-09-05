@@ -18,7 +18,7 @@
         android:layout_weight="1"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textSize="13sp"
+        android:textSize="14sp"
         android:textColor="#1C1B1F"
         android:text="" />
 
@@ -29,7 +29,7 @@
         android:layout_marginStart="8dp"
         android:maxLines="1"
         android:fontFamily="sans-serif-medium"
-        android:textSize="14sp"
+        android:textSize="15sp"
         android:textColor="#1E78D0"
         android:text="" />
 </LinearLayout>
