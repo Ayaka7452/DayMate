@@ -105,6 +105,9 @@ fun HomeScreen(
     // 主页顶部卡片模式：festival（默认）/ event / off
     val homeTopCard by container.settingsRepository.homeTopCard
         .collectAsState(initial = "festival")
+    // 节日卡片右侧角标 emoji（默认 ☀️）
+    val homeBadgeEmoji by container.settingsRepository.homeBadgeEmoji
+        .collectAsState(initial = "☀️")
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
@@ -514,7 +517,8 @@ fun HomeScreen(
                                     )
                                 }
                             },
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            badgeEmoji = homeBadgeEmoji
                         )
                     }
                     "event" -> {

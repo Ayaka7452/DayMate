@@ -80,13 +80,15 @@ fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier) {
  * 下一节日倒数卡片（列表顶部常驻）：
  *  - 未下载节假日数据 → 点击跳转设置下载（提示引导）；
  *  - 有数据 → 显示下一个放假节日与剩余天数，点击快捷创建「跟随节日」的倒数事件。
+ * 右侧角标为可配置 emoji（默认 ☀️）：卡片只展示放假节日，无需「休/班」标记。
  */
 @Composable
 fun FestivalCountdownCard(
     hasData: Boolean,
     festival: FestivalDay?,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    badgeEmoji: String = "☀️"
 ) {
     Card(
         onClick = onClick,
@@ -154,7 +156,10 @@ fun FestivalCountdownCard(
                     )
                 }
                 Spacer(Modifier.width(10.dp))
-                FestivalBadge(festival.isOffDay)
+                Text(
+                    badgeEmoji,
+                    style = MaterialTheme.typography.titleLarge
+                )
             }
         }
     }

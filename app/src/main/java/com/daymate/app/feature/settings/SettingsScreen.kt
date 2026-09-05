@@ -1,5 +1,6 @@
 package com.ayaka7452.daymate.feature.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
@@ -64,6 +66,8 @@ fun SettingsScreen(
         .collectAsState(initial = "remaining_asc")
     val homeTopCard by container.settingsRepository.homeTopCard
         .collectAsState(initial = "festival")
+    val homeBadgeEmoji by container.settingsRepository.homeBadgeEmoji
+        .collectAsState(initial = "☀️")
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
 
@@ -79,6 +83,7 @@ fun SettingsScreen(
     var showFestivalSourceDialog by remember { mutableStateOf(false) }
     var showFestivalCustomInput by remember { mutableStateOf(false) }
     var festivalCustomUrl by remember { mutableStateOf(festivalRepo.sourceUrl()) }
+    var showBadgeEmojiDialog by remember { mutableStateOf(false) }
 
     // 数据备份：选择文件夹仅作 SAF 导出/导入目标，不需要任何存储权限（全屏覆盖）
     var showSetup by remember { mutableStateOf(false) }
@@ -216,6 +221,25 @@ fun SettingsScreen(
                 scope.launch { container.settingsRepository.setHomeTopCard("festival") }
                 Toast.makeText(ctx, "已恢复默认（下一个节假日）", Toast.LENGTH_SHORT).show()
             }) { Text("恢复默认") }
+
+            // 节日卡片右侧角标 emoji（卡片只显示放假节日，不需要「休/班」标记）
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showBadgeEmojiDialog = true }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("节日卡片角标", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "卡片右侧的表情符号",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Text(homeBadgeEmoji, style = MaterialTheme.typography.titleLarge)
+            }
 
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
@@ -358,6 +382,50 @@ fun SettingsScreen(
                 Text("关于", style = MaterialTheme.typography.bodyLarge)
             }
         }
+    }
+
+    // 节日卡片角标 emoji 选择弹窗
+    if (showBadgeEmojiDialog) {
+        val emojiChoices = listOf(
+            "☀️", "🌙", "⭐", "✨", "⚡",
+            "🎉", "🎊", "🔥", "❤️", "🌸",
+            "🍀", "🎯", "🎄", "🏖️", "🎁"
+        )
+        AlertDialog(
+            onDismissRequest = { showBadgeEmojiDialog = false },
+            title = { Text("节日卡片角标") },
+            text = {
+                Column {
+                    emojiChoices.chunked(5).forEach { rowEmojis ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowEmojis.forEach { em ->
+                                val isSel = em == homeBadgeEmoji
+                                Text(
+                                    em,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    modifier = Modifier
+                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                        .background(
+                                            if (isSel) MaterialTheme.colorScheme.primaryContainer
+                                            else androidx.compose.ui.graphics.Color.Transparent
+                                        )
+                                        .clickable {
+                                            scope.launch {
+                                                container.settingsRepository.setHomeBadgeEmoji(em)
+                                            }
+                                            showBadgeEmojiDialog = false
+                                        }
+                                        .padding(6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showBadgeEmojiDialog = false }) { Text("关闭") }
+            }
+        )
     }
 
     // 节假日数据源选择弹窗

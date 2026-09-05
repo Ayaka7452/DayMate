@@ -18,6 +18,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val DEFAULT_SORT = stringPreferencesKey("default_sort")        // remaining_asc 等
         private val AUTO_BACKUP = booleanPreferencesKey("auto_backup_enabled")  // 修改后自动备份，默认开启
         private val HOME_TOP_CARD = stringPreferencesKey("home_top_card")       // festival / event / off
+        private val HOME_BADGE_EMOJI = stringPreferencesKey("home_badge_emoji") // 节日卡片右侧角标，默认 ☀️
     }
 
     val themeMode: Flow<String> = dataStore.data.map { it[THEME] ?: "system" }
@@ -41,6 +42,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     /** 主页顶部卡片内容：festival=下一个节假日（默认）/ event=最近的倒数日 / off=关闭。 */
     val homeTopCard: Flow<String> = dataStore.data.map { it[HOME_TOP_CARD] ?: "festival" }
+
+    /** 节日卡片右侧角标 emoji（默认 ☀️；卡片只显示放假节日，不需要「休/班」）。 */
+    val homeBadgeEmoji: Flow<String> = dataStore.data.map { it[HOME_BADGE_EMOJI] ?: "☀️" }
 
     suspend fun setThemeMode(mode: String) {
         dataStore.edit { it[THEME] = mode }
@@ -78,5 +82,10 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     /** 设置主页顶部卡片显示内容。 */
     suspend fun setHomeTopCard(mode: String) {
         dataStore.edit { it[HOME_TOP_CARD] = mode }
+    }
+
+    /** 设置节日卡片角标 emoji。 */
+    suspend fun setHomeBadgeEmoji(emoji: String) {
+        dataStore.edit { it[HOME_BADGE_EMOJI] = emoji }
     }
 }
