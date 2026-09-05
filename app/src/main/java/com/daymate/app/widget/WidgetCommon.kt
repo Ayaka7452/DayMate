@@ -23,34 +23,31 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
 /**
- * 小组件偏好（SharedPreferences，供 Widget 进程同步读取）：
- *  - 卡片透明度（全局）
- *  - 默认显示事件（全局，设置页可改）
- *  - 每个已添加小组件各自绑定的事件（部署时通过配置页选择，优先生效）
+ * 小组件偏好（SharedPreferences，供 Widget 进程同步读取）。
+ * 一切配置按小组件实例隔离：每个桌面小组件各自绑定事件与透明度，
+ * 通过配置页（添加时弹出，或长按小组件重新打开）设置，互不影响。
  */
 object WidgetPrefs {
     private const val FILE = "widget_prefs"
-    private const val KEY_OPACITY = "card_opacity"
-    private const val KEY_DEFAULT_EVENT = "default_event_id"
+    private const val KEY_OPACITY = "card_opacity" // 旧全局键，仅迁移用
+    private const val KEY_DEFAULT_EVENT = "default_event_id" // 旧全局键，仅迁移用
     private const val PREFIX_WIDGET_EVENT = "event_for_widget_"
+    private const val PREFIX_WIDGET_OPACITY = "opacity_for_widget_"
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-    /** 卡片不透明度 5–100（默认 100）。 */
-    fun opacity(ctx: Context): Int = prefs(ctx).getInt(KEY_OPACITY, 100).coerceIn(5, 100)
+    /**
+     * 单个小组件的不透明度 5–100（默认 100）。
+     * 配置页可改，仅对该组件生效。
+     */
+    fun opacityFor(ctx: Context, appWidgetId: Int): Int =
+        prefs(ctx).getInt(PREFIX_WIDGET_OPACITY + appWidgetId, 100).coerceIn(5, 100)
 
-    fun setOpacity(ctx: Context, value: Int) {
-        prefs(ctx).edit().putInt(KEY_OPACITY, value.coerceIn(5, 100)).apply()
+    fun setOpacityFor(ctx: Context, appWidgetId: Int, value: Int) {
+        prefs(ctx).edit().putInt(PREFIX_WIDGET_OPACITY + appWidgetId, value.coerceIn(5, 100)).apply()
     }
 
-    /** 全局默认事件 id；0 = 自动（最近的倒数日）。 */
-    fun defaultEventId(ctx: Context): Long = prefs(ctx).getLong(KEY_DEFAULT_EVENT, 0L)
-
-    fun setDefaultEventId(ctx: Context, id: Long) {
-        prefs(ctx).edit().putLong(KEY_DEFAULT_EVENT, id).apply()
-    }
-
-    /** 单个小组件绑定的事件 id；0 = 跟随全局默认。 */
+    /** 单个小组件绑定的事件 id；0 = 自动（最近倒数日，2×2 显示多事件列表）。 */
     fun eventForWidget(ctx: Context, appWidgetId: Int): Long =
         prefs(ctx).getLong(PREFIX_WIDGET_EVENT + appWidgetId, 0L)
 
@@ -58,9 +55,41 @@ object WidgetPrefs {
         prefs(ctx).edit().putLong(PREFIX_WIDGET_EVENT + appWidgetId, eventId).apply()
     }
 
-    /** 小组件被移除时清理其绑定记录。 */
+    /** 小组件被移除时清理其全部配置。 */
     fun clearWidget(ctx: Context, appWidgetId: Int) {
-        prefs(ctx).edit().remove(PREFIX_WIDGET_EVENT + appWidgetId).apply()
+        prefs(ctx).edit()
+            .remove(PREFIX_WIDGET_EVENT + appWidgetId)
+            .remove(PREFIX_WIDGET_OPACITY + appWidgetId)
+            .apply()
+    }
+
+    /**
+     * 一次性迁移：把旧版的「全局透明度 / 全局默认事件」写入每个现有小组件的独立配置，
+     * 然后删除旧全局键。应用启动时调用；迁移后 prefs 里没有旧键，重复调用为空操作。
+     */
+    fun migrateGlobalPrefs(context: Context) {
+        val p = prefs(context)
+        val legacyEvent = p.getLong(KEY_DEFAULT_EVENT, 0L)
+        val legacyOpacity = p.getInt(KEY_OPACITY, -1)
+        if (legacyEvent == 0L && legacyOpacity == -1) return
+        runCatching {
+            val manager = AppWidgetManager.getInstance(context)
+            for (cls in listOf(
+                CountdownWidgetProvider::class.java,
+                CountdownWidgetSmallProvider::class.java,
+                CountdownWidgetSquareProvider::class.java
+            )) {
+                for (id in manager.getAppWidgetIds(ComponentName(context, cls))) {
+                    if (legacyEvent != 0L && !p.contains(PREFIX_WIDGET_EVENT + id)) {
+                        p.edit().putLong(PREFIX_WIDGET_EVENT + id, legacyEvent).apply()
+                    }
+                    if (legacyOpacity != -1 && !p.contains(PREFIX_WIDGET_OPACITY + id)) {
+                        p.edit().putInt(PREFIX_WIDGET_OPACITY + id, legacyOpacity).apply()
+                    }
+                }
+            }
+        }
+        p.edit().remove(KEY_DEFAULT_EVENT).remove(KEY_OPACITY).apply()
     }
 }
 
@@ -143,23 +172,23 @@ object WidgetRenderer {
         val festival = runCatching {
             container.festivalRepository.todayInfo(LocalDate.now())
         }.getOrNull()
-        // 是否处于「固定事件」模式：小组件绑定或全局默认任一生效
-        val bound = WidgetPrefs.eventForWidget(context, appWidgetId) != 0L ||
-            WidgetPrefs.defaultEventId(context) != 0L
+        // 是否处于「固定事件」模式：该组件在配置页绑定了具体事件
+        val bound = WidgetPrefs.eventForWidget(context, appWidgetId) != 0L
         if (style == Style.SQUARE && !bound) {
-            return buildListViews(context, festival) to true
+            return buildListViews(context, appWidgetId, festival) to true
         }
         val picked = pickEvent(events, context, appWidgetId)
         val model = picked?.let { buildModel(it) }
-        return buildViews(context, model, style, picked?.id, festival) to false
+        return buildViews(context, appWidgetId, model, style, picked?.id, festival) to false
     }
 
-    /** 事件选取优先级：小组件绑定 > 全局默认 > 自动（最近未到期，否则最近已过）。 */
+    /** 事件选取优先级：该小组件绑定的事件 > 自动（最近未到期，否则最近已过）。 */
     private fun pickEvent(events: List<EventEntity>, context: Context, appWidgetId: Int): EventEntity? {
         if (events.isEmpty()) return null
-        val byId: (Long) -> EventEntity? = { id -> events.firstOrNull { it.id == id } }
-        byId(WidgetPrefs.eventForWidget(context, appWidgetId))?.let { return it }
-        byId(WidgetPrefs.defaultEventId(context))?.let { return it }
+        WidgetPrefs.eventForWidget(context, appWidgetId)
+            .takeIf { it != 0L }
+            ?.let { id -> events.firstOrNull { it.id == id } }
+            ?.let { return it }
         val today = LocalDate.now().toEpochDay()
         return events.filter { it.targetDateEpochDay - today >= 0 }
             .minByOrNull { it.targetDateEpochDay }
@@ -220,14 +249,18 @@ object WidgetRenderer {
     }
 
     /** 2×2「自动」模式的多事件列表视图（RemoteViews ListView）。 */
-    private fun buildListViews(context: Context, festival: com.ayaka7452.daymate.data.festival.FestivalDay?): RemoteViews {
+    private fun buildListViews(
+        context: Context,
+        appWidgetId: Int,
+        festival: com.ayaka7452.daymate.data.festival.FestivalDay?
+    ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_countdown_list)
         val dark = isDarkTheme(context)
         views.setInt(
             R.id.widget_card, "setBackgroundResource",
             if (dark) R.drawable.widget_bg_dark else R.drawable.widget_bg
         )
-        views.setFloat(R.id.widget_card, "setAlpha", WidgetPrefs.opacity(context) / 100f)
+        views.setFloat(R.id.widget_card, "setAlpha", WidgetPrefs.opacityFor(context, appWidgetId) / 100f)
         views.setTextColor(R.id.widget_empty, if (dark) 0xFF9B9498.toInt() else 0xFF7A7570.toInt())
         views.setEmptyView(R.id.widget_list, R.id.widget_empty)
         // 行点击：模板 PendingIntent + 工厂里的 FillInIntent（各行携带自己的 eventId）
@@ -252,6 +285,7 @@ object WidgetRenderer {
 
     private fun buildViews(
         context: Context,
+        appWidgetId: Int,
         model: WidgetModel?,
         style: Style,
         eventId: Long? = null,
@@ -273,7 +307,7 @@ object WidgetRenderer {
             R.id.widget_card, "setBackgroundResource",
             if (dark) R.drawable.widget_bg_dark else R.drawable.widget_bg
         )
-        views.setFloat(R.id.widget_card, "setAlpha", WidgetPrefs.opacity(context) / 100f)
+        views.setFloat(R.id.widget_card, "setAlpha", WidgetPrefs.opacityFor(context, appWidgetId) / 100f)
         views.setTextColor(R.id.widget_title, titleColor)
         views.setTextColor(R.id.widget_subtitle, subColor)
         views.setTextColor(R.id.widget_days_number, accentColor)

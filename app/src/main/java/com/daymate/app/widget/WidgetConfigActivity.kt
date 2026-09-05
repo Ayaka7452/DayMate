@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -122,11 +123,12 @@ private fun WidgetConfigScreen(
     val events by container.eventRepository.observeAll().collectAsState(initial = emptyList())
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var selected by remember { mutableStateOf(WidgetPrefs.eventForWidget(ctx, appWidgetId)) }
+    var opacity by remember { mutableStateOf(WidgetPrefs.opacityFor(ctx, appWidgetId).toFloat()) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("添加小组件") },
+                title = { Text("小组件配置") },
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -142,7 +144,9 @@ private fun WidgetConfigScreen(
                 horizontalArrangement = Arrangement.End
             ) {
                 Button(onClick = {
+                    // 两项配置都只写入该组件实例，与其他小组件互不影响
                     WidgetPrefs.setEventForWidget(ctx, appWidgetId, selected)
+                    WidgetPrefs.setOpacityFor(ctx, appWidgetId, opacity.toInt())
                     onConfirm(appWidgetId)
                 }) {
                     Text("完成")
@@ -167,7 +171,7 @@ private fun WidgetConfigScreen(
                 item {
                     OptionRow(
                         title = "自动（最近的倒数日）",
-                        subtitle = "总是显示最近的一个事件",
+                        subtitle = "总是显示最近的一个事件（2×2 组件将显示多事件列表）",
                         selected = selected == 0L,
                         onClick = { selected = 0L }
                     )
@@ -183,8 +187,28 @@ private fun WidgetConfigScreen(
                 }
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Text("卡片不透明度", style = MaterialTheme.typography.labelMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Slider(
+                    value = opacity / 100f,
+                    onValueChange = { opacity = (it * 100f).coerceIn(5f, 100f) },
+                    valueRange = 0.05f..1f,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "${opacity.toInt()}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Text(
-                "提示：也可以稍后在应用「设置 → 桌面小组件」中修改默认事件与卡片透明度。",
+                "提示：以上配置仅对当前小组件生效。长按桌面上的小组件可随时重新打开此页（Android 12+）。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )

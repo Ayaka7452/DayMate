@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -48,7 +47,6 @@ import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.data.festival.FestivalRepository
 import com.ayaka7452.daymate.feature.setup.StorageSetupBody
-import com.ayaka7452.daymate.widget.WidgetPrefs
 import com.ayaka7452.daymate.widget.WidgetRenderer
 import kotlinx.coroutines.launch
 import android.widget.Toast
@@ -70,12 +68,6 @@ fun SettingsScreen(
     val autoBackup by container.settingsRepository.autoBackupEnabled
         .collectAsState(initial = true)
     val backupConfigured = StorageConfig.isBackupConfigured(ctx)
-
-    // 桌面小组件：默认事件 + 卡片透明度（SharedPreferences，与 Widget 进程共享）
-    val widgetEvents by container.eventRepository.observeAll().collectAsState(initial = emptyList())
-    var showWidgetEventDialog by remember { mutableStateOf(false) }
-    var widgetDefaultEventId by remember { mutableStateOf(WidgetPrefs.defaultEventId(ctx)) }
-    var widgetOpacity by remember { mutableStateOf(WidgetPrefs.opacity(ctx).toFloat()) }
 
     // 节假日数据：不内置离线数据，由应用从可配置的数据源下载并缓存
     val festivalRepo = container.festivalRepository
@@ -237,56 +229,6 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
-            // ===== 桌面小组件（默认事件 + 卡片透明度） =====
-            Text(
-                "桌面小组件",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-            Text(
-                "部署到桌面时可单独选择每个小组件的事件；此处设置默认事件与卡片透明度。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showWidgetEventDialog = true }
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Filled.Widgets, contentDescription = null)
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("默认显示事件", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        if (widgetDefaultEventId == 0L) "当前：自动（最近的倒数日）"
-                        else "当前：" + (widgetEvents.firstOrNull { it.id == widgetDefaultEventId }?.title
-                            ?: "已删除的事件"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
-            Text(
-                "卡片透明度（${widgetOpacity.toInt()}%）",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-            Slider(
-                value = widgetOpacity / 100f,
-                onValueChange = { widgetOpacity = (it * 100f).coerceIn(5f, 100f) },
-                onValueChangeFinished = {
-                    WidgetPrefs.setOpacity(ctx, widgetOpacity.toInt())
-                    WidgetRenderer.refreshAll(ctx)
-                },
-                valueRange = 0.05f..1f
-            )
-
-            Spacer(Modifier.padding(vertical = 8.dp))
-            HorizontalDivider()
-
             // ===== 节假日数据（在线下载 + 本地缓存，无内置离线数据） =====
             Text(
                 "节假日数据",
@@ -442,47 +384,6 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showFestivalCustomInput = false }) { Text("取消") }
-            }
-        )
-    }
-
-    // 小组件默认事件选择弹窗
-    if (showWidgetEventDialog) {
-        AlertDialog(
-            onDismissRequest = { showWidgetEventDialog = false },
-            title = { Text("小组件默认事件") },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 420.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    WidgetEventOption(
-                        title = "自动（最近的倒数日）",
-                        subtitle = "总是显示最近的一个事件",
-                        selected = widgetDefaultEventId == 0L
-                    ) {
-                        widgetDefaultEventId = 0L
-                        scope.launch { WidgetPrefs.setDefaultEventId(ctx, 0L) }
-                        WidgetRenderer.refreshAll(ctx)
-                        showWidgetEventDialog = false
-                    }
-                    widgetEvents.forEach { ev ->
-                        WidgetEventOption(
-                            title = ev.title,
-                            subtitle = "固定显示该事件",
-                            selected = widgetDefaultEventId == ev.id
-                        ) {
-                            widgetDefaultEventId = ev.id
-                            scope.launch { WidgetPrefs.setDefaultEventId(ctx, ev.id) }
-                            WidgetRenderer.refreshAll(ctx)
-                            showWidgetEventDialog = false
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showWidgetEventDialog = false }) { Text("关闭") }
             }
         )
     }

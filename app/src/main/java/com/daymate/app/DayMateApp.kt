@@ -22,6 +22,10 @@ class DayMateApp : Application() {
         container = AppContainer(this)
         migrateLegacyVault()
         installCrashHandler()
+        // 一次性迁移：旧版全局的 widget 透明度/默认事件 → 按小组件实例各自保存
+        runCatching {
+            com.ayaka7452.daymate.widget.WidgetPrefs.migrateGlobalPrefs(this)
+        }
         // 应用启动时滚动循环/节日跟随事件：把目标日期已过的事件锚定到下一次日期
         // （节日跟随依赖节假日缓存数据；数据未下载时不滚动，仅周期循环生效）
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
