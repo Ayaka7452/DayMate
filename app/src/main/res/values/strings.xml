@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DayMate</string>
-    <string name="widget_description">显示最近的倒数日事件</string>
+    <string name="widget_description">在宽版卡片上显示倒数日</string>
+    <string name="widget_label_small">DayMate · 迷你</string>
+    <string name="widget_description_small">在 2×1 迷你卡片上显示倒数日</string>
+    <string name="widget_label_square">DayMate · 方形</string>
+    <string name="widget_description_square">在 2×2 方形卡片上显示倒数日</string>
 </resources>

@@ -1,0 +1,216 @@
+package com.ayaka7452.daymate.widget
+
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.res.Configuration
+import android.widget.RemoteViews
+import com.ayaka7452.daymate.DayMateApp
+import com.ayaka7452.daymate.MainActivity
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.data.db.EventEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.Period
+import java.time.format.DateTimeFormatter
+import kotlin.math.abs
+
+/**
+ * 小组件偏好（SharedPreferences，供 Widget 进程同步读取）：
+ *  - 卡片透明度（全局）
+ *  - 默认显示事件（全局，设置页可改）
+ *  - 每个已添加小组件各自绑定的事件（部署时通过配置页选择，优先生效）
+ */
+object WidgetPrefs {
+    private const val FILE = "widget_prefs"
+    private const val KEY_OPACITY = "card_opacity"
+    private const val KEY_DEFAULT_EVENT = "default_event_id"
+    private const val PREFIX_WIDGET_EVENT = "event_for_widget_"
+
+    private fun prefs(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    /** 卡片不透明度 5–100（默认 100）。 */
+    fun opacity(ctx: Context): Int = prefs(ctx).getInt(KEY_OPACITY, 100).coerceIn(5, 100)
+
+    fun setOpacity(ctx: Context, value: Int) {
+        prefs(ctx).edit().putInt(KEY_OPACITY, value.coerceIn(5, 100)).apply()
+    }
+
+    /** 全局默认事件 id；0 = 自动（最近的倒数日）。 */
+    fun defaultEventId(ctx: Context): Long = prefs(ctx).getLong(KEY_DEFAULT_EVENT, 0L)
+
+    fun setDefaultEventId(ctx: Context, id: Long) {
+        prefs(ctx).edit().putLong(KEY_DEFAULT_EVENT, id).apply()
+    }
+
+    /** 单个小组件绑定的事件 id；0 = 跟随全局默认。 */
+    fun eventForWidget(ctx: Context, appWidgetId: Int): Long =
+        prefs(ctx).getLong(PREFIX_WIDGET_EVENT + appWidgetId, 0L)
+
+    fun setEventForWidget(ctx: Context, appWidgetId: Int, eventId: Long) {
+        prefs(ctx).edit().putLong(PREFIX_WIDGET_EVENT + appWidgetId, eventId).apply()
+    }
+
+    /** 小组件被移除时清理其绑定记录。 */
+    fun clearWidget(ctx: Context, appWidgetId: Int) {
+        prefs(ctx).edit().remove(PREFIX_WIDGET_EVENT + appWidgetId).apply()
+    }
+}
+
+/**
+ * 小组件统一渲染器：三种尺寸（宽版 3×1 / 迷你 2×1 / 方形 2×2）共用同一套
+ * 事件选取（小组件绑定 > 全局默认 > 自动最近）、深浅色适配与透明度逻辑。
+ *  - 深浅色跟随系统（launcher 亮色亮卡片、深色深卡片），系统切换后立即重绘；
+ *  - 卡片背景用 View.setAlpha 控制不透明度（文字保持在独立层不受影响）。
+ */
+object WidgetRenderer {
+
+    private data class WidgetModel(
+        val title: String,
+        val subtitle: String,
+        val number: String,
+        val unit: String
+    )
+
+    enum class Style { WIDE, SMALL, SQUARE }
+
+    /** 三种小组件 provider 及对应布局样式。 */
+    private val providers: List<Pair<Class<out AppWidgetProvider>, Style>> = listOf(
+        CountdownWidgetProvider::class.java to Style.WIDE,
+        CountdownWidgetSmallProvider::class.java to Style.SMALL,
+        CountdownWidgetSquareProvider::class.java to Style.SQUARE
+    )
+
+    /** 应用内数据变更 / 设置变更时调用：立即刷新所有已添加到桌面的小组件。 */
+    fun refreshAll(context: Context) {
+        val appContext = context.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val manager = AppWidgetManager.getInstance(appContext)
+                for ((cls, style) in providers) {
+                    val ids = manager.getAppWidgetIds(ComponentName(appContext, cls))
+                    if (ids.isNotEmpty()) renderAll(appContext, manager, ids, style)
+                }
+            }
+        }
+    }
+
+    /** 系统深浅色切换后由 CONFIGURATION_CHANGED 广播触发。 */
+    fun onSystemConfigurationChanged(context: Context) {
+        refreshAll(context)
+    }
+
+    suspend fun renderOne(context: Context, manager: AppWidgetManager, appWidgetId: Int, style: Style) {
+        val container = (context.applicationContext as? DayMateApp)?.container ?: return
+        val model = runCatching { buildModel(container, context, appWidgetId) }.getOrNull()
+        manager.updateAppWidget(appWidgetId, buildViews(context, model, style))
+    }
+
+    suspend fun renderAll(context: Context, manager: AppWidgetManager, ids: IntArray, style: Style) {
+        val container = (context.applicationContext as? DayMateApp)?.container ?: return
+        for (id in ids) {
+            val model = runCatching { buildModel(container, context, id) }.getOrNull()
+            manager.updateAppWidget(id, buildViews(context, model, style))
+        }
+    }
+
+    /** 事件选取优先级：小组件绑定 > 全局默认 > 自动（最近未到期，否则最近已过）。 */
+    private suspend fun pickEvent(container: AppContainer, context: Context, appWidgetId: Int): EventEntity? {
+        val events = container.eventRepository.observeAll().first()
+        if (events.isEmpty()) return null
+        val byId: (Long) -> EventEntity? = { id -> events.firstOrNull { it.id == id } }
+        byId(WidgetPrefs.eventForWidget(context, appWidgetId))?.let { return it }
+        byId(WidgetPrefs.defaultEventId(context))?.let { return it }
+        val today = LocalDate.now().toEpochDay()
+        return events.filter { it.targetDateEpochDay - today >= 0 }
+            .minByOrNull { it.targetDateEpochDay }
+            ?: events.maxByOrNull { it.targetDateEpochDay }
+    }
+
+    private suspend fun buildModel(container: AppContainer, context: Context, appWidgetId: Int): WidgetModel? {
+        val picked = pickEvent(container, context, appWidgetId) ?: return null
+        val today = LocalDate.now()
+        val diff = (picked.targetDateEpochDay - today.toEpochDay()).toInt()
+        val isFuture = diff >= 0
+        val dateStr = LocalDate.ofEpochDay(picked.targetDateEpochDay)
+            .format(DateTimeFormatter.ofPattern("yyyy/M/d"))
+
+        // 数字与单位：跟随事件的显示单位（月/年不足 1 时自动退回更小单位）
+        var number = abs(diff).toString()
+        var unit = "天"
+        if (!isFuture || diff > 0) {
+            val period = if (isFuture) Period.between(today, LocalDate.ofEpochDay(picked.targetDateEpochDay))
+            else Period.between(LocalDate.ofEpochDay(picked.targetDateEpochDay), today)
+            val totalMonths = period.years * 12L + period.months
+            when (picked.displayUnit) {
+                "MONTH" -> if (totalMonths > 0) {
+                    number = totalMonths.toString(); unit = "个月"
+                }
+                "YEAR" -> when {
+                    period.years > 0 -> { number = period.years.toString(); unit = "年" }
+                    totalMonths > 0 -> { number = totalMonths.toString(); unit = "个月" }
+                }
+            }
+        }
+        return WidgetModel(
+            title = picked.title,
+            subtitle = "$dateStr · ${if (isFuture) "还有" else "已过"}",
+            number = number,
+            unit = unit
+        )
+    }
+
+    private fun buildViews(context: Context, model: WidgetModel?, style: Style): RemoteViews {
+        val layout = when (style) {
+            Style.WIDE -> R.layout.widget_countdown
+            Style.SMALL -> R.layout.widget_countdown_small
+            Style.SQUARE -> R.layout.widget_countdown_square
+        }
+        val views = RemoteViews(context.packageName, layout)
+
+        // 深浅色跟随系统；卡片背景与文字颜色整套切换
+        val dark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        val titleColor = if (dark) 0xFFE6E1E5.toInt() else 0xFF1C1B1F.toInt()
+        val subColor = if (dark) 0xFF9B9498.toInt() else 0xFF7A7570.toInt()
+        val accentColor = if (dark) 0xFF5AA9F0.toInt() else 0xFF1E78D0.toInt()
+        views.setInt(
+            R.id.widget_card, "setBackgroundResource",
+            if (dark) R.drawable.widget_bg_dark else R.drawable.widget_bg
+        )
+        views.setFloat(R.id.widget_card, "setAlpha", WidgetPrefs.opacity(context) / 100f)
+        views.setTextColor(R.id.widget_title, titleColor)
+        views.setTextColor(R.id.widget_subtitle, subColor)
+        views.setTextColor(R.id.widget_days_number, accentColor)
+        views.setTextColor(R.id.widget_days_unit, subColor)
+
+        if (model == null) {
+            views.setTextViewText(R.id.widget_title, "DayMate")
+            views.setTextViewText(R.id.widget_subtitle, "暂无倒数日")
+            views.setTextViewText(R.id.widget_days_number, "")
+            views.setTextViewText(R.id.widget_days_unit, "")
+        } else {
+            views.setTextViewText(R.id.widget_title, model.title)
+            views.setTextViewText(R.id.widget_subtitle, model.subtitle)
+            views.setTextViewText(R.id.widget_days_number, model.number)
+            views.setTextViewText(R.id.widget_days_unit, model.unit)
+        }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pending = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_root, pending)
+        return views
+    }
+}

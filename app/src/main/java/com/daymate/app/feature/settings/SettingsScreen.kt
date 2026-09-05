@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -22,8 +25,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -39,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.feature.setup.StorageSetupBody
+import com.ayaka7452.daymate.widget.WidgetPrefs
+import com.ayaka7452.daymate.widget.WidgetRenderer
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,6 +65,12 @@ fun SettingsScreen(
     val autoBackup by container.settingsRepository.autoBackupEnabled
         .collectAsState(initial = true)
     val backupConfigured = StorageConfig.isBackupConfigured(ctx)
+
+    // 桌面小组件：默认事件 + 卡片透明度（SharedPreferences，与 Widget 进程共享）
+    val widgetEvents by container.eventRepository.observeAll().collectAsState(initial = emptyList())
+    var showWidgetEventDialog by remember { mutableStateOf(false) }
+    var widgetDefaultEventId by remember { mutableStateOf(WidgetPrefs.defaultEventId(ctx)) }
+    var widgetOpacity by remember { mutableStateOf(WidgetPrefs.opacity(ctx).toFloat()) }
 
     // 数据备份：选择文件夹仅作 SAF 导出/导入目标，不需要任何存储权限（全屏覆盖）
     var showSetup by remember { mutableStateOf(false) }
@@ -210,6 +223,56 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
+            // ===== 桌面小组件（默认事件 + 卡片透明度） =====
+            Text(
+                "桌面小组件",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            Text(
+                "部署到桌面时可单独选择每个小组件的事件；此处设置默认事件与卡片透明度。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showWidgetEventDialog = true }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Widgets, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("默认显示事件", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (widgetDefaultEventId == 0L) "当前：自动（最近的倒数日）"
+                        else "当前：" + (widgetEvents.firstOrNull { it.id == widgetDefaultEventId }?.title
+                            ?: "已删除的事件"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+            Text(
+                "卡片透明度（${widgetOpacity.toInt()}%）",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Slider(
+                value = widgetOpacity / 100f,
+                onValueChange = { widgetOpacity = (it * 100f).coerceIn(5f, 100f) },
+                onValueChangeFinished = {
+                    WidgetPrefs.setOpacity(ctx, widgetOpacity.toInt())
+                    WidgetRenderer.refreshAll(ctx)
+                },
+                valueRange = 0.05f..1f
+            )
+
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -221,6 +284,74 @@ fun SettingsScreen(
                 Spacer(Modifier.width(12.dp))
                 Text("关于", style = MaterialTheme.typography.bodyLarge)
             }
+        }
+    }
+
+    // 小组件默认事件选择弹窗
+    if (showWidgetEventDialog) {
+        AlertDialog(
+            onDismissRequest = { showWidgetEventDialog = false },
+            title = { Text("小组件默认事件") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    WidgetEventOption(
+                        title = "自动（最近的倒数日）",
+                        subtitle = "总是显示最近的一个事件",
+                        selected = widgetDefaultEventId == 0L
+                    ) {
+                        widgetDefaultEventId = 0L
+                        scope.launch { WidgetPrefs.setDefaultEventId(ctx, 0L) }
+                        WidgetRenderer.refreshAll(ctx)
+                        showWidgetEventDialog = false
+                    }
+                    widgetEvents.forEach { ev ->
+                        WidgetEventOption(
+                            title = ev.title,
+                            subtitle = "固定显示该事件",
+                            selected = widgetDefaultEventId == ev.id
+                        ) {
+                            widgetDefaultEventId = ev.id
+                            scope.launch { WidgetPrefs.setDefaultEventId(ctx, ev.id) }
+                            WidgetRenderer.refreshAll(ctx)
+                            showWidgetEventDialog = false
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWidgetEventDialog = false }) { Text("关闭") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun WidgetEventOption(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
         }
     }
 }

@@ -24,7 +24,7 @@ class AppContainer(context: Context) {
     // 数据变更统一通知：触发自动备份计时 + 刷新桌面小组件
     private fun notifyDataChanged() {
         autoBackup.onDataChanged()
-        runCatching { com.ayaka7452.daymate.widget.CountdownWidgetProvider.refreshAll(appContext) }
+        runCatching { com.ayaka7452.daymate.widget.WidgetRenderer.refreshAll(appContext) }
     }
 
     val eventRepository = EventRepository(mainDb.eventDao(), ::notifyDataChanged)
