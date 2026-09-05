@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -87,7 +88,14 @@ fun FestivalCountdownCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            // 比默认 surfaceVariant 更浅的一档灰
+            containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+        )
+    ) {
         when {
             !hasData -> Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -131,16 +139,18 @@ fun FestivalCountdownCard(
                     )
                 }
                 val days = festival.date.toEpochDay() - LocalDate.now().toEpochDay()
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.End) {
+                Row(horizontalArrangement = Arrangement.End) {
                     Text(
                         days.toString(),
                         style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.alignByBaseline()
                     )
                     Text(
                         "天",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.alignByBaseline()
                     )
                 }
                 Spacer(Modifier.width(10.dp))
