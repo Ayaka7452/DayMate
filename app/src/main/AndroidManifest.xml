@@ -107,6 +107,12 @@
                 android:resource="@xml/countdown_widget_square_info" />
         </receiver>
 
+        <!-- 2×2「自动」模式多事件列表的数据源 -->
+        <service
+            android:name=".widget.CountdownWidgetListService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <!-- 小组件部署时的「选择显示事件」配置页 -->
         <activity
             android:name=".widget.WidgetConfigActivity"

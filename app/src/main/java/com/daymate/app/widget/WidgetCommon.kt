@@ -68,7 +68,9 @@ object WidgetPrefs {
  * 小组件统一渲染器：三种尺寸（宽版 3×1 / 迷你 2×1 / 方形 2×2）共用同一套
  * 事件选取（小组件绑定 > 全局默认 > 自动最近）、深浅色适配与透明度逻辑。
  *  - 深浅色跟随系统（launcher 亮色亮卡片、深色深卡片），系统切换后立即重绘；
- *  - 卡片背景用 View.setAlpha 控制不透明度（文字保持在独立层不受影响）。
+ *  - 卡片背景用 View.setAlpha 控制不透明度（文字保持在独立层不受影响）；
+ *  - 方形小组件在「自动」模式（未绑定事件且未设全局默认）下显示多事件列表
+ *    （RemoteViews ListView，最多 4 个最近事件）；绑定/默认事件后回到单事件大卡片。
  */
 object WidgetRenderer {
 
@@ -109,21 +111,43 @@ object WidgetRenderer {
 
     suspend fun renderOne(context: Context, manager: AppWidgetManager, appWidgetId: Int, style: Style) {
         val container = (context.applicationContext as? DayMateApp)?.container ?: return
-        val model = runCatching { buildModel(container, context, appWidgetId) }.getOrNull()
-        manager.updateAppWidget(appWidgetId, buildViews(context, model, style))
+        val pair = buildViewsForWidget(context, container, appWidgetId, style)
+        manager.updateAppWidget(appWidgetId, pair.first)
+        if (pair.second) manager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_list)
     }
 
     suspend fun renderAll(context: Context, manager: AppWidgetManager, ids: IntArray, style: Style) {
         val container = (context.applicationContext as? DayMateApp)?.container ?: return
         for (id in ids) {
-            val model = runCatching { buildModel(container, context, id) }.getOrNull()
-            manager.updateAppWidget(id, buildViews(context, model, style))
+            val pair = buildViewsForWidget(context, container, id, style)
+            manager.updateAppWidget(id, pair.first)
+            if (pair.second) manager.notifyAppWidgetViewDataChanged(id, R.id.widget_list)
         }
     }
 
+    /**
+     * 构建单个小组件的 RemoteViews。
+     * 返回 (views, isList)；isList=true 时调用方需 notifyAppWidgetViewDataChanged 刷新列表数据。
+     */
+    private suspend fun buildViewsForWidget(
+        context: Context,
+        container: AppContainer,
+        appWidgetId: Int,
+        style: Style
+    ): Pair<RemoteViews, Boolean> {
+        val events = runCatching { container.eventRepository.observeAll().first() }.getOrDefault(emptyList())
+        // 是否处于「固定事件」模式：小组件绑定或全局默认任一生效
+        val bound = WidgetPrefs.eventForWidget(context, appWidgetId) != 0L ||
+            WidgetPrefs.defaultEventId(context) != 0L
+        if (style == Style.SQUARE && !bound) {
+            return buildListViews(context) to true
+        }
+        val model = pickEvent(events, context, appWidgetId)?.let { buildModel(it) }
+        return buildViews(context, model, style) to false
+    }
+
     /** 事件选取优先级：小组件绑定 > 全局默认 > 自动（最近未到期，否则最近已过）。 */
-    private suspend fun pickEvent(container: AppContainer, context: Context, appWidgetId: Int): EventEntity? {
-        val events = container.eventRepository.observeAll().first()
+    private fun pickEvent(events: List<EventEntity>, context: Context, appWidgetId: Int): EventEntity? {
         if (events.isEmpty()) return null
         val byId: (Long) -> EventEntity? = { id -> events.firstOrNull { it.id == id } }
         byId(WidgetPrefs.eventForWidget(context, appWidgetId))?.let { return it }
@@ -134,8 +158,7 @@ object WidgetRenderer {
             ?: events.maxByOrNull { it.targetDateEpochDay }
     }
 
-    private suspend fun buildModel(container: AppContainer, context: Context, appWidgetId: Int): WidgetModel? {
-        val picked = pickEvent(container, context, appWidgetId) ?: return null
+    private fun buildModel(picked: EventEntity): WidgetModel {
         val today = LocalDate.now()
         val diff = (picked.targetDateEpochDay - today.toEpochDay()).toInt()
         val isFuture = diff >= 0
@@ -167,6 +190,36 @@ object WidgetRenderer {
         )
     }
 
+    private fun isDarkTheme(context: Context): Boolean =
+        (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+
+    private fun openAppPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        return PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    /** 2×2「自动」模式的多事件列表视图（RemoteViews ListView）。 */
+    private fun buildListViews(context: Context): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_countdown_list)
+        val dark = isDarkTheme(context)
+        views.setInt(
+            R.id.widget_card, "setBackgroundResource",
+            if (dark) R.drawable.widget_bg_dark else R.drawable.widget_bg
+        )
+        views.setFloat(R.id.widget_card, "setAlpha", WidgetPrefs.opacity(context) / 100f)
+        views.setTextColor(R.id.widget_empty, if (dark) 0xFF9B9498.toInt() else 0xFF7A7570.toInt())
+        views.setEmptyView(R.id.widget_list, R.id.widget_empty)
+        // 行点击：模板 PendingIntent + 工厂里的 FillInIntent
+        views.setPendingIntentTemplate(R.id.widget_list, openAppPendingIntent(context))
+        return views
+    }
+
     private fun buildViews(context: Context, model: WidgetModel?, style: Style): RemoteViews {
         val layout = when (style) {
             Style.WIDE -> R.layout.widget_countdown
@@ -176,8 +229,7 @@ object WidgetRenderer {
         val views = RemoteViews(context.packageName, layout)
 
         // 深浅色跟随系统；卡片背景与文字颜色整套切换
-        val dark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-            Configuration.UI_MODE_NIGHT_YES
+        val dark = isDarkTheme(context)
         val titleColor = if (dark) 0xFFE6E1E5.toInt() else 0xFF1C1B1F.toInt()
         val subColor = if (dark) 0xFF9B9498.toInt() else 0xFF7A7570.toInt()
         val accentColor = if (dark) 0xFF5AA9F0.toInt() else 0xFF1E78D0.toInt()
@@ -203,14 +255,7 @@ object WidgetRenderer {
             views.setTextViewText(R.id.widget_days_unit, model.unit)
         }
 
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pending = PendingIntent.getActivity(
-            context, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_root, pending)
+        views.setOnClickPendingIntent(R.id.widget_root, openAppPendingIntent(context))
         return views
     }
 }

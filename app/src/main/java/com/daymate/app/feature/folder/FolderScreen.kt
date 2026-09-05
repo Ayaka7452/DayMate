@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.activity.compose.BackHandler
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -32,6 +34,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -57,6 +60,7 @@ import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
+import com.ayaka7452.daymate.feature.common.matchesQuery
 import com.ayaka7452.daymate.feature.common.ReorderActions
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
@@ -100,6 +104,19 @@ fun FolderScreen(
 
     var vaultConfirmBatch by remember { mutableStateOf(false) }
     var vaultNeedSetup by remember { mutableStateOf(false) }
+
+    // 页内搜索（标题 + 备注）
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    BackHandler(enabled = searchActive) {
+        searchActive = false
+        searchQuery = ""
+    }
+    val query = searchQuery.trim()
+    val shownEvents = remember(displayEvents, query) {
+        if (query.isEmpty()) displayEvents
+        else displayEvents.filter { matchesQuery(it.title, it.note, query) }
+    }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -210,6 +227,12 @@ fun FolderScreen(
                         }
                     },
                     actions = {
+                        IconButton(onClick = {
+                            searchActive = !searchActive
+                            if (!searchActive) searchQuery = ""
+                        }) {
+                            Icon(Icons.Default.Search, contentDescription = "搜索")
+                        }
                         var menuExpanded by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {
@@ -248,28 +271,54 @@ fun FolderScreen(
             }
         }
     ) { padding ->
-        if (events.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text("📂", style = MaterialTheme.typography.displayMedium)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "这个文件夹还是空的",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (searchActive) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("搜索标题或备注") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
-        } else {
+            if (events.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text("📂", style = MaterialTheme.typography.displayMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "这个文件夹还是空的",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            } else if (searchActive && query.isNotEmpty() && shownEvents.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "未找到相关事件",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+            } else {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                items(displayEvents, key = { "e${it.id}" }) { event ->
+                items(shownEvents, key = { "e${it.id}" }) { event ->
                     ReorderableItem(reorderableState, key = "e${event.id}") {
                         val handle = if (selectionMode && manualSort) {
                             Modifier.draggableHandle(
@@ -314,6 +363,7 @@ fun FolderScreen(
                             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     )
                 }
+            }
             }
         }
     }
