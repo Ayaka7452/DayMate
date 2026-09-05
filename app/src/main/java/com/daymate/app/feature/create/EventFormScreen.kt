@@ -87,6 +87,8 @@ fun EventFormScreen(
                 displayUnit = e.displayUnit ?: CountdownCalculator.UNIT_DAY
                 repeatRule = e.repeatRule
                 linkedFestival = e.linkedFestival
+                // 跟随节日的事件不用 repeatRule（节日锚定优先），加载时归零保持数据一致
+                if (e.linkedFestival != null) repeatRule = null
             }
         }
     }
@@ -170,30 +172,40 @@ fun EventFormScreen(
 
             Text("循环", style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.height(6.dp))
+            // 跟随节日时循环不可选：节日每年日期不同（尤其农历），过期后由节假日数据自动锚定到该节日下一次
+            val repeatEnabled = linkedFestival == null
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = repeatRule == null,
+                    enabled = repeatEnabled,
                     onClick = { repeatRule = null },
                     label = { Text("不循环") }
                 )
                 FilterChip(
                     selected = repeatRule == CountdownCalculator.REPEAT_WEEKLY,
+                    enabled = repeatEnabled,
                     onClick = { repeatRule = CountdownCalculator.REPEAT_WEEKLY },
                     label = { Text("每周") }
                 )
                 FilterChip(
                     selected = repeatRule == CountdownCalculator.REPEAT_MONTHLY,
+                    enabled = repeatEnabled,
                     onClick = { repeatRule = CountdownCalculator.REPEAT_MONTHLY },
                     label = { Text("每月") }
                 )
                 FilterChip(
                     selected = repeatRule == CountdownCalculator.REPEAT_YEARLY,
+                    enabled = repeatEnabled,
                     onClick = { repeatRule = CountdownCalculator.REPEAT_YEARLY },
                     label = { Text("每年") }
                 )
             }
             Text(
-                "目标日期过后自动锚定到下一周期：每周同一星期几、每月同一日、每年同月同日",
+                if (linkedFestival != null) {
+                    "已跟随「$linkedFestival」：目标日期过后自动锚定到该节日的下一次日期，无需设置循环"
+                } else {
+                    "目标日期过后自动锚定到下一周期：每周同一星期几、每月同一日、每年同月同日"
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
