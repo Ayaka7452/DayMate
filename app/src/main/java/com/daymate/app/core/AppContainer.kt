@@ -20,6 +20,7 @@ class AppContainer(context: Context) {
 
     val settingsRepository = SettingsRepository(appContext.settingsDataStore)
     val autoBackup = AutoBackupManager(appContext, mainDb, settingsRepository)
+    val festivalRepository = com.ayaka7452.daymate.data.festival.FestivalRepository(appContext)
 
     // 数据变更统一通知：触发自动备份计时 + 刷新桌面小组件
     private fun notifyDataChanged() {

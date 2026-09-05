@@ -1,5 +1,6 @@
 package com.ayaka7452.daymate.feature.create
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -52,17 +54,26 @@ fun EventFormScreen(
     container: AppContainer,
     eventId: Long? = null,
     folderId: Long? = null,
+    prefillTitle: String? = null,
+    prefillEpochDay: Long? = null,
+    prefillFestival: String? = null,
     onBack: () -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(prefillTitle ?: "") }
     var note by remember { mutableStateOf("") }
-    var epochDay by remember { mutableStateOf(LocalDate.now().plusDays(7).toEpochDay()) }
+    var epochDay by remember {
+        mutableStateOf(prefillEpochDay ?: LocalDate.now().plusDays(7).toEpochDay())
+    }
     var refDaysText by remember { mutableStateOf("") }
     var displayUnit by remember { mutableStateOf(CountdownCalculator.UNIT_DAY) }
     var repeatRule by remember { mutableStateOf<String?>(null) }
+    // 跟随节日：从节日快选或主页节日卡片进入时预置；保存后随事件持久化
+    var linkedFestival by remember { mutableStateOf(prefillFestival) }
     var loaded by remember { mutableStateOf<EventEntity?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
+    var showFestivalDialog by remember { mutableStateOf(false) }
+    var festivalOptions by remember { mutableStateOf<List<com.ayaka7452.daymate.data.festival.FestivalDay>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(eventId) {
@@ -75,6 +86,7 @@ fun EventFormScreen(
                 refDaysText = e.refDays?.toString() ?: ""
                 displayUnit = e.displayUnit ?: CountdownCalculator.UNIT_DAY
                 repeatRule = e.repeatRule
+                linkedFestival = e.linkedFestival
             }
         }
     }
@@ -186,6 +198,31 @@ fun EventFormScreen(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
 
+            Spacer(Modifier.height(12.dp))
+
+            // ===== 跟随节日：目标日期自动锚定到节假日数据源中该节日的下一次日期 =====
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                TextButton(onClick = {
+                    // 打开弹窗时加载接下来可快选的节日（来自已下载的节假日缓存）
+                    festivalOptions = container.festivalRepository.upcomingOffDays(LocalDate.now())
+                    showFestivalDialog = true
+                }) { Text("跟随节日…") }
+                if (linkedFestival != null) {
+                    TextButton(onClick = { linkedFestival = null }) {
+                        Text("取消跟随（${linkedFestival}）")
+                    }
+                }
+            }
+            Text(
+                "选择节日后，目标日期过后会自动更新到该节日的下一次日期（如春节每年变动）",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+
             Spacer(Modifier.height(16.dp))
 
             Text("倒计时显示单位", style = MaterialTheme.typography.labelMedium)
@@ -243,7 +280,8 @@ fun EventFormScreen(
                                     targetDateEpochDay = epochDay,
                                     refDays = refValue,
                                     displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
-                                    repeatRule = repeatRule
+                                    repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
+                                    linkedFestival = linkedFestival
                                 )
                             )
                         } else {
@@ -254,7 +292,8 @@ fun EventFormScreen(
                                     targetDateEpochDay = epochDay,
                                     refDays = refValue,
                                     displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
-                                    repeatRule = repeatRule,
+                                    repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
+                                    linkedFestival = linkedFestival,
                                     folderId = folderId
                                 )
                             )
@@ -328,6 +367,62 @@ fun EventFormScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showFestivalDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showFestivalDialog = false },
+            title = { Text("跟随节日") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (festivalOptions.isEmpty()) {
+                        Text(
+                            "暂无节假日数据。\n请到「设置 → 节假日数据」选择数据源并下载后再使用跟随节日功能。",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        festivalOptions.forEach { f ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        // 标题为空或仍是上一个跟随节日名时自动填入，避免覆盖用户自定义标题
+                                        if (title.isBlank() || title == linkedFestival) title = f.name
+                                        linkedFestival = f.name
+                                        epochDay = f.date.toEpochDay()
+                                        repeatRule = null
+                                        showFestivalDialog = false
+                                    }
+                                    .padding(vertical = 10.dp),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(f.name, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        f.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日")),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                                val days = f.date.toEpochDay() - LocalDate.now().toEpochDay()
+                                Text(
+                                    if (days == 0L) "今天" else "还有 $days 天",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFestivalDialog = false }) { Text("关闭") }
             }
         )
     }

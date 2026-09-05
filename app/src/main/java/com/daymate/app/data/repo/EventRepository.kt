@@ -73,25 +73,44 @@ class EventRepository(
     suspend fun nextSortIndex(): Int = (dao.maxSortIndex() ?: -1) + 1
 
     /**
-     * 循环事件自动锚定：把目标日期已过的循环事件（WEEKLY/MONTHLY/YEARLY）滚动到
-     * 下一周期的同位日期。返回滚动的事件数；有滚动时通知界面与小组件刷新。
-     * 在应用启动、跨天午夜刷新等时机调用；重复调用安全（已滚动的日期不再是「已过」）。
+     * 自动锚定：把目标日期已过的事件滚动到下一次日期。返回滚动的事件数。
+     *  - repeatRule（WEEKLY/MONTHLY/YEARLY）→ 按周期同位日期滚动；
+     *  - linkedFestival（跟随节日）→ 按节假日数据源中该节日的下一次日期滚动（优先于 repeatRule）。
+     * 在应用启动、跨天午夜刷新、节假日数据下载成功后调用；重复调用安全。
+     * festivalRepo 传入 null 或缓存无数据时，节日跟随事件保持原日期不动。
      */
-    suspend fun rollForwardRepeating(): Int {
-        val todayEpochDay = java.time.LocalDate.now().toEpochDay()
-        val stale = dao.getRepeatingPast(todayEpochDay)
-        if (stale.isEmpty()) return 0
+    suspend fun rollForwardRepeating(
+        festivalRepo: com.ayaka7452.daymate.data.festival.FestivalRepository? = null
+    ): Int {
+        val today = java.time.LocalDate.now()
+        val todayEpochDay = today.toEpochDay()
         var count = 0
-        for (e in stale) {
+        // 1) 周期循环（linkedFestival 存在时跳过——节日跟随优先）
+        for (e in dao.getRepeatingPast(todayEpochDay)) {
+            if (!e.linkedFestival.isNullOrBlank()) continue
             val next = com.ayaka7452.daymate.core.util.CountdownCalculator
                 .nextOccurrence(e.targetDateEpochDay, e.repeatRule) ?: continue
             dao.update(
-                e.copy(
-                    targetDateEpochDay = next.toEpochDay(),
-                    updatedAt = System.currentTimeMillis()
-                )
+                e.copy(targetDateEpochDay = next.toEpochDay(), updatedAt = System.currentTimeMillis())
             )
             count++
+        }
+        // 2) 跟随节日
+        if (festivalRepo != null) {
+            for (e in dao.getFestivalLinkedPast(todayEpochDay)) {
+                val name = e.linkedFestival ?: continue
+                val next = festivalRepo.nextOccurrenceOf(name, today) ?: continue
+                if (next.toEpochDay() != e.targetDateEpochDay) {
+                    dao.update(
+                        e.copy(
+                            targetDateEpochDay = next.toEpochDay(),
+                            repeatRule = null,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                    count++
+                }
+            }
         }
         if (count > 0) {
             onChanged()

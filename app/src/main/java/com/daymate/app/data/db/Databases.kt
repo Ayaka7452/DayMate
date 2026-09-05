@@ -13,7 +13,7 @@ import androidx.room.migration.Migration
         VaultEventEntity::class,
         VaultFolderEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -99,6 +99,14 @@ abstract class DayMateDatabase : RoomDatabase() {
             }
         }
 
+        /** v6 -> v7：事件与 Vault 事件新增「跟随节日」linkedFestival（可空，节日名）。 */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                addColumnIfMissing(db, "events", "linkedFestival", "ALTER TABLE events ADD COLUMN linkedFestival TEXT")
+                addColumnIfMissing(db, "vault_events", "linkedFestival", "ALTER TABLE vault_events ADD COLUMN linkedFestival TEXT")
+            }
+        }
+
         /** 幂等加列：列已存在时跳过（防重复 ALTER TABLE 崩溃）。 */
         private fun addColumnIfMissing(
             db: androidx.sqlite.db.SupportSQLiteDatabase,
@@ -119,7 +127,10 @@ abstract class DayMateDatabase : RoomDatabase() {
             // 用户数据「备份到自选文件夹」由 StorageBackup 通过 SAF 持久化 URI 完成，
             // 与 Room 主库的物理位置解耦。
             return Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                    MIGRATION_5_6, MIGRATION_6_7
+                )
                 .fallbackToDestructiveMigration()
                 .build()
         }

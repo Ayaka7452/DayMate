@@ -65,6 +65,10 @@ interface EventDao {
     /** 循环事件里目标日期已过的（供自动锚定下一周期）。 */
     @Query("SELECT * FROM events WHERE isDeleted = 0 AND repeatRule IS NOT NULL AND targetDateEpochDay < :todayEpochDay")
     suspend fun getRepeatingPast(todayEpochDay: Long): List<EventEntity>
+
+    /** 跟随节日的事件里目标日期已过的（供自动锚定到节日下一次日期）。 */
+    @Query("SELECT * FROM events WHERE isDeleted = 0 AND linkedFestival IS NOT NULL AND targetDateEpochDay < :todayEpochDay")
+    suspend fun getFestivalLinkedPast(todayEpochDay: Long): List<EventEntity>
 }
 
 @Dao

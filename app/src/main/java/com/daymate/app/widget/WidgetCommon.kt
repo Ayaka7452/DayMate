@@ -96,9 +96,9 @@ object WidgetRenderer {
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val manager = AppWidgetManager.getInstance(appContext)
-                // 先滚动循环事件（跨天午夜/开机路径依赖此调用把已过的循环日期锚定到下一周期）
+                // 先滚动循环/节日跟随事件（跨天午夜/开机路径依赖此调用把已过的日期锚定到下一次）
                 val container = (appContext as? DayMateApp)?.container
-                container?.eventRepository?.rollForwardRepeating()
+                container?.eventRepository?.rollForwardRepeating(container.festivalRepository)
                 for ((cls, style) in providers) {
                     val ids = manager.getAppWidgetIds(ComponentName(appContext, cls))
                     if (ids.isNotEmpty()) renderAll(appContext, manager, ids, style)
@@ -139,15 +139,19 @@ object WidgetRenderer {
         style: Style
     ): Pair<RemoteViews, Boolean> {
         val events = runCatching { container.eventRepository.observeAll().first() }.getOrDefault(emptyList())
+        // 今日节假日信息（来自已下载的节假日缓存；未下载时为 null，角标隐藏）
+        val festival = runCatching {
+            container.festivalRepository.todayInfo(LocalDate.now())
+        }.getOrNull()
         // 是否处于「固定事件」模式：小组件绑定或全局默认任一生效
         val bound = WidgetPrefs.eventForWidget(context, appWidgetId) != 0L ||
             WidgetPrefs.defaultEventId(context) != 0L
         if (style == Style.SQUARE && !bound) {
-            return buildListViews(context) to true
+            return buildListViews(context, festival) to true
         }
         val picked = pickEvent(events, context, appWidgetId)
         val model = picked?.let { buildModel(it) }
-        return buildViews(context, model, style, picked?.id) to false
+        return buildViews(context, model, style, picked?.id, festival) to false
     }
 
     /** 事件选取优先级：小组件绑定 > 全局默认 > 自动（最近未到期，否则最近已过）。 */
@@ -216,7 +220,7 @@ object WidgetRenderer {
     }
 
     /** 2×2「自动」模式的多事件列表视图（RemoteViews ListView）。 */
-    private fun buildListViews(context: Context): RemoteViews {
+    private fun buildListViews(context: Context, festival: com.ayaka7452.daymate.data.festival.FestivalDay?): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_countdown_list)
         val dark = isDarkTheme(context)
         views.setInt(
@@ -228,10 +232,31 @@ object WidgetRenderer {
         views.setEmptyView(R.id.widget_list, R.id.widget_empty)
         // 行点击：模板 PendingIntent + 工厂里的 FillInIntent（各行携带自己的 eventId）
         views.setPendingIntentTemplate(R.id.widget_list, openEventPendingIntent(context, null))
+        applyFestivalBadge(views, festival)
         return views
     }
 
-    private fun buildViews(context: Context, model: WidgetModel?, style: Style, eventId: Long? = null): RemoteViews {
+    /** 节日角标：今天恰逢法定节假日显示绿色「休」，调休上班日显示橙色「班」；无数据隐藏。 */
+    private fun applyFestivalBadge(views: RemoteViews, festival: com.ayaka7452.daymate.data.festival.FestivalDay?) {
+        if (festival == null) {
+            views.setViewVisibility(R.id.widget_festival_badge, android.view.View.GONE)
+            return
+        }
+        views.setViewVisibility(R.id.widget_festival_badge, android.view.View.VISIBLE)
+        views.setTextViewText(R.id.widget_festival_badge, if (festival.isOffDay) "休" else "班")
+        views.setInt(
+            R.id.widget_festival_badge, "setBackgroundResource",
+            if (festival.isOffDay) R.drawable.widget_badge_off else R.drawable.widget_badge_work
+        )
+    }
+
+    private fun buildViews(
+        context: Context,
+        model: WidgetModel?,
+        style: Style,
+        eventId: Long? = null,
+        festival: com.ayaka7452.daymate.data.festival.FestivalDay? = null
+    ): RemoteViews {
         val layout = when (style) {
             Style.WIDE -> R.layout.widget_countdown
             Style.SMALL -> R.layout.widget_countdown_small
@@ -268,6 +293,7 @@ object WidgetRenderer {
 
         // 整卡点击直达当前显示事件的详情页
         views.setOnClickPendingIntent(R.id.widget_root, openEventPendingIntent(context, eventId))
+        applyFestivalBadge(views, festival)
         return views
     }
 }

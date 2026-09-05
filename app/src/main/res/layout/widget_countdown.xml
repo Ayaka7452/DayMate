@@ -48,7 +48,9 @@
                 android:layout_marginTop="2dp"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textSize="14sp"
+                android:autoSizeTextType="uniform"
+                android:autoSizeMinTextSize="10sp"
+                android:autoSizeMaxTextSize="14sp"
                 android:textColor="#7A7570"
                 android:text="2026/12/19 · 还有" />
         </LinearLayout>
@@ -80,4 +82,22 @@
                 android:text="天" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- 节日角标（休/班）：今日恰逢节假日或调休时由渲染层显示 -->
+    <TextView
+        android:id="@+id/widget_festival_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="10dp"
+        android:paddingStart="7dp"
+        android:paddingEnd="7dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:textSize="11sp"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/widget_badge_off"
+        android:text="休"
+        android:visibility="gone" />
 </FrameLayout>

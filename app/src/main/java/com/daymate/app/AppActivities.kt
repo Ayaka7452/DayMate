@@ -104,13 +104,25 @@ fun Context.route(route: String) {
             val qs = route.substringAfter("?").split("&")
             var eventId: Long? = null
             var folderId: Long? = null
+            var festivalName: String? = null
+            var festivalEpochDay: Long? = null
             for (p in qs) {
                 if (p.startsWith("eventId=")) eventId = p.substringAfter("=").toLongOrNull()
                 if (p.startsWith("folderId=")) folderId = p.substringAfter("=").toLongOrNull()
+                if (p.startsWith("festivalName=")) {
+                    festivalName = runCatching {
+                        java.net.URLDecoder.decode(p.substringAfter("="), "UTF-8")
+                    }.getOrNull()
+                }
+                if (p.startsWith("festivalEpochDay=")) {
+                    festivalEpochDay = p.substringAfter("=").toLongOrNull()
+                }
             }
             Intent(this, EventFormActivity::class.java).apply {
                 eventId?.let { putExtra("eventId", it) }
                 folderId?.let { putExtra("folderId", it) }
+                festivalName?.let { putExtra("festivalName", it) }
+                festivalEpochDay?.let { putExtra("festivalEpochDay", it) }
             }
         }
         else -> null
@@ -124,11 +136,18 @@ class EventFormActivity : ComposeActivity() {
         super.onCreate(savedInstanceState)
         val eventId = intent.getLongExtra("eventId", -1L).let { if (it == -1L) null else it }
         val folderId = intent.getLongExtra("folderId", -1L).let { if (it == -1L) null else it }
+        // 从主页节日倒数卡片快捷进入：预填节日名与目标日期
+        val festivalName = intent.getStringExtra("festivalName")
+        val festivalEpochDay = intent.getLongExtra("festivalEpochDay", -1L)
+            .let { if (it == -1L) null else it }
         setDayMateContent {
             EventFormScreen(
                 container = container,
                 eventId = eventId,
                 folderId = folderId,
+                prefillTitle = festivalName,
+                prefillEpochDay = festivalEpochDay,
+                prefillFestival = festivalName,
                 onBack = { finish() }
             )
         }

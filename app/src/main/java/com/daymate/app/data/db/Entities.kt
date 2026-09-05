@@ -47,6 +47,8 @@ data class EventEntity(
     val displayUnit: String? = null,
     /** 循环规则：WEEKLY/MONTHLY/YEARLY，null = 不循环。目标日期过后自动锚定到下一周期同日。 */
     val repeatRule: String? = null,
+    /** 跟随的节日名（来自节假日数据源）：目标日期过后自动锚定到该节日的下一次日期。优先于 repeatRule。 */
+    val linkedFestival: String? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val isDeleted: Boolean = false,
@@ -84,6 +86,8 @@ data class VaultEventEntity(
     val displayUnit: String? = null,
     /** 循环规则：WEEKLY/MONTHLY/YEARLY，null = 不循环。与主表 events.repeatRule 同义。 */
     val repeatRule: String? = null,
+    /** 跟随的节日名（来自节假日数据源）。与主表 events.linkedFestival 同义。 */
+    val linkedFestival: String? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

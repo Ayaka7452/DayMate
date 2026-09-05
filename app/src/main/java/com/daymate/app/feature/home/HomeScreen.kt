@@ -136,6 +136,22 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    // 节假日数据（在线下载 + 本地缓存）：主页顶部横幅 + 下一节日倒数卡片
+    val festivalRepo = remember { container.festivalRepository }
+    var festivalHasData by remember { mutableStateOf(false) }
+    var todayFestival by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
+    var nextFestival by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val today = java.time.LocalDate.now()
+            Triple(festivalRepo.hasData(), festivalRepo.todayInfo(today), festivalRepo.nextOffDay(today))
+        }?.let { (has, todayF, nextF) ->
+            festivalHasData = has
+            todayFestival = todayF
+            nextFestival = nextF
+        }
+    }
+
     // 排序模式：remaining_asc/remaining_desc/manual（manual 才允许手动调整顺序）
     val defaultSort by container.settingsRepository.defaultSort
         .collectAsState(initial = SortModes.REMAINING_ASC)
@@ -464,6 +480,34 @@ fun HomeScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
+                // 今日节日/调休横幅 + 下一节日倒数卡片（未下载数据时引导去设置）
+                todayFestival?.let { tf ->
+                    item(key = "festival_today") {
+                        com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
+                            day = tf,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                item(key = "festival_card") {
+                    com.ayaka7452.daymate.feature.common.FestivalCountdownCard(
+                        hasData = festivalHasData,
+                        festival = nextFestival,
+                        onClick = {
+                            if (!festivalHasData) {
+                                onNavigate(Routes.SETTINGS)
+                            } else if (nextFestival != null) {
+                                val f = nextFestival!!
+                                onNavigate(
+                                    "event_form?festivalName=" +
+                                        android.net.Uri.encode(f.name) +
+                                        "&festivalEpochDay=" + f.date.toEpochDay()
+                                )
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
                         val handle = if (selectionMode && manualSort) {

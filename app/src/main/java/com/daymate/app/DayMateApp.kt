@@ -22,9 +22,10 @@ class DayMateApp : Application() {
         container = AppContainer(this)
         migrateLegacyVault()
         installCrashHandler()
-        // 应用启动时滚动循环事件：把目标日期已过的循环事件锚定到下一周期（周/月/年）
+        // 应用启动时滚动循环/节日跟随事件：把目标日期已过的事件锚定到下一次日期
+        // （节日跟随依赖节假日缓存数据；数据未下载时不滚动，仅周期循环生效）
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-            runCatching { container.eventRepository.rollForwardRepeating() }
+            runCatching { container.eventRepository.rollForwardRepeating(container.festivalRepository) }
         }
         // 小组件跨天精确刷新：应用起来后续订下一个午夜的刷新闹钟
         runCatching {

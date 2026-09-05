@@ -117,6 +117,17 @@ fun FolderScreen(
     val context = LocalContext.current
     val totalSelected = selectedEventIds.size
 
+    // 今日节日/调休横幅（数据未下载时为 null，不显示；主页倒数卡片负责引导下载）
+    var todayFestival by remember {
+        mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null)
+    }
+    LaunchedEffect(Unit) {
+        val t = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            container.festivalRepository.todayInfo(java.time.LocalDate.now())
+        }
+        todayFestival = t
+    }
+
     // 排序模式：manual 才允许手动调整顺序
     val defaultSort by container.settingsRepository.defaultSort
         .collectAsState(initial = SortModes.REMAINING_ASC)
@@ -320,6 +331,15 @@ fun FolderScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
+                // 今日节日/调休横幅（数据未下载时不在文件夹页引导，主页卡片负责提示）
+                todayFestival?.let { tf ->
+                    item(key = "festival_today") {
+                        com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
+                            day = tf,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
                 items(shownEvents, key = { "e${it.id}" }) { event ->
                     ReorderableItem(reorderableState, key = "e${event.id}") {
                         val handle = if (selectionMode && manualSort) {
