@@ -105,9 +105,6 @@ fun HomeScreen(
     // 主页顶部卡片模式：festival（默认）/ event / off
     val homeTopCard by container.settingsRepository.homeTopCard
         .collectAsState(initial = "festival")
-    // 「最近倒数日」卡片数据源：含各文件夹内的事件（observeRoot 不够）
-    val allEventsFlow = remember { container.eventRepository.observeAll() }
-    val allEvents by allEventsFlow.collectAsState(initial = emptyList())
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
