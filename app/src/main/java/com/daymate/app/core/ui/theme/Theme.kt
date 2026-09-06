@@ -94,7 +94,7 @@ private val DarkAccents: Map<String, List<Long>> = mapOf(
 )
 
 private fun accentScheme(mode: String, darkTheme: Boolean): ColorScheme {
-    val tones = if (darkTheme) DarkAccents[mode] else LightAccents[mode]
+    val tones = (if (darkTheme) DarkAccents[mode] else LightAccents[mode])
         ?: return if (darkTheme) DarkColors else LightColors
     val c = tones.map { Color(it) }
     return if (darkTheme) {
