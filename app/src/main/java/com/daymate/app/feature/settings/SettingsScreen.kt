@@ -1,6 +1,8 @@
 package com.ayaka7452.daymate.feature.settings
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -117,13 +121,14 @@ fun SettingsScreen(
         "event" to "最近的倒数日",
         "off" to "关闭"
     )
+    // 配色选项：value / 短标签（横排显示）/ 色板色（system 特殊渲染为四色圆）
     val colorOptions: List<Triple<String, String, Color>> = listOf(
-        Triple("white", "白色（默认）", Color(0xFF2F5D62)),
-        Triple("system", "跟随系统（取壁纸颜色）", Color(0xFF6750A4)),
-        Triple("blue", "蓝色", Color(0xFF1565C0)),
-        Triple("green", "绿色", Color(0xFF2E7D32)),
-        Triple("orange", "橙色", Color(0xFFE65100)),
-        Triple("purple", "紫色", Color(0xFF6A1B9A))
+        Triple("white", "白", Color(0xFFFFFFFF)),
+        Triple("system", "自动", Color.Transparent),
+        Triple("blue", "蓝", Color(0xFF1565C0)),
+        Triple("green", "绿", Color(0xFF2E7D32)),
+        Triple("orange", "橙", Color(0xFFE65100)),
+        Triple("purple", "紫", Color(0xFF6A1B9A))
     )
 
     Scaffold(
@@ -167,38 +172,38 @@ fun SettingsScreen(
                 }
             }
 
-            // ===== 配色（Android 原生颜色组合） =====
+            // ===== 配色（横排色板，选中带圈） =====
             Text(
                 "配色",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 8.dp)
             )
-            colorOptions.forEach { (value, label, swatch) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            scope.launch { container.settingsRepository.setColorMode(value) }
-                        }
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = colorMode == value,
-                        onClick = {
-                            scope.launch { container.settingsRepository.setColorMode(value) }
-                        }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Box(
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+            ) {
+                colorOptions.forEach { (value, label, swatch) ->
+                    Column(
                         modifier = Modifier
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .background(swatch)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                                scope.launch { container.settingsRepository.setColorMode(value) }
+                            }
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        ColorSwatchDot(value = value, selected = colorMode == value, accent = swatch)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (colorMode == value) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
 
@@ -550,6 +555,47 @@ fun SettingsScreen(
                 TextButton(onClick = { showFestivalCustomInput = false }) { Text("取消") }
             }
         )
+    }
+}
+
+@Composable
+private fun ColorSwatchDot(value: String, selected: Boolean, accent: Color) {
+    val ring = if (selected) MaterialTheme.colorScheme.primary
+               else MaterialTheme.colorScheme.outlineVariant
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = ring,
+                shape = CircleShape
+            )
+            .padding(3.dp)
+            .clip(CircleShape)
+    ) {
+        if (value == "system") {
+            // 「自动」= 四色拼圆，表达跟随壁纸的动态取色
+            Canvas(Modifier.fillMaxSize()) {
+                val quad = listOf(
+                    Color(0xFF1565C0), Color(0xFF2E7D32),
+                    Color(0xFFE65100), Color(0xFF6A1B9A)
+                )
+                quad.forEachIndexed { i, c ->
+                    drawArc(
+                        color = c,
+                        startAngle = 90f * i - 90f,
+                        sweepAngle = 90f,
+                        useCenter = true
+                    )
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(accent)
+            )
+        }
     }
 }
 
