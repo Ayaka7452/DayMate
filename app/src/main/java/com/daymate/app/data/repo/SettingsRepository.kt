@@ -46,6 +46,12 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     /** 节日卡片右侧角标 emoji（默认 ☀️；卡片只显示放假节日，不需要「休/班」）。 */
     val homeBadgeEmoji: Flow<String> = dataStore.data.map { it[HOME_BADGE_EMOJI] ?: "☀️" }
 
+    /**
+     * UI 配色方案：white=白底品牌色（默认）/ system=跟随系统壁纸取色（Material You，Android 12+，
+     * 低版本回退白色）/ blue / green / orange / purple=固定原生配色组合。
+     */
+    val colorMode: Flow<String> = dataStore.data.map { it[COLOR_MODE] ?: "white" }
+
     suspend fun setThemeMode(mode: String) {
         dataStore.edit { it[THEME] = mode }
     }

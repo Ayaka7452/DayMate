@@ -2,6 +2,7 @@ package com.ayaka7452.daymate.core.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -37,14 +38,37 @@ private val DarkColors = darkColorScheme(
 )
 
 /**
+ * 固定原生配色组合（Material 色板取色）：浅色 = 白底 + 主题色，深色 = 墨底 + 提亮主题色。
+ * key 与 SettingsRepository.COLOR_MODE 的取值对应。
+ */
+private val AccentSchemes: Map<String, Pair<Long, Long>> = mapOf(
+    //            浅色 primary     深色 primary
+    "blue"   to Pair(0xFF1565C0, 0xFF90CAF9),
+    "green"  to Pair(0xFF2E7D32, 0xFFA5D6A7),
+    "orange" to Pair(0xFFE65100, 0xFFFFB74D),
+    "purple" to Pair(0xFF6A1B9A, 0xFFCE93D8)
+)
+
+private fun accentScheme(mode: String, darkTheme: Boolean): ColorScheme {
+    val (lightPrimary, darkPrimary) = AccentSchemes[mode] ?: return if (darkTheme) DarkColors else LightColors
+    val primary = Color(if (darkTheme) darkPrimary else lightPrimary)
+    return if (darkTheme) {
+        DarkColors.copy(primary = primary, onPrimary = Color(0xFF1A1A18))
+    } else {
+        LightColors.copy(primary = primary, onPrimary = Color.White)
+    }
+}
+
+/**
  * DayMate 主题。
- * - mode: system / light / dark
- * - dynamicColor: Android 12+ 时跟随壁纸动态取色（Material You），低于该版本回退到品牌配色
+ * - mode: system / light / dark（深浅模式）
+ * - colorMode: white（白底品牌色，默认）/ system（Material You 壁纸取色，Android 12+，
+ *   低版本回退白色）/ blue / green / orange / purple（固定原生配色）
  */
 @Composable
 fun DayMateTheme(
     mode: String = "system",
-    dynamicColor: Boolean = true,
+    colorMode: String = "white",
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (mode) {
@@ -53,12 +77,13 @@ fun DayMateTheme(
         else -> isSystemInDarkTheme()
     }
     val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        colorMode == "system" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val ctx = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
         }
-        darkTheme -> DarkColors
-        else -> LightColors
+        colorMode == "system" -> if (darkTheme) DarkColors else LightColors // 低版本回退白色
+        AccentSchemes.containsKey(colorMode) -> accentScheme(colorMode, darkTheme)
+        else -> if (darkTheme) DarkColors else LightColors
     }
     MaterialTheme(
         colorScheme = colorScheme,

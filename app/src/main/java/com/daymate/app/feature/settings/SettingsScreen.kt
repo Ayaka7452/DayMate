@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
@@ -62,6 +63,8 @@ fun SettingsScreen(
 ) {
     val themeMode by container.settingsRepository.themeMode
         .collectAsState(initial = "system")
+    val colorMode by container.settingsRepository.colorMode
+        .collectAsState(initial = "white")
     val defaultSort by container.settingsRepository.defaultSort
         .collectAsState(initial = "remaining_asc")
     val homeTopCard by container.settingsRepository.homeTopCard
@@ -111,6 +114,14 @@ fun SettingsScreen(
         "event" to "最近的倒数日",
         "off" to "关闭"
     )
+    val colorOptions: List<Triple<String, String, Color>> = listOf(
+        Triple("white", "白色（默认）", Color(0xFF2F5D62)),
+        Triple("system", "跟随系统（取壁纸颜色）", Color(0xFF6750A4)),
+        Triple("blue", "蓝色", Color(0xFF1565C0)),
+        Triple("green", "绿色", Color(0xFF2E7D32)),
+        Triple("orange", "橙色", Color(0xFFE65100)),
+        Triple("purple", "紫色", Color(0xFF6A1B9A))
+    )
 
     Scaffold(
         topBar = {
@@ -147,6 +158,41 @@ fun SettingsScreen(
                         onClick = {
                             scope.launch { container.settingsRepository.setThemeMode(value) }
                         }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+
+            // ===== 配色（Android 原生颜色组合） =====
+            Text(
+                "配色",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            colorOptions.forEach { (value, label, swatch) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            scope.launch { container.settingsRepository.setColorMode(value) }
+                        }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = colorMode == value,
+                        onClick = {
+                            scope.launch { container.settingsRepository.setColorMode(value) }
+                        }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(swatch)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(label, style = MaterialTheme.typography.bodyLarge)

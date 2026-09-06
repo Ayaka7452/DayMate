@@ -54,13 +54,14 @@ abstract class ComposeActivity : FragmentActivity() {
         val repo = container.settingsRepository
         setContent {
             val themeMode by repo.themeMode.collectAsState(initial = "system")
-            DayMateChrome(themeMode = themeMode) { content() }
+            val colorMode by repo.colorMode.collectAsState(initial = "white")
+            DayMateChrome(themeMode = themeMode, colorMode = colorMode) { content() }
         }
     }
 }
 
 @Composable
-private fun DayMateChrome(themeMode: String, content: @Composable () -> Unit) {
+private fun DayMateChrome(themeMode: String, colorMode: String, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
     val darkTheme = when (themeMode) {
