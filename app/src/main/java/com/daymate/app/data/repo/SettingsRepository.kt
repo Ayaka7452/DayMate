@@ -19,9 +19,18 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val AUTO_BACKUP = booleanPreferencesKey("auto_backup_enabled")  // 修改后自动备份，默认开启
         private val HOME_TOP_CARD = stringPreferencesKey("home_top_card")       // festival / event / off
         private val HOME_BADGE_EMOJI = stringPreferencesKey("home_badge_emoji") // 节日卡片右侧角标，默认 ☀️
+        private val COLOR_MODE = stringPreferencesKey("color_mode")            // white(默认) / system / blue / green / orange / purple
     }
 
     val themeMode: Flow<String> = dataStore.data.map { it[THEME] ?: "system" }
+
+    suspend fun setThemeMode(mode: String) {
+        dataStore.edit { it[THEME] = mode }
+    }
+
+    suspend fun setColorMode(mode: String) {
+        dataStore.edit { it[COLOR_MODE] = mode }
+    }
 
     val vaultPasswordSet: Flow<Boolean> =
         dataStore.data.map { !it[VAULT_PASSWORD_HASH].isNullOrEmpty() }
@@ -51,10 +60,6 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
      * 低版本回退白色）/ blue / green / orange / purple=固定原生配色组合。
      */
     val colorMode: Flow<String> = dataStore.data.map { it[COLOR_MODE] ?: "white" }
-
-    suspend fun setThemeMode(mode: String) {
-        dataStore.edit { it[THEME] = mode }
-    }
 
     suspend fun setDefaultSort(sort: String) {
         dataStore.edit { it[DEFAULT_SORT] = sort }
