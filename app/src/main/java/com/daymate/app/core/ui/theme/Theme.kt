@@ -15,17 +15,17 @@ import androidx.compose.ui.platform.LocalContext
 val PaperLight = Color(0xFFFAFAF7)
 val InkDark = Color(0xFF1A1A18)
 
-// 「默认」配色：纸白统一底色（背景 = 表面，避免顶部栏纯白与底部灰白的割裂感）+ 蓝色控件
-// 控件色调与「蓝」配色一致（primary/secondary 同源），仅背景保持纸白不做着色
+// 「默认」配色：纸白统一底色（背景 = 表面，避免顶部栏纯白与底部灰白的割裂感）+ 深青蓝控件
+// 控件主色取自用户指定的 #00668C（截图采样），容器色为同色调 M3 派生
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF1565C0),
+    primary = Color(0xFF00668C),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD5E3FF),
-    onPrimaryContainer = Color(0xFF001C3B),
-    secondary = Color(0xFF565E71),
+    primaryContainer = Color(0xFFC1E8FF),
+    onPrimaryContainer = Color(0xFF001E2C),
+    secondary = Color(0xFF4C616E),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFDAE2F9),
-    onSecondaryContainer = Color(0xFF131C2B),
+    secondaryContainer = Color(0xFFD3E5F0),
+    onSecondaryContainer = Color(0xFF0C1D27),
     background = PaperLight,
     surface = PaperLight,
     onBackground = Color(0xFF1C1C1C),
@@ -33,14 +33,14 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFA6C8FF),
-    onPrimary = Color(0xFF00315E),
-    primaryContainer = Color(0xFF004785),
-    onPrimaryContainer = Color(0xFFD5E3FF),
-    secondary = Color(0xFFBEC6DC),
-    onSecondary = Color(0xFF263141),
-    secondaryContainer = Color(0xFF3C4758),
-    onSecondaryContainer = Color(0xFFDAE2F9),
+    primary = Color(0xFF83D1F2),
+    onPrimary = Color(0xFF003549),
+    primaryContainer = Color(0xFF004B66),
+    onPrimaryContainer = Color(0xFFC1E8FF),
+    secondary = Color(0xFFB7C9D4),
+    onSecondary = Color(0xFF22333D),
+    secondaryContainer = Color(0xFF384954),
+    onSecondaryContainer = Color(0xFFD3E5F0),
     background = InkDark,
     surface = Color(0xFF242422),
     onBackground = Color(0xFFE8E6DF),
@@ -148,7 +148,7 @@ fun DayMateTheme(
             val ctx = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
         }
-        colorMode == "system" -> if (darkTheme) DarkColors else LightColors // 低版本回退白色
+        colorMode == "system" -> if (darkTheme) DarkColors else LightColors // 低版本回退默认
         LightAccents.containsKey(colorMode) -> accentScheme(colorMode, darkTheme)
         else -> if (darkTheme) DarkColors else LightColors
     }
