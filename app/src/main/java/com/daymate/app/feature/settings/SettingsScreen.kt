@@ -123,7 +123,7 @@ fun SettingsScreen(
     )
     // 配色选项：value / 短标签（横排显示）/ 色板色（system 特殊渲染为四色圆）
     val colorOptions: List<Triple<String, String, Color>> = listOf(
-        Triple("white", "白", Color(0xFFFFFFFF)),
+        Triple("white", "默认", Color(0xFFFFFFFF)),
         Triple("system", "自动", Color.Transparent),
         Triple("blue", "蓝", Color(0xFF1565C0)),
         Triple("green", "绿", Color(0xFF2E7D32)),
