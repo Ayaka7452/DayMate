@@ -1094,9 +1094,12 @@ private fun VaultEventDialog(
     onDismiss: () -> Unit
 ) {
     var title by remember { mutableStateOf(existing?.title ?: "") }
+    var noteText by remember { mutableStateOf(existing?.note ?: "") }
     var epochDay by remember {
         mutableStateOf(existing?.targetDateEpochDay ?: LocalDate.now().plusDays(7).toEpochDay())
     }
+    var repeatRule by remember { mutableStateOf(existing?.repeatRule) }
+    var showResetConfirm by remember { mutableStateOf(false) }
     var refDaysText by remember { mutableStateOf(existing?.refDays?.toString() ?: "") }
     var displayUnit by remember {
         mutableStateOf(existing?.displayUnit ?: CountdownCalculator.UNIT_DAY)
@@ -1121,6 +1124,7 @@ private fun VaultEventDialog(
             TextButton(onClick = {
                 scope.launch {
                     val refValue = refDaysText.toIntOrNull()?.takeIf { it > 0 }
+                    val noteValue = noteText.takeIf { it.isNotBlank() }
                     if (existing == null) {
                         container.vaultRepository.add(
                             VaultEventEntity(
@@ -1128,6 +1132,8 @@ private fun VaultEventDialog(
                                 targetDateEpochDay = epochDay,
                                 refDays = refValue,
                                 displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
+                                note = noteValue,
+                                repeatRule = repeatRule,
                                 folderId = folderId
                             )
                         )
@@ -1137,7 +1143,9 @@ private fun VaultEventDialog(
                                 title = title.ifBlank { "未命名" },
                                 targetDateEpochDay = epochDay,
                                 refDays = refValue,
-                                displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY }
+                                displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
+                                note = noteValue,
+                                repeatRule = repeatRule
                             )
                         )
                     }
@@ -1156,15 +1164,34 @@ private fun VaultEventDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text("简述（可选）") },
+                    placeholder = { Text("补充说明，例如地点、注意事项") },
+                    minLines = 2,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(Modifier.height(16.dp))
-                TextButton(onClick = { showDatePicker = true }) {
-                    Text(
-                        "目标日期：${
-                            LocalDate.ofEpochDay(epochDay)
-                                .format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
-                        }",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = { showDatePicker = true }) {
+                        Text(
+                            "目标日期：${
+                                LocalDate.ofEpochDay(epochDay)
+                                    .format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
+                            }",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                    TextButton(onClick = { showResetConfirm = true }) {
+                        Text("重置为今天")
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
 
@@ -1192,6 +1219,32 @@ private fun VaultEventDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
+                Spacer(Modifier.height(12.dp))
+
+                Text("循环", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = repeatRule == null,
+                        onClick = { repeatRule = null },
+                        label = { Text("不循环") }
+                    )
+                    FilterChip(
+                        selected = repeatRule == CountdownCalculator.REPEAT_WEEKLY,
+                        onClick = { repeatRule = CountdownCalculator.REPEAT_WEEKLY },
+                        label = { Text("每周") }
+                    )
+                    FilterChip(
+                        selected = repeatRule == CountdownCalculator.REPEAT_MONTHLY,
+                        onClick = { repeatRule = CountdownCalculator.REPEAT_MONTHLY },
+                        label = { Text("每月") }
+                    )
+                    FilterChip(
+                        selected = repeatRule == CountdownCalculator.REPEAT_YEARLY,
+                        onClick = { repeatRule = CountdownCalculator.REPEAT_YEARLY },
+                        label = { Text("每年") }
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
 
                 OutlinedTextField(
@@ -1224,6 +1277,39 @@ private fun VaultEventDialog(
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
         ) { DatePicker(state = datePickerState) }
+    }
+
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("重置目标日期") },
+            text = {
+                Text(
+                    "是否把目标日期重置为今天？\n当前：${
+                        LocalDate.ofEpochDay(epochDay)
+                            .format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
+                    }"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val today = LocalDate.now().toEpochDay()
+                    epochDay = today
+                    // 编辑模式下与主页表单一致：立即写库，仅改日期
+                    existing?.let { e ->
+                        scope.launch {
+                            container.vaultRepository.update(
+                                e.copy(targetDateEpochDay = today)
+                            )
+                        }
+                    }
+                    showResetConfirm = false
+                }) { Text("重置") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("取消") }
+            }
+        )
     }
 }
 

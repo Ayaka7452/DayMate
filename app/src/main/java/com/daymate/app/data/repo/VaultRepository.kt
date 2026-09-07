@@ -80,4 +80,30 @@ class VaultRepository(
 
     suspend fun unparentByFolders(folderIds: List<Long>) =
         dao.unparentByFolders(folderIds).also { onChanged(); refreshSignal.tryEmit(Unit) }
+
+    /**
+     * 自动锚定：把目标日期已过的循环 Vault 事件滚动到下一次日期（与主表 rollForwardRepeating 同义）。
+     * 直接在 DAO 原始行上改日期，title/note 密文原样保留、不经加解密（避免二次加密）。
+     * 在应用启动、跨天午夜刷新后调用；重复调用安全。
+     */
+    suspend fun rollForwardRepeating(): Int {
+        val todayEpochDay = java.time.LocalDate.now().toEpochDay()
+        var count = 0
+        for (e in dao.getRepeatingPast(todayEpochDay)) {
+            // 跟随节日优先（目前 Vault 无创建入口，防御性跳过）
+            if (!e.linkedFestival.isNullOrBlank()) continue
+            val rule = e.repeatRule ?: continue
+            val next = com.ayaka7452.daymate.core.util.CountdownCalculator
+                .nextOccurrence(e.targetDateEpochDay, rule) ?: continue
+            dao.update(
+                e.copy(targetDateEpochDay = next.toEpochDay(), updatedAt = System.currentTimeMillis())
+            )
+            count++
+        }
+        if (count > 0) {
+            onChanged()
+            refreshSignal.tryEmit(Unit)
+        }
+        return count
+    }
 }

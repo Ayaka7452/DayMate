@@ -124,6 +124,9 @@ interface VaultEventDao {
     @Query("SELECT * FROM vault_events WHERE id = :id")
     suspend fun getById(id: Long): VaultEventEntity?
 
+    @Query("SELECT * FROM vault_events WHERE repeatRule IS NOT NULL AND targetDateEpochDay < :todayEpochDay")
+    suspend fun getRepeatingPast(todayEpochDay: Long): List<VaultEventEntity>
+
     @Query("SELECT * FROM vault_events")
     suspend fun getAll(): List<VaultEventEntity>
 

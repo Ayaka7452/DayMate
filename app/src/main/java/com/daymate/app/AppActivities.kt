@@ -76,7 +76,7 @@ private fun DayMateChrome(themeMode: String, colorMode: String, content: @Compos
             c.isAppearanceLightNavigationBars = !darkTheme
         }
     }
-    DayMateTheme(mode = themeMode) { content() }
+    DayMateTheme(mode = themeMode, colorMode = colorMode) { content() }
 }
 
 /**

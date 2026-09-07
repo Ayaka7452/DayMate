@@ -17,7 +17,7 @@ val DayMateWarm = Color(0xFFC97A3B)
 val PaperLight = Color(0xFFFAFAF7)
 val InkDark = Color(0xFF1A1A18)
 
-// 「白色」默认配色：白/纸底 + 品牌墨绿，容器色也用品牌色系（避免 M3 默认的淡紫容器）
+// 「白色」默认配色：纸白统一底色（背景 = 表面，避免顶部栏纯白与底部灰白的割裂感）+ 品牌墨绿
 private val LightColors = lightColorScheme(
     primary = DayMateGreen,
     onPrimary = Color.White,
@@ -28,7 +28,7 @@ private val LightColors = lightColorScheme(
     secondaryContainer = Color(0xFFFFDCC2),
     onSecondaryContainer = Color(0xFF2E1500),
     background = PaperLight,
-    surface = Color(0xFFFFFFFF),
+    surface = PaperLight,
     onBackground = Color(0xFF1C1C1C),
     onSurface = Color(0xFF1C1C1C)
 )
@@ -93,6 +93,16 @@ private val DarkAccents: Map<String, List<Long>> = mapOf(
     )
 )
 
+/**
+ * 各配色的浅色底色调（背景 = 表面，统一的近白着色，让配色切换一眼可辨）。
+ */
+private val LightBgTint: Map<String, Long> = mapOf(
+    "blue" to 0xFFF2F7FD,
+    "green" to 0xFFF2F9F1,
+    "orange" to 0xFFFDF6F0,
+    "purple" to 0xFFF8F4FD
+)
+
 private fun accentScheme(mode: String, darkTheme: Boolean): ColorScheme {
     val tones = (if (darkTheme) DarkAccents[mode] else LightAccents[mode])
         ?: return if (darkTheme) DarkColors else LightColors
@@ -105,11 +115,14 @@ private fun accentScheme(mode: String, darkTheme: Boolean): ColorScheme {
             secondaryContainer = c[6], onSecondaryContainer = c[7]
         )
     } else {
+        val bg = LightBgTint[mode]?.let { Color(it) } ?: PaperLight
         LightColors.copy(
             primary = c[0], onPrimary = c[1],
             primaryContainer = c[2], onPrimaryContainer = c[3],
             secondary = c[4], onSecondary = c[5],
-            secondaryContainer = c[6], onSecondaryContainer = c[7]
+            secondaryContainer = c[6], onSecondaryContainer = c[7],
+            background = bg, surface = bg,
+            onBackground = Color(0xFF1C1C1C), onSurface = Color(0xFF1C1C1C)
         )
     }
 }

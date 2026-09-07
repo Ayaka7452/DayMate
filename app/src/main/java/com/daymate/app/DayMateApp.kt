@@ -30,6 +30,8 @@ class DayMateApp : Application() {
         // （节日跟随依赖节假日缓存数据；数据未下载时不滚动，仅周期循环生效）
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             runCatching { container.eventRepository.rollForwardRepeating(container.festivalRepository) }
+            // Vault 事件的周期循环同样锚定（日期为明文列，直接滚动，无需解密）
+            runCatching { container.vaultRepository.rollForwardRepeating() }
         }
         // 小组件跨天精确刷新：应用起来后续订下一个午夜的刷新闹钟
         runCatching {
