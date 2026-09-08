@@ -360,7 +360,7 @@ fun FolderScreen(
                             selected = event.id in selectedEventIds,
                             onClick = {
                                 if (selectionMode) toggleEvent(event.id)
-                                else onNavigate("event_form?eventId=${event.id}")
+                                else onNavigate("event_detail?eventId=${event.id}")
                             },
                             onMoveToVault = {
                                 if (vaultSet) {

@@ -26,6 +26,9 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE id = :id")
     suspend fun getById(id: Long): EventEntity?
 
+    @Query("SELECT * FROM events WHERE id = :id AND isDeleted = 0")
+    fun observeById(id: Long): Flow<EventEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: EventEntity): Long
 

@@ -35,6 +35,9 @@ class EventRepository(
 
     suspend fun getById(id: Long): EventEntity? = dao.getById(id)
 
+    /** 详情页实时观察单事件（Room 失效通知自动重发；软删/恢复也会触发）。 */
+    fun observeById(id: Long): Flow<EventEntity?> = dao.observeById(id)
+
     suspend fun add(event: EventEntity): Long =
         dao.insert(event).also { onChanged(); refreshSignal.tryEmit(Unit) }
 

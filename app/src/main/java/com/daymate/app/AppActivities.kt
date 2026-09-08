@@ -101,6 +101,12 @@ fun Context.route(route: String) {
             val id = route.substringAfter("vault_folder/").toLongOrNull() ?: 0L
             Intent(this, VaultFolderActivity::class.java).apply { putExtra("folderId", id) }
         }
+        route.startsWith("event_detail") -> {
+            val id = route.substringAfter("eventId=").toLongOrNull() ?: 0L
+            if (id > 0) {
+                Intent(this, EventDetailActivity::class.java).apply { putExtra("eventId", id) }
+            } else null
+        }
         route.startsWith("event_form") -> {
             val qs = route.substringAfter("?").split("&")
             var eventId: Long? = null
@@ -130,6 +136,21 @@ fun Context.route(route: String) {
     } ?: return
     // 不调用 overridePendingTransition：交给系统/设备原生 Activity 转场（与系统设置一致）
     startActivity(intent)
+}
+
+class EventDetailActivity : ComposeActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val eventId = intent.getLongExtra("eventId", -1L)
+        setDayMateContent {
+            EventDetailScreen(
+                container = container,
+                eventId = eventId,
+                onBack = { finish() },
+                onEdit = { this@EventDetailActivity.route("event_form?eventId=$eventId") }
+            )
+        }
+    }
 }
 
 class EventFormActivity : ComposeActivity() {

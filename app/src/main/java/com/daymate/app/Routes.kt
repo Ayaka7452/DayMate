@@ -6,6 +6,7 @@ package com.ayaka7452.daymate
  */
 object Routes {
     const val HOME = "home"
+    const val EVENT_DETAIL = "event_detail"
     const val EVENT_FORM = "event_form"
     const val SETTINGS = "settings"
     const val ABOUT = "about"

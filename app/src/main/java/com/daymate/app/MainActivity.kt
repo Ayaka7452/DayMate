@@ -31,6 +31,6 @@ class MainActivity : ComposeActivity() {
 
     private fun handleWidgetDeepLink(intent: Intent?) {
         val id = intent?.getLongExtra("eventId", -1L) ?: -1L
-        if (id > 0) route("event_form?eventId=$id")
+        if (id > 0) route("event_detail?eventId=$id")
     }
 }

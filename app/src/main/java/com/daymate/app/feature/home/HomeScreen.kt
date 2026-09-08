@@ -454,7 +454,7 @@ fun HomeScreen(
                         items(searchResults, key = { "e${it.id}" }) { event ->
                             EventRow(
                                 event = event,
-                                onClick = { onNavigate("event_form?eventId=${event.id}") },
+                                onClick = { onNavigate("event_detail?eventId=${event.id}") },
                                 onMoveToVault = {
                                     if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
                                 },
@@ -541,7 +541,7 @@ fun HomeScreen(
                                     dateStr = dateStr,
                                     days = kotlin.math.abs(show.targetDateEpochDay - today).toInt(),
                                     past = isPast,
-                                    onClick = { onNavigate("event_form?eventId=${show.id}") },
+                                    onClick = { onNavigate("event_detail?eventId=${show.id}") },
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -600,7 +600,7 @@ fun HomeScreen(
                             selected = event.id in selectedEventIds,
                             onClick = {
                                 if (selectionMode) toggleEvent(event.id)
-                                else onNavigate("event_form?eventId=${event.id}")
+                                else onNavigate("event_detail?eventId=${event.id}")
                             },
                             onMoveToVault = {
                                 if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
