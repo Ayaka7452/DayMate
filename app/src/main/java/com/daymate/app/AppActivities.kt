@@ -17,6 +17,7 @@ import androidx.fragment.app.FragmentActivity
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.ui.theme.DayMateTheme
 import com.ayaka7452.daymate.feature.about.AboutScreen
+import com.ayaka7452.daymate.feature.create.EventDetailScreen
 import com.ayaka7452.daymate.feature.create.EventFormScreen
 import com.ayaka7452.daymate.feature.recyclebin.RecycleBinScreen
 import com.ayaka7452.daymate.feature.folder.FolderScreen
