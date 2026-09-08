@@ -232,22 +232,21 @@ private fun countdownDisplay(e: EventEntity): CountdownDisplay {
     val hasRef = e.refDays != null && e.refDays > 0
 
     // 主数字：优先按显示单位取整，不足一个单位退回更小单位
-    data class V(val n: Long, val u: String)
-    val v = when (e.displayUnit) {
+    var n = diffDays
+    var u = "天"
+    when (e.displayUnit) {
         CountdownCalculator.UNIT_YEAR -> when {
-            period.years > 0 -> V(period.years.toLong(), "年")
-            totalMonths > 0 -> V(totalMonths, "个月")
-            else -> V(diffDays, "天")
+            period.years > 0 -> { n = period.years.toLong(); u = "年" }
+            totalMonths > 0 -> { n = totalMonths; u = "个月" }
         }
-        CountdownCalculator.UNIT_MONTH -> if (totalMonths > 0) V(totalMonths, "个月") else V(diffDays, "天")
-        else -> V(diffDays, "天")
+        CountdownCalculator.UNIT_MONTH -> if (totalMonths > 0) { n = totalMonths; u = "个月" }
     }
     // 已过且有对照值时数字区显示 X/N（对照值单位跟随显示单位）
-    val number = if (!isFuture && hasRef) "${v.n} / ${e.refDays}" else "${v.n}"
+    val number = if (!isFuture && hasRef) "$n / ${e.refDays}" else "$n"
     val caption = when {
         diffDays == 0L -> "就是今天"
         isFuture -> "距离目标日期"
         else -> "目标日期已过去"
     }
-    return CountdownDisplay(number = number, unit = v.u, caption = caption)
+    return CountdownDisplay(number = number, unit = u, caption = caption)
 }
