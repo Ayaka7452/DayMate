@@ -360,6 +360,7 @@ fun FolderScreen(
                             selected = event.id in selectedEventIds,
                             onClick = {
                                 if (selectionMode) toggleEvent(event.id)
+                                else if (event.specialType == "cycle") onNavigate("cycle")
                                 else onNavigate("event_detail?eventId=${event.id}")
                             },
                             onMoveToVault = {

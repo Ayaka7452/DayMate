@@ -49,10 +49,25 @@ data class EventEntity(
     val repeatRule: String? = null,
     /** 跟随的节日名（来自节假日数据源）：目标日期过后自动锚定到该节日的下一次日期。优先于 repeatRule。 */
     val linkedFestival: String? = null,
+    /** 功能快捷事件标记：null=普通事件；"cycle"=周期管家入口（点击进入周期管家而非详情页）。 */
+    val specialType: String? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val isDeleted: Boolean = false,
     val deletedAt: Long = 0,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+/** 周期管家：一次经期的登记记录（startDate 为该次经期首日，periodDays 为该次持续天数）。 */
+@Entity(tableName = "cycle_logs")
+data class CycleLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** 经期首日（epoch day）。 */
+    val startDateEpochDay: Long,
+    /** 该次经期持续天数（2~10 合理区间，登记后可调整）。 */
+    val periodDays: Int = 5,
+    val note: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

@@ -31,6 +31,11 @@ class MainActivity : ComposeActivity() {
 
     private fun handleWidgetDeepLink(intent: Intent?) {
         val id = intent?.getLongExtra("eventId", -1L) ?: -1L
-        if (id > 0) route("event_detail?eventId=$id")
+        if (id <= 0) return
+        // 周期管家快捷事件：深链直达功能页（与列表点击行为一致）
+        val special = kotlinx.coroutines.runBlocking {
+            runCatching { container.eventRepository.getById(id)?.specialType }.getOrNull()
+        }
+        if (special == "cycle") route("cycle") else route("event_detail?eventId=$id")
     }
 }

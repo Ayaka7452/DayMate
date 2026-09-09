@@ -11,9 +11,10 @@ import androidx.room.migration.Migration
         EventEntity::class,
         FolderEntity::class,
         VaultEventEntity::class,
-        VaultFolderEntity::class
+        VaultFolderEntity::class,
+        CycleLogEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -21,6 +22,7 @@ abstract class DayMateDatabase : RoomDatabase() {
     abstract fun folderDao(): FolderDao
     abstract fun vaultEventDao(): VaultEventDao
     abstract fun vaultFolderDao(): VaultFolderDao
+    abstract fun cycleLogDao(): CycleLogDao
 
     companion object {
         /** v1 -> v2：新增回收站软删除字段。 */
@@ -107,6 +109,25 @@ abstract class DayMateDatabase : RoomDatabase() {
             }
         }
 
+        /** v7 -> v8：周期管家——事件新增 specialType 标记 + 新表 cycle_logs（经期登记记录）。 */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                addColumnIfMissing(db, "events", "specialType", "ALTER TABLE events ADD COLUMN specialType TEXT")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS cycle_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        startDateEpochDay INTEGER NOT NULL,
+                        periodDays INTEGER NOT NULL DEFAULT 5,
+                        note TEXT,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         /** 幂等加列：列已存在时跳过（防重复 ALTER TABLE 崩溃）。 */
         private fun addColumnIfMissing(
             db: androidx.sqlite.db.SupportSQLiteDatabase,
@@ -129,7 +150,7 @@ abstract class DayMateDatabase : RoomDatabase() {
             return Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                    MIGRATION_5_6, MIGRATION_6_7
+                    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
                 )
                 .fallbackToDestructiveMigration()
                 .build()

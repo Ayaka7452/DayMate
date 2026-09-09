@@ -33,6 +33,8 @@ class AppContainer(context: Context) {
     val vaultRepository = VaultRepository(mainDb.vaultEventDao(), ::notifyDataChanged)
     val vaultFolderRepository = VaultFolderRepository(mainDb.vaultFolderDao(), ::notifyDataChanged)
     val vaultBridge = VaultBridge(eventRepository, vaultRepository)
+    val cycleRepository = com.ayaka7452.daymate.data.repo.CycleRepository(mainDb.cycleLogDao(), ::notifyDataChanged)
+    val cycleEventBridge = CycleEventBridge(eventRepository, cycleRepository, settingsRepository)
 
     /**
      * 对仍处于打开状态的库执行 WAL checkpoint（TRUNCATE），把 -wal 中的已提交数据合并进主文件。

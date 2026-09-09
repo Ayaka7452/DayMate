@@ -32,6 +32,8 @@ class DayMateApp : Application() {
             runCatching { container.eventRepository.rollForwardRepeating(container.festivalRepository) }
             // Vault 事件的周期循环同样锚定（日期为明文列，直接滚动，无需解密）
             runCatching { container.vaultRepository.rollForwardRepeating() }
+            // 周期管家快捷事件：日期滚动到未来的一次预测经期首日；事件被用户手动删除时按需重建
+            runCatching { container.cycleEventBridge.syncEvent() }
         }
         // 小组件跨天精确刷新：应用起来后续订下一个午夜的刷新闹钟
         runCatching {

@@ -485,6 +485,10 @@ private fun VaultListScreen(
         onDelete = { showDeleteConfirm = true },
         menuItems = {
             DropdownMenuItem(
+                text = { Text("周期管家") },
+                onClick = { onNavigate("cycle") }
+            )
+            DropdownMenuItem(
                 text = { Text("批量管理") },
                 onClick = { enterSelection() }
             )

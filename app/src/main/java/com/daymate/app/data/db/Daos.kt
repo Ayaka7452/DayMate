@@ -185,3 +185,25 @@ interface VaultFolderDao {
     @Query("DELETE FROM vault_folders")
     suspend fun clearAll()
 }
+
+@Dao
+interface CycleLogDao {
+
+    @Query("SELECT * FROM cycle_logs ORDER BY startDateEpochDay DESC")
+    fun observeAll(): Flow<List<CycleLogEntity>>
+
+    @Query("SELECT * FROM cycle_logs ORDER BY startDateEpochDay DESC")
+    suspend fun getAll(): List<CycleLogEntity>
+
+    @Query("SELECT * FROM cycle_logs WHERE id = :id")
+    suspend fun getById(id: Long): CycleLogEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(log: CycleLogEntity): Long
+
+    @Update
+    suspend fun update(log: CycleLogEntity)
+
+    @Delete
+    suspend fun delete(log: CycleLogEntity)
+}

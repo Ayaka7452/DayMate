@@ -4,6 +4,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -20,6 +22,12 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val HOME_TOP_CARD = stringPreferencesKey("home_top_card")       // festival / event / off
         private val HOME_BADGE_EMOJI = stringPreferencesKey("home_badge_emoji") // 节日卡片右侧角标，默认 ☀️
         private val COLOR_MODE = stringPreferencesKey("color_mode")            // white(默认) / system / blue / green / orange / purple
+        private val CYCLE_CYCLE_DAYS = intPreferencesKey("cycle_days")          // 周期管家：周期天数（默认 28）
+        private val CYCLE_PERIOD_DAYS = intPreferencesKey("cycle_period_days")  // 周期管家：经期持续天数（默认 5）
+        private val CYCLE_PASSWORD = booleanPreferencesKey("cycle_password_enabled") // 周期管家密码保护（默认关，验证用 Vault 密码）
+        private val CYCLE_EVENT_ENABLED = booleanPreferencesKey("cycle_event_enabled") // 主页快捷事件开关
+        private val CYCLE_EVENT_TITLE = stringPreferencesKey("cycle_event_title")   // 快捷事件自定义名（默认「周期管家」）
+        private val CYCLE_EVENT_ID = longPreferencesKey("cycle_event_id")           // 快捷事件的事件 id
     }
 
     val themeMode: Flow<String> = dataStore.data.map { it[THEME] ?: "system" }
@@ -98,5 +106,38 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     /** 设置节日卡片角标 emoji。 */
     suspend fun setHomeBadgeEmoji(emoji: String) {
         dataStore.edit { it[HOME_BADGE_EMOJI] = emoji }
+    }
+
+    // ===== 周期管家 =====
+
+    val cycleDays: Flow<Int> = dataStore.data.map { it[CYCLE_CYCLE_DAYS] ?: 28 }
+    val cyclePeriodDays: Flow<Int> = dataStore.data.map { it[CYCLE_PERIOD_DAYS] ?: 5 }
+    val cyclePasswordEnabled: Flow<Boolean> = dataStore.data.map { it[CYCLE_PASSWORD] ?: false }
+    val cycleEventEnabled: Flow<Boolean> = dataStore.data.map { it[CYCLE_EVENT_ENABLED] ?: false }
+    val cycleEventTitle: Flow<String> = dataStore.data.map { it[CYCLE_EVENT_TITLE] ?: "周期管家" }
+    val cycleEventId: Flow<Long> = dataStore.data.map { it[CYCLE_EVENT_ID] ?: -1L }
+
+    suspend fun setCycleDays(days: Int) {
+        dataStore.edit { it[CYCLE_CYCLE_DAYS] = days }
+    }
+
+    suspend fun setCyclePeriodDays(days: Int) {
+        dataStore.edit { it[CYCLE_PERIOD_DAYS] = days }
+    }
+
+    suspend fun setCyclePasswordEnabled(enabled: Boolean) {
+        dataStore.edit { it[CYCLE_PASSWORD] = enabled }
+    }
+
+    suspend fun setCycleEventEnabled(enabled: Boolean) {
+        dataStore.edit { it[CYCLE_EVENT_ENABLED] = enabled }
+    }
+
+    suspend fun setCycleEventTitle(title: String) {
+        dataStore.edit { it[CYCLE_EVENT_TITLE] = title }
+    }
+
+    suspend fun setCycleEventId(id: Long) {
+        dataStore.edit { it[CYCLE_EVENT_ID] = id }
     }
 }

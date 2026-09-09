@@ -88,6 +88,8 @@ fun Context.route(route: String) {
     val intent = when {
         route == "vault" ->
             Intent(this, VaultActivity::class.java)
+        route == "cycle" ->
+            Intent(this, CycleActivity::class.java)
         route == "settings" ->
             Intent(this, SettingsActivity::class.java)
         route == "about" ->
@@ -212,6 +214,18 @@ class VaultActivity : ComposeActivity() {
                 container = container,
                 onExit = { finish() },
                 onNavigate = { this@VaultActivity.route(it) }
+            )
+        }
+    }
+}
+
+class CycleActivity : ComposeActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setDayMateContent {
+            com.ayaka7452.daymate.feature.cycle.CycleScreen(
+                container = container,
+                onExit = { finish() }
             )
         }
     }
