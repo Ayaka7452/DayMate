@@ -174,6 +174,14 @@ private fun CycleOverviewScreen(
     var showTips by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
+    // 结束本次经期：把最近一次记录的持续天数调整为「到今天」（提前结束或延后），2~10 天内可用
+    val endNow = lastLog?.let { l ->
+        val diff = (today - l.startDateEpochDay + 1).toInt()
+        if (today >= l.startDateEpochDay &&
+            diff in CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS &&
+            diff != l.periodDays
+        ) diff else null
+    }
 
     Scaffold(
         topBar = {
@@ -233,6 +241,20 @@ private fun CycleOverviewScreen(
                         Button(onClick = { showRegister = true }) { Text("登记本次经期") }
                     }
                 }
+                Spacer(Modifier.height(12.dp))
+            }
+
+            // ===== 结束本次经期：显著按钮，一键把持续天数调整为到今天 =====
+            if (endNow != null && lastLog != null) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            container.cycleRepository.update(lastLog.copy(periodDays = endNow))
+                            scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("结束本次经期（到今天，共 " + endNow + " 天）") }
                 Spacer(Modifier.height(12.dp))
             }
 
@@ -1388,7 +1410,7 @@ private fun CycleCalendarMonth(
                     ) {
                         val dayNum = idx - leading + 1
                         if (dayNum in 1..daysInMonth) {
-                            val epochDay = month.atDay(dayNum).toEpochDay()
+                            val epochDay = month.withDayOfMonth(dayNum).toEpochDay()
                             val phase = CycleCalculator.phaseOfAnyDay(epochDay, logStarts, periodDays, cycleDays)
                             val bg = when (phase) {
                                 CycleCalculator.Phase.PERIOD -> periodColor
