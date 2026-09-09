@@ -380,6 +380,13 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    text = { Text("周期管家") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigate(Routes.CYCLE)
+                                    }
+                                )
+                                DropdownMenuItem(
                                     text = { Text("设置") },
                                     onClick = {
                                         menuExpanded = false
