@@ -159,6 +159,7 @@ private fun CycleOverviewScreen(
     val lastLog = logs.firstOrNull()
     val scope = rememberCoroutineScope()
     var showRegister by remember { mutableStateOf(false) }
+    var showTips by remember { mutableStateOf(false) }
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
 
     Scaffold(
@@ -276,7 +277,14 @@ private fun CycleOverviewScreen(
                 Button(onClick = onOpenSettings) { Text("去设置并登记") }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "温馨提示...",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { showTips = true }
+            )
+            Spacer(Modifier.height(8.dp))
             Text(
                 "日历法推算仅供参考，不能作为避孕或医学诊断依据。",
                 style = MaterialTheme.typography.labelSmall,
@@ -308,6 +316,48 @@ private fun CycleOverviewScreen(
             },
             dismissButton = { TextButton(onClick = { showRegister = false }) { Text("取消") } }
         ) { DatePicker(state = registerState) }
+    }
+
+    // 温馨提示弹窗
+    if (showTips) {
+        AlertDialog(
+            onDismissRequest = { showTips = false },
+            confirmButton = {
+                TextButton(onClick = { showTips = false }) { Text("我知道了") }
+            },
+            title = { Text("温馨提示") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "这是什么？",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        "周期管家通过记录每次经期首日，用日历法推算你的月经周期：预测下次经期、排卵日与排卵期，并把下次经期同步为首页倒数事件。所有数据只保存在本机。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        "周期四个阶段",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        "· 月经期：经期出血的第 1 天到结束，通常 3～7 天，对应圆环的深色段。\n· 卵泡期：月经结束后到排卵前，卵泡逐渐发育成熟，是子宫内膜重新增厚的阶段。\n· 排卵期：排卵日一般在下次经期前 14 天左右，其前后各约 2 天是受孕概率最高的窗口。\n· 黄体期：排卵后到下次经期来临前，身体分泌孕激素维持内膜；未受孕则内膜脱落，进入下一个月经期。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        "关于准确性",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        "每个人的周期长度、经期天数都不同，情绪、压力、作息、出行、疾病等都可能让周期提前或延后；日历法按平均值推算，与实际排卵时间可能有数天误差。请把这里的推算当作参考，不要作为避孕或医学诊断依据；如周期长期紊乱或伴有不适，请及时咨询医生。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        )
     }
 }
 

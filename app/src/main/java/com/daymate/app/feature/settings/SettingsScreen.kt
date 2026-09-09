@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -99,14 +100,15 @@ fun SettingsScreen(
     var showSetup by remember { mutableStateOf(false) }
     // 备份子页是同 Activity 内的状态切换：返回手势先回设置主页，而不是退出设置
     androidx.activity.compose.BackHandler(enabled = showSetup) { showSetup = false }
-    if (showSetup) {
-        StorageSetupBody(
-            title = "数据备份",
-            showBack = true,
-            onBack = { showSetup = false }
-        )
-        return
-    }
+    // 备份子页 ⇄ 设置主页淡入淡出
+    Crossfade(targetState = showSetup, label = "settings_backup") { setup ->
+        if (setup) {
+            StorageSetupBody(
+                title = "数据备份",
+                showBack = true,
+                onBack = { showSetup = false }
+            )
+        } else {
 
     val themeOptions = listOf(
         "system" to "跟随系统",
@@ -557,6 +559,8 @@ fun SettingsScreen(
                 TextButton(onClick = { showFestivalCustomInput = false }) { Text("取消") }
             }
         )
+    }
+        }
     }
 }
 
