@@ -1015,6 +1015,7 @@ private fun formatDate(epochDay: Long): String =
     LocalDate.ofEpochDay(epochDay).format(DateFmt)
 
 /** 历史记录管理子页：全部经期记录 + 调整/删除入口。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CycleHistoryScreen(
     logs: List<CycleLogEntity>,
