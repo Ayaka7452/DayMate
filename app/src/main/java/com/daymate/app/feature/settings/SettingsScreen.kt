@@ -97,6 +97,8 @@ fun SettingsScreen(
 
     // 数据备份：选择文件夹仅作 SAF 导出/导入目标，不需要任何存储权限（全屏覆盖）
     var showSetup by remember { mutableStateOf(false) }
+    // 备份子页是同 Activity 内的状态切换：返回手势先回设置主页，而不是退出设置
+    androidx.activity.compose.BackHandler(enabled = showSetup) { showSetup = false }
     if (showSetup) {
         StorageSetupBody(
             title = "数据备份",

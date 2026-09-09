@@ -4,6 +4,7 @@ import android.content.pm.PackageManager
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.Canvas
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -95,6 +98,8 @@ fun CycleScreen(
         .collectAsState(initial = false)
     var unlocked by remember { mutableStateOf(!passwordEnabled) }
     var showSettings by remember { mutableStateOf(false) }
+    // 设置子页是同 Activity 内的状态切换：返回手势先回到主视图，而不是退出功能
+    BackHandler(enabled = showSettings) { showSettings = false }
     // 密码开关变化时即时生效（在页面内直接开/关）
     LaunchedEffect(passwordEnabled) {
         if (!passwordEnabled) unlocked = true
@@ -144,6 +149,9 @@ private fun CycleOverviewScreen(
 
     val today = LocalDate.now().toEpochDay()
     val lastLog = logs.firstOrNull()
+    val scope = rememberCoroutineScope()
+    var showRegister by remember { mutableStateOf(false) }
+    val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
 
     Scaffold(
         topBar = {
@@ -171,6 +179,40 @@ private fun CycleOverviewScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(12.dp))
+
+            // ===== 逾期提醒卡：已到预测经期日，引导登记实际日期 =====
+            if (overdue && lastLog != null) {
+                val predicted = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "已到预测经期日（" + formatDate(predicted) + "）",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "请登记本次实际开始日期，推算会更准确",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Button(onClick = { showRegister = true }) { Text("登记本次经期") }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
 
             // ===== 圆环周期图 =====
             CycleRing(
@@ -234,6 +276,30 @@ private fun CycleOverviewScreen(
             )
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    // 逾期登记弹窗（主视图直达）
+    if (showRegister && lastLog != null) {
+        val registerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showRegister = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    registerState.selectedDateMillis?.let { millis ->
+                        val day = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+                        scope.launch {
+                            container.cycleRepository.add(
+                                CycleLogEntity(startDateEpochDay = day, periodDays = periodDays)
+                            )
+                            scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                        }
+                    }
+                    showRegister = false
+                }) { Text("保存") }
+            },
+            dismissButton = { TextButton(onClick = { showRegister = false }) { Text("取消") } }
+        ) { DatePicker(state = registerState) }
     }
 }
 
