@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,8 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -296,7 +297,10 @@ private fun CycleOverviewScreen(
 
     // 逾期登记弹窗（主视图直达）
     if (showRegister && lastLog != null) {
-        val registerState = rememberDatePickerState()
+        // 默认选中今天：直接点确定即登记今天，避免不触摸日期选择器时静默无效果
+        val registerState = rememberDatePickerState(
+            initialSelectedDateMillis = today * 86400000L
+        )
         DatePickerDialog(
             onDismissRequest = { showRegister = false },
             confirmButton = {
@@ -551,6 +555,17 @@ private fun CycleSettingsScreen(
         scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
     }
 
+    // 历史记录管理子页 ⇄ 设置页淡入淡出；返回手势先回设置页
+    BackHandler(enabled = showHistory) { showHistory = false }
+    Crossfade(targetState = showHistory, label = "cycle_history") { hist ->
+        if (hist) {
+            CycleHistoryScreen(
+                logs = logs,
+                onBack = { showHistory = false },
+                onEdit = { editingLog = it },
+                onDelete = { deletingLog = it }
+            )
+        } else {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -621,56 +636,24 @@ private fun CycleSettingsScreen(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             } else {
-                // 折叠式历史入口：数据多了不撑长页面，点击展开/收起
+                // 历史记录管理：独立子页（点击进入，返回手势回设置页）
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showHistory = !showHistory }
+                        .clickable { showHistory = true }
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "历史记录（${logs.size}）",
+                        "历史记录管理（${logs.size}）",
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.weight(1f)
                     )
                     Icon(
-                        if (showHistory) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (showHistory) "收起" else "展开",
+                        Icons.Default.KeyboardArrowRight,
+                        contentDescription = "进入",
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
-                }
-                AnimatedVisibility(visible = showHistory) {
-                    Column {
-                        logs.forEach { log ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        formatDate(log.startDateEpochDay) + " · " + log.periodDays + "天",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                    val dow = LocalDate.ofEpochDay(log.startDateEpochDay)
-                                        .dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
-                                    Text(
-                                        dow,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                    )
-                                }
-                                TextButton(onClick = { editingLog = log }) { Text("调整") }
-                                IconButton(onClick = { deletingLog = log }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "删除",
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                                }
-                            }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                        }
-                    }
                 }
             }
 
@@ -722,11 +705,16 @@ private fun CycleSettingsScreen(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
         }
+        }
+        }
     }
 
     // ===== 弹窗层 =====
-    val addPickerState = rememberDatePickerState()
     if (showAddPicker) {
+        // 默认选中今天：直接点确定即登记今天
+        val addPickerState = rememberDatePickerState(
+            initialSelectedDateMillis = today * 86400000L
+        )
         DatePickerDialog(
             onDismissRequest = { showAddPicker = false },
             confirmButton = {
@@ -1025,3 +1013,77 @@ private fun CycleUnlockGate(
 
 private fun formatDate(epochDay: Long): String =
     LocalDate.ofEpochDay(epochDay).format(DateFmt)
+
+/** 历史记录管理子页：全部经期记录 + 调整/删除入口。 */
+@Composable
+private fun CycleHistoryScreen(
+    logs: List<CycleLogEntity>,
+    onBack: () -> Unit,
+    onEdit: (CycleLogEntity) -> Unit,
+    onDelete: (CycleLogEntity) -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("历史记录管理") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        if (logs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "还没有记录",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                items(logs, key = { it.id }) { log ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                formatDate(log.startDateEpochDay) + " · " + log.periodDays + "天",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            val dow = LocalDate.ofEpochDay(log.startDateEpochDay)
+                                .dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
+                            Text(
+                                dow,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                        TextButton(onClick = { onEdit(log) }) { Text("调整") }
+                        IconButton(onClick = { onDelete(log) }) {
+                            Icon(
+                                Icons.Default.Delete, contentDescription = "删除",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                }
+            }
+        }
+    }
+}
