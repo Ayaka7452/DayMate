@@ -28,6 +28,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val CYCLE_EVENT_ENABLED = booleanPreferencesKey("cycle_event_enabled") // 主页快捷事件开关
         private val CYCLE_EVENT_TITLE = stringPreferencesKey("cycle_event_title")   // 快捷事件自定义名（默认「周期管家」）
         private val CYCLE_EVENT_ID = longPreferencesKey("cycle_event_id")           // 快捷事件的事件 id
+        private val CYCLE_DEFAULT_CALENDAR = booleanPreferencesKey("cycle_default_calendar") // 周期管家默认视图（false=圆环，true=日历）
     }
 
     val themeMode: Flow<String> = dataStore.data.map { it[THEME] ?: "system" }
@@ -116,6 +117,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val cycleEventEnabled: Flow<Boolean> = dataStore.data.map { it[CYCLE_EVENT_ENABLED] ?: false }
     val cycleEventTitle: Flow<String> = dataStore.data.map { it[CYCLE_EVENT_TITLE] ?: "周期管家" }
     val cycleEventId: Flow<Long> = dataStore.data.map { it[CYCLE_EVENT_ID] ?: -1L }
+    val cycleDefaultCalendar: Flow<Boolean> = dataStore.data.map { it[CYCLE_DEFAULT_CALENDAR] ?: false }
 
     suspend fun setCycleDays(days: Int) {
         dataStore.edit { it[CYCLE_CYCLE_DAYS] = days }
@@ -139,5 +141,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setCycleEventId(id: Long) {
         dataStore.edit { it[CYCLE_EVENT_ID] = id }
+    }
+
+    suspend fun setCycleDefaultCalendar(calendar: Boolean) {
+        dataStore.edit { it[CYCLE_DEFAULT_CALENDAR] = calendar }
     }
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -173,7 +174,10 @@ private fun CycleOverviewScreen(
     var showRegister by remember { mutableStateOf(false) }
     var showBackfill by remember { mutableStateOf(false) }
     var showTips by remember { mutableStateOf(false) }
-    var showCalendar by remember { mutableStateOf(false) }
+    // 默认视图来自设置；手动切换只改本页状态，不写回设置
+    val defaultCalendar by container.settingsRepository.cycleDefaultCalendar
+        .collectAsState(initial = false)
+    var showCalendar by remember(defaultCalendar) { mutableStateOf(defaultCalendar) }
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
     // 结束本次经期：经期活跃期内始终显示入口（提前结束或延后，2~10 天内可用）
     val activeLog = logs.firstOrNull { it.startDateEpochDay <= today }
@@ -244,7 +248,12 @@ private fun CycleOverviewScreen(
 
             // ===== 圆环周期图 / 日历视图 =====
             // Crossfade 内部按 TopStart 摆放子项，必须包一层全宽居中 Box，否则切换瞬间圆环会在左侧闪现
-            Crossfade(targetState = showCalendar, label = "cycle_view") { cal ->
+            // animateContentSize 让圆环/日历高度差过渡平滑，下方内容跟随滑动而不是跳变
+            Crossfade(
+                targetState = showCalendar,
+                modifier = Modifier.animateContentSize(),
+                label = "cycle_view"
+            ) { cal ->
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -365,23 +374,12 @@ private fun CycleOverviewScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (overdue) {
-                        InfoCard(
-                            "下次经期",
-                            formatDate(nextStart),
-                            "已到预测日期，请登记",
-                            Modifier.weight(1f),
-                            highlight = true
-                        )
-                    } else {
-                        InfoCard(
-                            "下次经期",
-                            formatDate(nextStart),
-                            "还有 " + (nextStart - today) + " 天",
-                            Modifier.weight(1f),
-                            highlight = true
-                        )
-                    }
+                    InfoCard(
+                        "下次经期",
+                        formatDate(nextStart),
+                        if (overdue) "已到预测日期，请登记" else "还有 " + (nextStart - today) + " 天",
+                        Modifier.weight(1f)
+                    )
                     InfoCard(
                         "排卵日",
                         formatDate(CycleCalculator.ovulationDay(nextStart)),
@@ -808,6 +806,38 @@ private fun CycleSettingsScreen(
             ) { v ->
                 scope.launch { container.settingsRepository.setCyclePeriodDays(v) }
             }
+
+            Spacer(Modifier.height(20.dp))
+
+            // ===== 默认视图 =====
+            val defaultCalendar by container.settingsRepository.cycleDefaultCalendar
+                .collectAsState(initial = false)
+            Text("默认视图", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            Row {
+                Row(
+                    modifier = Modifier
+                        .background(
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                            RoundedCornerShape(50)
+                        )
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    ViewToggle("圆环", selected = !defaultCalendar) {
+                        scope.launch { container.settingsRepository.setCycleDefaultCalendar(false) }
+                    }
+                    ViewToggle("日历", selected = defaultCalendar) {
+                        scope.launch { container.settingsRepository.setCycleDefaultCalendar(true) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "进入周期管家时默认显示的视图；主视图里的手动切换不会改变这个设置。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+            )
 
             Spacer(Modifier.height(20.dp))
 
