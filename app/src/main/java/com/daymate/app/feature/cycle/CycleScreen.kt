@@ -165,8 +165,13 @@ private fun CycleOverviewScreen(
     onOpenSettings: () -> Unit
 ) {
     val logs by container.cycleRepository.observeAll().collectAsState(initial = emptyList())
-    val cycleDays by container.settingsRepository.cycleDays.collectAsState(initial = CycleCalculator.DEFAULT_CYCLE_DAYS)
-    val periodDays by container.settingsRepository.cyclePeriodDays.collectAsState(initial = CycleCalculator.DEFAULT_PERIOD_DAYS)
+    val cycleManual by container.settingsRepository.cycleDays.collectAsState(initial = CycleCalculator.DEFAULT_CYCLE_DAYS)
+    val periodManual by container.settingsRepository.cyclePeriodDays.collectAsState(initial = CycleCalculator.DEFAULT_PERIOD_DAYS)
+    val cycleAuto by container.settingsRepository.cycleCycleAuto.collectAsState(initial = true)
+    val periodAuto by container.settingsRepository.cyclePeriodAuto.collectAsState(initial = true)
+    // 生效参数：自动开启且数据足够时按近 3 次记录均值推算，否则回落到手动设置值
+    val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
+    val periodDays = container.cycleRepository.effectivePeriodDays(logs, periodManual, periodAuto)
 
     val today = LocalDate.now().toEpochDay()
     val lastLog = logs.firstOrNull()
@@ -261,7 +266,6 @@ private fun CycleOverviewScreen(
                     if (cal) {
                         CycleCalendarMonth(
                             logs = logs,
-                            periodDays = periodDays,
                             cycleDays = cycleDays,
                             today = today
                         )
@@ -709,8 +713,10 @@ private fun CycleSettingsScreen(
     val scope = rememberCoroutineScope()
 
     val logs by container.cycleRepository.observeAll().collectAsState(initial = emptyList())
-    val cycleDays by container.settingsRepository.cycleDays.collectAsState(initial = CycleCalculator.DEFAULT_CYCLE_DAYS)
-    val periodDays by container.settingsRepository.cyclePeriodDays.collectAsState(initial = CycleCalculator.DEFAULT_PERIOD_DAYS)
+    val cycleManual by container.settingsRepository.cycleDays.collectAsState(initial = CycleCalculator.DEFAULT_CYCLE_DAYS)
+    val periodManual by container.settingsRepository.cyclePeriodDays.collectAsState(initial = CycleCalculator.DEFAULT_PERIOD_DAYS)
+    val cycleAuto by container.settingsRepository.cycleCycleAuto.collectAsState(initial = true)
+    val periodAuto by container.settingsRepository.cyclePeriodAuto.collectAsState(initial = true)
     val passwordEnabled by container.settingsRepository.cyclePasswordEnabled.collectAsState(initial = false)
     val eventEnabled by container.settingsRepository.cycleEventEnabled.collectAsState(initial = false)
     val eventTitle by container.settingsRepository.cycleEventTitle.collectAsState(initial = "周期管家")
@@ -719,14 +725,17 @@ private fun CycleSettingsScreen(
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
     var deletingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
     var showHistory by remember { mutableStateOf(false) }
-    var avgHintDismissed by remember { mutableStateOf(false) }
     var showEventNameDialog by remember { mutableStateOf(false) }
     var showPasswordNeedVault by remember { mutableStateOf(false) }
     var showNeedLog by remember { mutableStateOf(false) }
 
     val today = LocalDate.now().toEpochDay()
     val lastLog = logs.firstOrNull()
+    // 生效参数：自动开启且数据足够时按近 3 次记录均值推算，否则回落到手动设置值
+    val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
+    val periodDays = container.cycleRepository.effectivePeriodDays(logs, periodManual, periodAuto)
     val avg = container.cycleRepository.averageCycleDays(logs)
+    val periodAvg = container.cycleRepository.averagePeriodDays(logs)
     val nextStart = lastLog?.let { CycleCalculator.nextStartAfter(it.startDateEpochDay, cycleDays) }
     val overdue = nextStart != null && today >= nextStart
 
@@ -764,8 +773,14 @@ private fun CycleSettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // ===== 周期参数（± 步进） =====
+            // ===== 周期参数（自动推算优先，手改即固定） =====
             Text("周期参数", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "有足够的登记记录时自动按近 ${CycleCalculator.AVG_WINDOW} 次均值推算；手动调整后会固定为该值。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+            )
             Spacer(Modifier.height(8.dp))
             SettingStepper(
                 label = "周期天数",
@@ -774,27 +789,28 @@ private fun CycleSettingsScreen(
             ) { v ->
                 scope.launch {
                     container.settingsRepository.setCycleDays(v)
+                    container.settingsRepository.setCycleCycleAuto(false) // 手改 = 固定该值
                     syncEvent()
                 }
             }
-            if (avg != null && avg != cycleDays && !avgHintDismissed) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "您近${CycleCalculator.AVG_WINDOW}次平均周期为 $avg 天，建议更新设置",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = {
-                        // 按记录均值一键更新周期天数（补记后自动推算）
-                        scope.launch {
-                            container.settingsRepository.setCycleDays(avg)
-                            syncEvent()
-                        }
-                        avgHintDismissed = true
-                    }) { Text("应用") }
-                    TextButton(onClick = { avgHintDismissed = true }) { Text("✕") }
-                }
+            Text(
+                when {
+                    !cycleAuto && avg != null -> "手动固定值（近${CycleCalculator.AVG_WINDOW}次均值 $avg 天）"
+                    !cycleAuto -> "手动固定值"
+                    avg != null -> "自动 · 按近${CycleCalculator.AVG_WINDOW}次记录均值"
+                    else -> "记录不足 2 次，暂按手动值推算"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            if (!cycleAuto && avg != null) {
+                TextButton(onClick = {
+                    scope.launch {
+                        container.settingsRepository.setCycleCycleAuto(true)
+                        syncEvent()
+                    }
+                }) { Text("恢复自动推算") }
             }
             Spacer(Modifier.height(10.dp))
             SettingStepper(
@@ -802,7 +818,30 @@ private fun CycleSettingsScreen(
                 value = periodDays,
                 range = CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS
             ) { v ->
-                scope.launch { container.settingsRepository.setCyclePeriodDays(v) }
+                scope.launch {
+                    container.settingsRepository.setCyclePeriodDays(v)
+                    container.settingsRepository.setCyclePeriodAuto(false) // 手改 = 固定该值
+                    syncEvent()
+                }
+            }
+            Text(
+                when {
+                    !periodAuto && periodAvg != null -> "手动固定值（近${CycleCalculator.AVG_WINDOW}次均值 $periodAvg 天）"
+                    !periodAuto -> "手动固定值"
+                    periodAvg != null -> "自动 · 按近${CycleCalculator.AVG_WINDOW}次记录均值"
+                    else -> "暂无记录，暂按手动值"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            if (!periodAuto && periodAvg != null) {
+                TextButton(onClick = {
+                    scope.launch {
+                        container.settingsRepository.setCyclePeriodAuto(true)
+                        syncEvent()
+                    }
+                }) { Text("恢复自动推算") }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -922,36 +961,74 @@ private fun CycleSettingsScreen(
     // ===== 弹窗层 =====
     if (editingLog != null) {
         val log = editingLog!!
-        var daysText by remember(log.id) { mutableStateOf(log.periodDays.toString()) }
-        AlertDialog(
+        // 调整记录：日期区间选择（预设当前区间），开始/结束日期一起改
+        val editState = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = log.startDateEpochDay * 86400000L,
+            initialSelectedEndDateMillis = (log.startDateEpochDay + log.periodDays - 1) * 86400000L
+        )
+        val selStart = editState.selectedStartDateMillis
+        val selEnd = editState.selectedEndDateMillis
+        val startDay = selStart?.let {
+            Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+        }
+        val days = if (selStart != null && selEnd != null && selEnd >= selStart)
+            ((selEnd - selStart) / 86400000L + 1).toInt() else 0
+        val valid = days in CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS
+        // 与其他记录重叠会让均值与着色失真：保存前校验（排除本记录自身）
+        val overlap = startDay != null && logs.any { other ->
+            other.id != log.id &&
+                startDay <= other.startDateEpochDay + other.periodDays - 1 &&
+                startDay + days - 1 >= other.startDateEpochDay
+        }
+        DatePickerDialog(
             onDismissRequest = { editingLog = null },
-            title = { Text("调整经期天数") },
-            text = {
-                Column {
-                    Text(formatRange(log.startDateEpochDay, log.periodDays) + " 的这次经期", style = MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = daysText,
-                        onValueChange = { daysText = it.filter { ch -> ch.isDigit() }.take(2) },
-                        label = { Text("持续天数（${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS}）") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
-                }
-            },
             confirmButton = {
-                TextButton(onClick = {
-                    val v = daysText.toIntOrNull()
-                    if (v != null && CycleCalculator.isPeriodDaysValid(v)) {
-                        scope.launch {
-                            container.cycleRepository.update(log.copy(periodDays = v))
-                            editingLog = null
+                TextButton(
+                    enabled = valid && !overlap,
+                    onClick = {
+                        if (startDay != null) {
+                            scope.launch {
+                                container.cycleRepository.update(
+                                    log.copy(startDateEpochDay = startDay, periodDays = days)
+                                )
+                                runCatching { container.cycleEventBridge.syncEvent() }
+                                editingLog = null
+                            }
                         }
                     }
-                }) { Text("保存") }
+                ) { Text("保存") }
             },
             dismissButton = { TextButton(onClick = { editingLog = null }) { Text("取消") } }
-        )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            ) {
+                Text(
+                    "调整这条记录",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                Text(
+                    when {
+                        startDay == null || selEnd == null -> "重新选择这次经期的开始与结束日期"
+                        overlap -> "与另一条记录的日期重叠，请调整"
+                        !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
+                        else -> "将改为 " + formatRange(startDay, days) + "，共 " + days + " 天"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                )
+                DateRangePicker(
+                    state = editState,
+                    showModeToggle = false,
+                    modifier = Modifier.height(420.dp)
+                )
+            }
+        }
     }
 
     if (deletingLog != null) {
@@ -1342,11 +1419,10 @@ private fun InfoCard(
     }
 }
 
-/** 月历视图：每天底色 = 当日所处阶段，圆点 = 已登记经期日；可翻月。 */
+/** 月历视图：每天底色 = 当日所处阶段，圆点 = 已登记经期日；可翻月。已登记区间按各记录自身的持续天数。 */
 @Composable
 private fun CycleCalendarMonth(
     logs: List<CycleLogEntity>,
-    periodDays: Int,
     cycleDays: Int,
     today: Long
 ) {
@@ -1363,8 +1439,8 @@ private fun CycleCalendarMonth(
     val lutealColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
     val plainTextColor = MaterialTheme.colorScheme.onSurface
 
-    val logStarts = logs.map { it.startDateEpochDay }
-    val loggedDays = remember(logs, periodDays) {
+    val logEntries = logs.map { it.startDateEpochDay to it.periodDays }
+    val loggedDays = remember(logs) {
         val set = mutableSetOf<Long>()
         logs.forEach { set.addAll(CycleCalculator.periodRange(it.startDateEpochDay, it.periodDays)) }
         set
@@ -1418,7 +1494,7 @@ private fun CycleCalendarMonth(
                         val dayNum = idx - leading + 1
                         if (dayNum in 1..daysInMonth) {
                             val epochDay = month.withDayOfMonth(dayNum).toEpochDay()
-                            val phase = CycleCalculator.phaseOfAnyDay(epochDay, logStarts, periodDays, cycleDays)
+                            val phase = CycleCalculator.phaseOfAnyDay(epochDay, logEntries, cycleDays)
                             val bg = when (phase) {
                                 CycleCalculator.Phase.PERIOD -> periodColor
                                 CycleCalculator.Phase.FOLLICULAR -> follicularColor

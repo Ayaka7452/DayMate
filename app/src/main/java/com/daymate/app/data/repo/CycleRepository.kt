@@ -36,4 +36,19 @@ class CycleRepository(
      */
     fun averageCycleDays(logs: List<CycleLogEntity>): Int? =
         CycleCalculator.averageCycleDays(logs.map { it.startDateEpochDay }.sortedDescending())
+
+    /** 近 3 次记录的经期持续天数均值（天）；无记录返回 null。 */
+    fun averagePeriodDays(logs: List<CycleLogEntity>): Int? =
+        CycleCalculator.averagePeriodDays(logs.map { it.periodDays })
+
+    /**
+     * 生效周期天数：自动开启且能算出均值（≥2 条有效记录）时用近 3 次均值，
+     * 否则回落到手动设置值（数据不足时的种子）。
+     */
+    fun effectiveCycleDays(logs: List<CycleLogEntity>, manual: Int, auto: Boolean): Int =
+        if (auto) averageCycleDays(logs) ?: manual else manual
+
+    /** 生效经期天数：自动开启且有记录时用近 3 次记录均值，否则用手动设置值。 */
+    fun effectivePeriodDays(logs: List<CycleLogEntity>, manual: Int, auto: Boolean): Int =
+        if (auto) averagePeriodDays(logs) ?: manual else manual
 }

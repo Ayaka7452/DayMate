@@ -21,12 +21,16 @@ class CycleEventBridge(
     private val settingsRepository: SettingsRepository
 ) {
 
-    /** 基于最近一次登记与手动周期设置，递推出今天及之后的下一次预测首日。 */
+    /** 基于最近一次登记与生效周期设置（自动均值优先，回落手动值），递推出今天及之后的下一次预测首日。 */
     suspend fun nextPredictedStart(): Long? {
         val logs = cycleRepository.getAll()
         if (logs.isEmpty()) return null
         val lastStart = logs.maxOf { it.startDateEpochDay }
-        val cycleDays = settingsRepository.cycleDays.first()
+        val cycleDays = cycleRepository.effectiveCycleDays(
+            logs,
+            settingsRepository.cycleDays.first(),
+            settingsRepository.cycleCycleAuto.first()
+        )
         var next = CycleCalculator.nextStartAfter(lastStart, cycleDays)
         val today = java.time.LocalDate.now().toEpochDay()
         // 逾期未登记时按周期外推，保证快捷事件始终指向未来的一次预测

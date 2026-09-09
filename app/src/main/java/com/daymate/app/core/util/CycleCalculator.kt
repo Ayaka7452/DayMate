@@ -62,6 +62,16 @@ object CycleCalculator {
         return Math.round(lengths.sum().toDouble() / lengths.size).toInt()
     }
 
+    /**
+     * 近 N 次（最多 3 次）记录的经期持续天数均值：传入按日期降序记录的 periodDays 列表。
+     * 无记录时返回 null。单条记录也能得出均值（该条本身就是样本）。
+     */
+    fun averagePeriodDays(periodDaysDesc: List<Int>): Int? {
+        if (periodDaysDesc.isEmpty()) return null
+        val sample = periodDaysDesc.take(AVG_WINDOW)
+        return Math.round(sample.sum().toDouble() / sample.size).toInt()
+    }
+
     /** 预测下一次经期首日 = 已知首日 + 周期天数。 */
     fun nextStartAfter(lastStartEpochDay: Long, cycleDays: Int): Long =
         lastStartEpochDay + cycleDays
@@ -104,24 +114,23 @@ object CycleCalculator {
     }
 
     /**
-     * 推算任意日期所处阶段（日历视图着色用）。logsStartDesc：按日期降序的经期首日。
-     *  - 落在任一已登记经期区间内 → 月经期
+     * 推算任意日期所处阶段（日历视图着色用）。logsDesc：(经期首日, 该次持续天数) 列表，按首日降序。
+     *  - 落在任一已登记经期区间内（按该记录自身的持续天数）→ 月经期
      *  - 否则以「最后一个不晚于该日的记录」为锚点推算（记录都在未来时，用最早记录按周期向前虚拟推算）
      *  - 锚点推进保证 nextStart 晚于目标日；逾期未登记的未来日子按预测月经期着色
      */
     fun phaseOfAnyDay(
         epochDay: Long,
-        logsStartDesc: List<Long>,
-        periodDays: Int,
+        logsDesc: List<Pair<Long, Int>>,
         cycleDays: Int
     ): Phase {
-        if (logsStartDesc.isEmpty()) return Phase.FOLLICULAR
-        for (s in logsStartDesc) {
-            if (epochDay in periodRange(s, periodDays)) return Phase.PERIOD
+        if (logsDesc.isEmpty()) return Phase.FOLLICULAR
+        for ((s, pd) in logsDesc) {
+            if (epochDay in periodRange(s, pd)) return Phase.PERIOD
         }
-        var anchor = logsStartDesc.lastOrNull { it <= epochDay }
+        var anchor = logsDesc.lastOrNull { it.first <= epochDay }?.first
         if (anchor == null) {
-            val first = logsStartDesc.last()
+            val first = logsDesc.last().first
             val k = (first - epochDay + cycleDays - 1) / cycleDays
             anchor = first - k * cycleDays
         } else {
