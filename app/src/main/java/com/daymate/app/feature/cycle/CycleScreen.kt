@@ -174,14 +174,11 @@ private fun CycleOverviewScreen(
     var showTips by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
-    // 结束本次经期：把最近一次记录的持续天数调整为「到今天」（提前结束或延后），2~10 天内可用
-    val endNow = lastLog?.let { l ->
-        val diff = (today - l.startDateEpochDay + 1).toInt()
-        if (today >= l.startDateEpochDay &&
-            diff in CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS &&
-            diff != l.periodDays
-        ) diff else null
-    }
+    // 结束本次经期：经期活跃期内始终显示入口（提前结束或延后，2~10 天内可用）
+    val activeLog = logs.firstOrNull { it.startDateEpochDay <= today }
+    val activeDiff = activeLog?.let { (today - it.startDateEpochDay + 1).toInt() }
+    val showEndNow = activeDiff != null &&
+        activeDiff in CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS
 
     Scaffold(
         topBar = {
@@ -244,17 +241,24 @@ private fun CycleOverviewScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            // ===== 结束本次经期：显著按钮，一键把持续天数调整为到今天 =====
-            if (endNow != null && lastLog != null) {
+            // ===== 结束本次经期：显著入口，一键把持续天数调整为到今天 =====
+            if (showEndNow && activeLog != null && activeDiff != null) {
+                val alreadyToday = activeDiff == activeLog.periodDays
                 Button(
                     onClick = {
                         scope.launch {
-                            container.cycleRepository.update(lastLog.copy(periodDays = endNow))
+                            container.cycleRepository.update(activeLog.copy(periodDays = activeDiff))
                             scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
                         }
                     },
+                    enabled = !alreadyToday,
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("结束本次经期（到今天，共 " + endNow + " 天）") }
+                ) {
+                    Text(
+                        if (alreadyToday) "本次经期已记录到今天（共 " + activeDiff + " 天）"
+                        else "结束本次经期（到今天，共 " + activeDiff + " 天）"
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
             }
 
@@ -275,21 +279,27 @@ private fun CycleOverviewScreen(
             Spacer(Modifier.height(16.dp))
 
             // ===== 圆环周期图 / 日历视图 =====
+            // Crossfade 内部按 TopStart 摆放子项，必须包一层全宽居中 Box，否则切换瞬间圆环会在左侧闪现
             Crossfade(targetState = showCalendar, label = "cycle_view") { cal ->
-                if (cal) {
-                    CycleCalendarMonth(
-                        logs = logs,
-                        periodDays = periodDays,
-                        cycleDays = cycleDays,
-                        today = today
-                    )
-                } else {
-                    CycleRing(
-                        lastStart = lastLog?.startDateEpochDay,
-                        periodDays = periodDays,
-                        cycleDays = cycleDays,
-                        today = today
-                    )
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (cal) {
+                        CycleCalendarMonth(
+                            logs = logs,
+                            periodDays = periodDays,
+                            cycleDays = cycleDays,
+                            today = today
+                        )
+                    } else {
+                        CycleRing(
+                            lastStart = lastLog?.startDateEpochDay,
+                            periodDays = periodDays,
+                            cycleDays = cycleDays,
+                            today = today
+                        )
+                    }
                 }
             }
 
