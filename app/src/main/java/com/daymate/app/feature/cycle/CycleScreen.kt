@@ -262,22 +262,6 @@ private fun CycleOverviewScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            // ===== 视图切换：圆环 / 日历 =====
-            Row(
-                modifier = Modifier
-                    .background(
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                        RoundedCornerShape(50)
-                    )
-                    .padding(3.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                ViewToggle("圆环", selected = !showCalendar) { showCalendar = false }
-                ViewToggle("日历", selected = showCalendar) { showCalendar = true }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
             // ===== 圆环周期图 / 日历视图 =====
             // Crossfade 内部按 TopStart 摆放子项，必须包一层全宽居中 Box，否则切换瞬间圆环会在左侧闪现
             Crossfade(targetState = showCalendar, label = "cycle_view") { cal ->
@@ -300,6 +284,27 @@ private fun CycleOverviewScreen(
                             today = today
                         )
                     }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // ===== 视图切换：圆环 / 日历（放视图下方） =====
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Row(
+                    modifier = Modifier
+                        .background(
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                            RoundedCornerShape(50)
+                        )
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    ViewToggle("圆环", selected = !showCalendar) { showCalendar = false }
+                    ViewToggle("日历", selected = showCalendar) { showCalendar = true }
                 }
             }
 
