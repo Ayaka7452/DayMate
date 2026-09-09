@@ -97,6 +97,7 @@ fun CycleScreen(
 }
 
 /** 解锁门：验证 Vault 密码（只验证不解密），支持指纹（跟随 Vault 的指纹开关）。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CycleUnlockGate(
     container: AppContainer,
