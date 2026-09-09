@@ -171,6 +171,7 @@ private fun CycleOverviewScreen(
     val lastLog = logs.firstOrNull()
     val scope = rememberCoroutineScope()
     var showRegister by remember { mutableStateOf(false) }
+    var showBackfill by remember { mutableStateOf(false) }
     var showTips by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
@@ -241,27 +242,6 @@ private fun CycleOverviewScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            // ===== 结束本次经期：显著入口，一键把持续天数调整为到今天 =====
-            if (showEndNow && activeLog != null && activeDiff != null) {
-                val alreadyToday = activeDiff == activeLog.periodDays
-                Button(
-                    onClick = {
-                        scope.launch {
-                            container.cycleRepository.update(activeLog.copy(periodDays = activeDiff))
-                            scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
-                        }
-                    },
-                    enabled = !alreadyToday,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        if (alreadyToday) "本次经期已记录到今天（共 " + activeDiff + " 天）"
-                        else "结束本次经期（到今天，共 " + activeDiff + " 天）"
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-
             // ===== 圆环周期图 / 日历视图 =====
             // Crossfade 内部按 TopStart 摆放子项，必须包一层全宽居中 Box，否则切换瞬间圆环会在左侧闪现
             Crossfade(targetState = showCalendar, label = "cycle_view") { cal ->
@@ -306,6 +286,44 @@ private fun CycleOverviewScreen(
                     ViewToggle("圆环", selected = !showCalendar) { showCalendar = false }
                     ViewToggle("日历", selected = showCalendar) { showCalendar = true }
                 }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // ===== 结束本次经期：显著入口，一键把持续天数调整为到今天 =====
+            if (showEndNow && activeLog != null && activeDiff != null) {
+                val alreadyToday = activeDiff == activeLog.periodDays
+                Button(
+                    onClick = {
+                        scope.launch {
+                            container.cycleRepository.update(activeLog.copy(periodDays = activeDiff))
+                            scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                        }
+                    },
+                    enabled = !alreadyToday,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (alreadyToday) "本次经期已记录到今天（共 " + activeDiff + " 天）"
+                        else "结束本次经期（到今天，共 " + activeDiff + " 天）"
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+
+            // ===== 登记 / 补记：常驻主视图操作行 =====
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = { showRegister = true },
+                    modifier = Modifier.weight(1f)
+                ) { Text("开始新经期") }
+                OutlinedButton(
+                    onClick = { showBackfill = true },
+                    modifier = Modifier.weight(1f)
+                ) { Text("补记历史经期") }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -399,8 +417,8 @@ private fun CycleOverviewScreen(
         }
     }
 
-    // 逾期登记弹窗（主视图直达）
-    if (showRegister && lastLog != null) {
+    // 登记 / 开始新经期弹窗（主视图直达，默认选中今天）
+    if (showRegister) {
         // 默认选中今天：直接点确定即登记今天，避免不触摸日期选择器时静默无效果
         val registerState = rememberDatePickerState(
             initialSelectedDateMillis = today * 86400000L
@@ -424,6 +442,67 @@ private fun CycleOverviewScreen(
             },
             dismissButton = { TextButton(onClick = { showRegister = false }) { Text("取消") } }
         ) { DatePicker(state = registerState) }
+    }
+
+    // 补记历史经期：区间选择（几号到几号），纯补充记录
+    if (showBackfill) {
+        val rangeState = rememberDateRangePickerState()
+        val selStart = rangeState.selectedStartDateMillis
+        val selEnd = rangeState.selectedEndDateMillis
+        val startDay = selStart?.let {
+            Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+        }
+        val days = if (selStart != null && selEnd != null && selEnd >= selStart)
+            ((selEnd - selStart) / 86400000L + 1).toInt() else 0
+        val valid = days in CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS
+        DatePickerDialog(
+            onDismissRequest = { showBackfill = false },
+            confirmButton = {
+                TextButton(
+                    enabled = valid,
+                    onClick = {
+                        if (startDay != null) {
+                            scope.launch {
+                                container.cycleRepository.add(
+                                    CycleLogEntity(startDateEpochDay = startDay, periodDays = days)
+                                )
+                                scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                            }
+                        }
+                        showBackfill = false
+                    }
+                ) { Text("保存") }
+            },
+            dismissButton = { TextButton(onClick = { showBackfill = false }) { Text("取消") } }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            ) {
+                Text(
+                    "补记历史经期",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                Text(
+                    when {
+                        startDay == null || selEnd == null -> "选择这次经期的开始与结束日期"
+                        !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
+                        else -> "将记录 " + formatRange(startDay, days) + "，共 " + days + " 天"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                )
+                DateRangePicker(
+                    state = rangeState,
+                    showModeToggle = false,
+                    modifier = Modifier.height(420.dp)
+                )
+            }
+        }
     }
 
     // 温馨提示弹窗
@@ -641,8 +720,6 @@ private fun CycleSettingsScreen(
     val eventTitle by container.settingsRepository.cycleEventTitle.collectAsState(initial = "周期管家")
     val vaultSet by container.settingsRepository.vaultPasswordSet.collectAsState(initial = false)
 
-    var showAddPicker by remember { mutableStateOf(false) }
-    var showBackfill by remember { mutableStateOf(false) }
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
     var deletingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
     var showHistory by remember { mutableStateOf(false) }
@@ -734,32 +811,6 @@ private fun CycleSettingsScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // ===== 登记 =====
-            Text("经期登记", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = { showAddPicker = true },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("登记本次经期") }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "经期还没结束？先登记开始日即可，持续天数之后可在历史记录中调整。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { showBackfill = true },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("补记历史经期") }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "之前没记上的经期：选「几号到几号」补一条完整记录。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-            )
-            Spacer(Modifier.height(12.dp))
-
             if (logs.isEmpty()) {
                 Text(
                     "还没有记录。登记最近一次经期首日后，主视图会显示月经期、卵泡期、排卵期和黄体期的推算。",
@@ -841,93 +892,6 @@ private fun CycleSettingsScreen(
     }
 
     // ===== 弹窗层 =====
-    if (showAddPicker) {
-        // 默认选中今天：直接点确定即登记今天
-        val addPickerState = rememberDatePickerState(
-            initialSelectedDateMillis = today * 86400000L
-        )
-        DatePickerDialog(
-            onDismissRequest = { showAddPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    addPickerState.selectedDateMillis?.let { millis ->
-                        val day = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
-                        scope.launch {
-                            container.cycleRepository.add(
-                                CycleLogEntity(startDateEpochDay = day, periodDays = periodDays)
-                            )
-                            syncEvent()
-                        }
-                    }
-                    showAddPicker = false
-                }) { Text("保存") }
-            },
-            dismissButton = { TextButton(onClick = { showAddPicker = false }) { Text("取消") } }
-        ) { DatePicker(state = addPickerState) }
-    }
-
-    // 补记历史经期：区间选择（几号到几号），纯补充记录
-    if (showBackfill) {
-        val rangeState = rememberDateRangePickerState()
-        val selStart = rangeState.selectedStartDateMillis
-        val selEnd = rangeState.selectedEndDateMillis
-        val startDay = selStart?.let {
-            Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
-        }
-        val days = if (selStart != null && selEnd != null && selEnd >= selStart)
-            ((selEnd - selStart) / 86400000L + 1).toInt() else 0
-        val valid = days in CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS
-        DatePickerDialog(
-            onDismissRequest = { showBackfill = false },
-            confirmButton = {
-                TextButton(
-                    enabled = valid,
-                    onClick = {
-                        if (startDay != null) {
-                            scope.launch {
-                                container.cycleRepository.add(
-                                    CycleLogEntity(startDateEpochDay = startDay, periodDays = days)
-                                )
-                                syncEvent()
-                            }
-                        }
-                        showBackfill = false
-                    }
-                ) { Text("保存") }
-            },
-            dismissButton = { TextButton(onClick = { showBackfill = false }) { Text("取消") } }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
-            ) {
-                Text(
-                    "补记历史经期",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
-                Text(
-                    when {
-                        startDay == null || selEnd == null -> "选择这次经期的开始与结束日期"
-                        !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
-                        else -> "将记录 " + formatRange(startDay, days) + "，共 " + days + " 天"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
-                )
-                DateRangePicker(
-                    state = rangeState,
-                    showModeToggle = false,
-                    modifier = Modifier.height(420.dp)
-                )
-            }
-        }
-    }
-
     if (editingLog != null) {
         val log = editingLog!!
         var daysText by remember(log.id) { mutableStateOf(log.periodDays.toString()) }
@@ -1022,7 +986,7 @@ private fun CycleSettingsScreen(
         AlertDialog(
             onDismissRequest = { showNeedLog = false },
             title = { Text("请先登记一次经期") },
-            text = { Text("快捷事件的日期来自周期推算，需要至少一次经期登记。请先在上方「登记本次经期」，登记后快捷事件会自动创建并显示在主页。") },
+            text = { Text("快捷事件的日期来自周期推算，需要至少一次经期登记。请先回到主视图点「开始新经期」登记，登记后快捷事件会自动创建并显示在主页。") },
             confirmButton = {
                 TextButton(onClick = { showNeedLog = false }) { Text("知道了") }
             }
