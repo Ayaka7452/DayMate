@@ -5,7 +5,10 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.Canvas
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +27,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -120,17 +125,20 @@ fun CycleScreen(
         )
         return
     }
-    if (showSettings) {
-        CycleSettingsScreen(
-            container = container,
-            onBack = { showSettings = false }
-        )
-    } else {
-        CycleOverviewScreen(
-            container = container,
-            onExit = onExit,
-            onOpenSettings = { showSettings = true }
-        )
+    // 主视图 ⇄ 设置页淡入淡出，避免生硬跳变
+    Crossfade(targetState = showSettings, label = "cycle_pages") { settings ->
+        if (settings) {
+            CycleSettingsScreen(
+                container = container,
+                onBack = { showSettings = false }
+            )
+        } else {
+            CycleOverviewScreen(
+                container = container,
+                onExit = onExit,
+                onOpenSettings = { showSettings = true }
+            )
+        }
     }
 }
 
@@ -476,6 +484,8 @@ private fun CycleSettingsScreen(
 
     var showAddPicker by remember { mutableStateOf(false) }
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
+    var deletingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
+    var showHistory by remember { mutableStateOf(false) }
     var avgHintDismissed by remember { mutableStateOf(false) }
     var showEventNameDialog by remember { mutableStateOf(false) }
     var showPasswordNeedVault by remember { mutableStateOf(false) }
@@ -561,40 +571,56 @@ private fun CycleSettingsScreen(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             } else {
-                Text("历史记录", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                logs.forEach { log ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                formatDate(log.startDateEpochDay) + " · " + log.periodDays + "天",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            val dow = LocalDate.ofEpochDay(log.startDateEpochDay)
-                                .dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
-                            Text(
-                                dow,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        }
-                        TextButton(onClick = { editingLog = log }) { Text("调整") }
-                        IconButton(onClick = {
-                            scope.launch {
-                                container.cycleRepository.delete(log)
-                                syncEvent()
+                // 折叠式历史入口：数据多了不撑长页面，点击展开/收起
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showHistory = !showHistory }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "历史记录（${logs.size}）",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        if (showHistory) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (showHistory) "收起" else "展开",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                AnimatedVisibility(visible = showHistory) {
+                    Column {
+                        logs.forEach { log ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        formatDate(log.startDateEpochDay) + " · " + log.periodDays + "天",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    val dow = LocalDate.ofEpochDay(log.startDateEpochDay)
+                                        .dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
+                                    Text(
+                                        dow,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                                TextButton(onClick = { editingLog = log }) { Text("调整") }
+                                IconButton(onClick = { deletingLog = log }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "删除",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                                }
                             }
-                        }) {
-                            Icon(Icons.Default.Delete, contentDescription = "删除",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
             }
 
@@ -703,6 +729,25 @@ private fun CycleSettingsScreen(
                 }) { Text("保存") }
             },
             dismissButton = { TextButton(onClick = { editingLog = null }) { Text("取消") } }
+        )
+    }
+
+    if (deletingLog != null) {
+        val log = deletingLog!!
+        AlertDialog(
+            onDismissRequest = { deletingLog = null },
+            title = { Text("删除这条记录？") },
+            text = { Text(formatDate(log.startDateEpochDay) + " 开始的经期记录将被删除，推算将基于剩余的记录进行。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        container.cycleRepository.delete(log)
+                        deletingLog = null
+                        syncEvent()
+                    }
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { deletingLog = null }) { Text("取消") } }
         )
     }
 
