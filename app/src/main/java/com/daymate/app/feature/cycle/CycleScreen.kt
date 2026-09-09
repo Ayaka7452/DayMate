@@ -389,13 +389,11 @@ private fun CycleOverviewScreen(
                 }
             } else {
                 Text(
-                    "还没有登记记录。\n点击右上角设置，登记最近一次经期首日后，这里会显示完整的周期推算。",
+                    "还没有登记记录。\n点击「开始新经期」登记最近一次经期首日后，这里会显示完整的周期推算。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.height(12.dp))
-                Button(onClick = onOpenSettings) { Text("去设置并登记") }
             }
 
             Spacer(Modifier.height(16.dp))
