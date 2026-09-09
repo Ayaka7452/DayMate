@@ -102,13 +102,16 @@ fun CycleScreen(
 ) {
     val passwordEnabled by container.settingsRepository.cyclePasswordEnabled
         .collectAsState(initial = false)
-    var unlocked by remember { mutableStateOf(!passwordEnabled) }
+    // 本次会话是否已通过验证。锁定态必须派生：collectAsState 首帧 initial=false，
+    // 若直接 mutableStateOf(!passwordEnabled) 会在数据到达前把 unlocked 固定为 true，密码门永远不弹
+    var unlockedByUser by remember { mutableStateOf(false) }
+    val locked = passwordEnabled && !unlockedByUser
     var showSettings by remember { mutableStateOf(false) }
     // 设置子页是同 Activity 内的状态切换：返回手势先回到主视图，而不是退出功能
     BackHandler(enabled = showSettings) { showSettings = false }
-    // 密码开关变化时即时生效（在页面内直接开/关）
+    // 密码开关变化时即时生效：关闭即解锁；会话内重新开启需重新验证
     LaunchedEffect(passwordEnabled) {
-        if (!passwordEnabled) unlocked = true
+        if (!passwordEnabled) unlockedByUser = false
     }
 
     // 防截屏/最近任务缩略图遮挡（与 Vault 一致）
@@ -118,10 +121,10 @@ fun CycleScreen(
         onDispose { activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE) }
     }
 
-    if (!unlocked) {
+    if (locked) {
         CycleUnlockGate(
             container = container,
-            onUnlocked = { unlocked = true },
+            onUnlocked = { unlockedByUser = true },
             onExit = onExit
         )
         return
