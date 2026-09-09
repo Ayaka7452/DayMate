@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,10 +26,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
@@ -38,6 +42,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -62,6 +68,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
@@ -72,6 +79,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -164,6 +172,7 @@ private fun CycleOverviewScreen(
     val scope = rememberCoroutineScope()
     var showRegister by remember { mutableStateOf(false) }
     var showTips by remember { mutableStateOf(false) }
+    var showCalendar by remember { mutableStateOf(false) }
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
 
     Scaffold(
@@ -227,21 +236,49 @@ private fun CycleOverviewScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            // ===== 圆环周期图 =====
-            CycleRing(
-                lastStart = lastLog?.startDateEpochDay,
-                periodDays = periodDays,
-                cycleDays = cycleDays,
-                today = today
-            )
+            // ===== 视图切换：圆环 / 日历 =====
+            Row(
+                modifier = Modifier
+                    .background(
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                        RoundedCornerShape(50)
+                    )
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                ViewToggle("圆环", selected = !showCalendar) { showCalendar = false }
+                ViewToggle("日历", selected = showCalendar) { showCalendar = true }
+            }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
+
+            // ===== 圆环周期图 / 日历视图 =====
+            Crossfade(targetState = showCalendar, label = "cycle_view") { cal ->
+                if (cal) {
+                    CycleCalendarMonth(
+                        logs = logs,
+                        periodDays = periodDays,
+                        cycleDays = cycleDays,
+                        today = today
+                    )
+                } else {
+                    CycleRing(
+                        lastStart = lastLog?.startDateEpochDay,
+                        periodDays = periodDays,
+                        cycleDays = cycleDays,
+                        today = today
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
 
             // ===== 图例 =====
             val legendPeriod = MaterialTheme.colorScheme.primary
             val legendFollicular = MaterialTheme.colorScheme.secondaryContainer
             val legendOvulation = MaterialTheme.colorScheme.tertiary
-            val legendLuteal = Color(0x24000000)
+            // 深色模式下用 onSurface 透明度（半透明白）而非固定半透明黑
+            val legendLuteal = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LegendDot(legendPeriod, "月经期")
                 LegendDot(legendFollicular, "卵泡期")
@@ -251,25 +288,52 @@ private fun CycleOverviewScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // ===== 关键日期 =====
+            // ===== 关键日期（2×2 网格卡片，填满版面不留大空白） =====
             if (lastLog != null) {
                 val nextStart = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
                 val overdue = today >= nextStart
                 val phase = CycleCalculator.phaseOf(today, lastLog.startDateEpochDay, periodDays, cycleDays)
-                InfoRow("上次经期", formatDate(lastLog.startDateEpochDay) + " · " + lastLog.periodDays + "天")
-                InfoRow("当前阶段", phase.label)
-                if (overdue) {
-                    InfoRow("下次经期", "已到预测日期，请登记本次经期", highlight = true)
-                } else {
-                    InfoRow(
-                        "下次经期",
-                        formatDate(nextStart) + "（还有 " + (nextStart - today) + " 天）",
-                        highlight = true
+                val ovuRange = CycleCalculator.ovulationRange(nextStart)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    InfoCard(
+                        "上次经期",
+                        formatRange(lastLog.startDateEpochDay, lastLog.periodDays),
+                        "共 " + lastLog.periodDays + " 天",
+                        Modifier.weight(1f)
+                    )
+                    InfoCard(
+                        "当前阶段",
+                        phase.label,
+                        "周期第 " + (today - lastLog.startDateEpochDay + 1) + " 天",
+                        Modifier.weight(1f)
                     )
                 }
-                InfoRow("排卵日", formatDate(CycleCalculator.ovulationDay(nextStart)))
-                InfoRow("排卵期窗口", formatDate(CycleCalculator.ovulationRange(nextStart).first) +
-                    " ~ " + formatDate(CycleCalculator.ovulationRange(nextStart).last))
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (overdue) {
+                        InfoCard(
+                            "下次经期",
+                            formatDate(nextStart),
+                            "已到预测日期，请登记",
+                            Modifier.weight(1f),
+                            highlight = true
+                        )
+                    } else {
+                        InfoCard(
+                            "下次经期",
+                            formatDate(nextStart),
+                            "还有 " + (nextStart - today) + " 天",
+                            Modifier.weight(1f),
+                            highlight = true
+                        )
+                    }
+                    InfoCard(
+                        "排卵日",
+                        formatDate(CycleCalculator.ovulationDay(nextStart)),
+                        "窗口 " + formatDate(ovuRange.first) + " ~ " + formatDate(ovuRange.last),
+                        Modifier.weight(1f)
+                    )
+                }
             } else {
                 Text(
                     "还没有登记记录。\n点击右上角设置，登记最近一次经期首日后，这里会显示完整的周期推算。",
@@ -380,8 +444,9 @@ private fun CycleRing(
     val periodColor = MaterialTheme.colorScheme.primary
     val follicularColor = MaterialTheme.colorScheme.secondaryContainer
     val ovulationColor = MaterialTheme.colorScheme.tertiary
-    val lutealColor = Color(0x24000000)
-    val trackColor = Color(0x14000000)
+    // 黄体期/底环用 onSurface 透明度：浅色=半透明黑，深色=半透明白，两种模式都可见
+    val lutealColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp)) {
@@ -540,6 +605,7 @@ private fun CycleSettingsScreen(
     val vaultSet by container.settingsRepository.vaultPasswordSet.collectAsState(initial = false)
 
     var showAddPicker by remember { mutableStateOf(false) }
+    var showBackfill by remember { mutableStateOf(false) }
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
     var deletingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
     var showHistory by remember { mutableStateOf(false) }
@@ -609,6 +675,14 @@ private fun CycleSettingsScreen(
                         color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.weight(1f)
                     )
+                    TextButton(onClick = {
+                        // 按记录均值一键更新周期天数（补记后自动推算）
+                        scope.launch {
+                            container.settingsRepository.setCycleDays(avg)
+                            syncEvent()
+                        }
+                        avgHintDismissed = true
+                    }) { Text("应用") }
                     TextButton(onClick = { avgHintDismissed = true }) { Text("✕") }
                 }
             }
@@ -629,7 +703,24 @@ private fun CycleSettingsScreen(
             Button(
                 onClick = { showAddPicker = true },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text(if (overdue || lastLog == null) "登记本次经期" else "补记 / 更正既往经期") }
+            ) { Text("登记本次经期") }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "经期还没结束？先登记开始日即可，持续天数之后可在历史记录中调整。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { showBackfill = true },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("补记历史经期") }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "之前没记上的经期：选「几号到几号」补一条完整记录。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+            )
             Spacer(Modifier.height(12.dp))
 
             if (logs.isEmpty()) {
@@ -739,6 +830,67 @@ private fun CycleSettingsScreen(
         ) { DatePicker(state = addPickerState) }
     }
 
+    // 补记历史经期：区间选择（几号到几号），纯补充记录
+    if (showBackfill) {
+        val rangeState = rememberDateRangePickerState()
+        val selStart = rangeState.selectedStartDateMillis
+        val selEnd = rangeState.selectedEndDateMillis
+        val startDay = selStart?.let {
+            Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+        }
+        val days = if (selStart != null && selEnd != null && selEnd >= selStart)
+            ((selEnd - selStart) / 86400000L + 1).toInt() else 0
+        val valid = days in CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS
+        DatePickerDialog(
+            onDismissRequest = { showBackfill = false },
+            confirmButton = {
+                TextButton(
+                    enabled = valid,
+                    onClick = {
+                        if (startDay != null) {
+                            scope.launch {
+                                container.cycleRepository.add(
+                                    CycleLogEntity(startDateEpochDay = startDay, periodDays = days)
+                                )
+                                syncEvent()
+                            }
+                        }
+                        showBackfill = false
+                    }
+                ) { Text("保存") }
+            },
+            dismissButton = { TextButton(onClick = { showBackfill = false }) { Text("取消") } }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            ) {
+                Text(
+                    "补记历史经期",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                Text(
+                    when {
+                        startDay == null || selEnd == null -> "选择这次经期的开始与结束日期"
+                        !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
+                        else -> "将记录 " + formatRange(startDay, days) + "，共 " + days + " 天"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                )
+                DateRangePicker(
+                    state = rangeState,
+                    showModeToggle = false,
+                    modifier = Modifier.height(420.dp)
+                )
+            }
+        }
+    }
+
     if (editingLog != null) {
         val log = editingLog!!
         var daysText by remember(log.id) { mutableStateOf(log.periodDays.toString()) }
@@ -747,7 +899,7 @@ private fun CycleSettingsScreen(
             title = { Text("调整经期天数") },
             text = {
                 Column {
-                    Text(formatDate(log.startDateEpochDay) + " 开始的这次经期", style = MaterialTheme.typography.bodySmall)
+                    Text(formatRange(log.startDateEpochDay, log.periodDays) + " 的这次经期", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = daysText,
@@ -778,7 +930,7 @@ private fun CycleSettingsScreen(
         AlertDialog(
             onDismissRequest = { deletingLog = null },
             title = { Text("删除这条记录？") },
-            text = { Text(formatDate(log.startDateEpochDay) + " 开始的经期记录将被删除，推算将基于剩余的记录进行。") },
+            text = { Text(formatRange(log.startDateEpochDay, log.periodDays) + " 的经期记录将被删除，推算将基于剩余的记录进行。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -1017,6 +1169,10 @@ private fun CycleUnlockGate(
 private fun formatDate(epochDay: Long): String =
     LocalDate.ofEpochDay(epochDay).format(DateFmt)
 
+/** 「几号到几号」区间格式：X月X日 ~ X月X日 */
+private fun formatRange(startEpochDay: Long, days: Int): String =
+    formatDate(startEpochDay) + " ~ " + formatDate(startEpochDay + days - 1)
+
 /** 历史记录管理子页：全部经期记录 + 调整/删除入口。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1066,7 +1222,7 @@ private fun CycleHistoryScreen(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                formatDate(log.startDateEpochDay) + " · " + log.periodDays + "天",
+                                formatRange(log.startDateEpochDay, log.periodDays) + " · " + log.periodDays + "天",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             val dow = LocalDate.ofEpochDay(log.startDateEpochDay)
@@ -1089,5 +1245,202 @@ private fun CycleHistoryScreen(
                 }
             }
         }
+    }
+}
+
+/** 圆环/日历切换 pill。 */
+@Composable
+private fun ViewToggle(text: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+    }
+}
+
+/** 关键日期网格卡片：label + 主值 + 副说明。 */
+@Composable
+private fun InfoCard(
+    label: String,
+    value: String,
+    sub: String,
+    modifier: Modifier = Modifier,
+    highlight: Boolean = false
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = if (highlight) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                value,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                sub,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** 月历视图：每天底色 = 当日所处阶段，圆点 = 已登记经期日；可翻月。 */
+@Composable
+private fun CycleCalendarMonth(
+    logs: List<CycleLogEntity>,
+    periodDays: Int,
+    cycleDays: Int,
+    today: Long
+) {
+    var monthOffset by remember { mutableStateOf(0) }
+    val month = LocalDate.now().plusMonths(monthOffset.toLong())
+
+    // 颜色在 Composable 体内解析
+    val periodColor = MaterialTheme.colorScheme.primary
+    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+    val follicularColor = MaterialTheme.colorScheme.secondaryContainer
+    val onFollicularColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val ovulationColor = MaterialTheme.colorScheme.tertiary
+    val onOvulationColor = MaterialTheme.colorScheme.onTertiary
+    val lutealColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+    val plainTextColor = MaterialTheme.colorScheme.onSurface
+
+    val logStarts = logs.map { it.startDateEpochDay }
+    val loggedDays = remember(logs, periodDays) {
+        val set = mutableSetOf<Long>()
+        logs.forEach { set.addAll(CycleCalculator.periodRange(it.startDateEpochDay, it.periodDays)) }
+        set
+    }
+
+    Column(Modifier.fillMaxWidth()) {
+        // 月份导航
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            IconButton(onClick = { monthOffset -= 1 }) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "上个月")
+            }
+            Text(
+                month.year.toString() + "年" + month.monthValue + "月",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = { monthOffset += 1 }) {
+                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "下个月")
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        // 星期表头（周一开始）
+        Row(Modifier.fillMaxWidth()) {
+            listOf("一", "二", "三", "四", "五", "六", "日").forEach { d ->
+                Text(
+                    d,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        // 日期网格
+        val leading = month.dayOfWeek.value - 1 // 周一=1 → 前导空格数
+        val daysInMonth = month.lengthOfMonth()
+        val rows = (leading + daysInMonth + 6) / 7
+        for (r in 0 until rows) {
+            Row(Modifier.fillMaxWidth()) {
+                for (c in 0 until 7) {
+                    val idx = r * 7 + c
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(0.9f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val dayNum = idx - leading + 1
+                        if (dayNum in 1..daysInMonth) {
+                            val epochDay = month.atDay(dayNum).toEpochDay()
+                            val phase = CycleCalculator.phaseOfAnyDay(epochDay, logStarts, periodDays, cycleDays)
+                            val bg = when (phase) {
+                                CycleCalculator.Phase.PERIOD -> periodColor
+                                CycleCalculator.Phase.FOLLICULAR -> follicularColor
+                                CycleCalculator.Phase.OVULATION -> ovulationColor
+                                CycleCalculator.Phase.LUTEAL -> lutealColor
+                            }
+                            val fg = when (phase) {
+                                CycleCalculator.Phase.PERIOD -> onPrimaryColor
+                                CycleCalculator.Phase.FOLLICULAR -> onFollicularColor
+                                CycleCalculator.Phase.OVULATION -> onOvulationColor
+                                CycleCalculator.Phase.LUTEAL -> plainTextColor
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(1.dp)
+                                    .background(bg, RoundedCornerShape(8.dp)),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    dayNum.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = fg,
+                                    fontWeight = if (epochDay == today) FontWeight.Bold else FontWeight.Normal
+                                )
+                                if (loggedDays.contains(epochDay)) {
+                                    Box(Modifier.size(4.dp).background(fg, CircleShape))
+                                } else {
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                            if (epochDay == today) {
+                                Box(
+                                    Modifier
+                                        .matchParentSize()
+                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "底色 = 当日所处阶段；圆点 = 已登记的经期日",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

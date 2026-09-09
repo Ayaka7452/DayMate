@@ -103,6 +103,38 @@ object CycleCalculator {
         }
     }
 
+    /**
+     * 推算任意日期所处阶段（日历视图着色用）。logsStartDesc：按日期降序的经期首日。
+     *  - 落在任一已登记经期区间内 → 月经期
+     *  - 否则以「最后一个不晚于该日的记录」为锚点推算（记录都在未来时，用最早记录按周期向前虚拟推算）
+     *  - 锚点推进保证 nextStart 晚于目标日；逾期未登记的未来日子按预测月经期着色
+     */
+    fun phaseOfAnyDay(
+        epochDay: Long,
+        logsStartDesc: List<Long>,
+        periodDays: Int,
+        cycleDays: Int
+    ): Phase {
+        if (logsStartDesc.isEmpty()) return Phase.FOLLICULAR
+        for (s in logsStartDesc) {
+            if (epochDay in periodRange(s, periodDays)) return Phase.PERIOD
+        }
+        var anchor = logsStartDesc.lastOrNull { it <= epochDay }
+        if (anchor == null) {
+            val first = logsStartDesc.last()
+            val k = (first - epochDay + cycleDays - 1) / cycleDays
+            anchor = first - k * cycleDays
+        } else {
+            while (anchor + cycleDays <= epochDay) anchor += cycleDays
+        }
+        val nextStart = anchor + cycleDays
+        return when {
+            epochDay in ovulationRange(nextStart) -> Phase.OVULATION
+            epochDay in lutealRange(nextStart) -> Phase.LUTEAL
+            else -> Phase.FOLLICULAR
+        }
+    }
+
     enum class Phase(val label: String) {
         PERIOD("月经期"),
         FOLLICULAR("卵泡期"),
