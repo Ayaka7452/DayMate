@@ -179,10 +179,13 @@ private fun CycleOverviewScreen(
     var showRegister by remember { mutableStateOf(false) }
     var showBackfill by remember { mutableStateOf(false) }
     var showTips by remember { mutableStateOf(false) }
-    // 默认视图来自设置；手动切换只改本页状态，不写回设置
-    val defaultCalendar by container.settingsRepository.cycleDefaultCalendar
-        .collectAsState(initial = false)
-    var showCalendar by remember(defaultCalendar) { mutableStateOf(defaultCalendar) }
+    // 默认视图来自设置；手动切换只改本页状态，不写回设置。
+    // collectAsState initial=null：设置值加载完成前不渲染视图区——
+    // 若用 initial=false，默认日历的用户会先看到一帧圆环再淡出成日历（首帧闪变）
+    val defaultCalendarPref by container.settingsRepository.cycleDefaultCalendar
+        .collectAsState(initial = null as Boolean?)
+    var manualCalendar by remember(defaultCalendarPref) { mutableStateOf<Boolean?>(null) }
+    val showCalendar = manualCalendar ?: (defaultCalendarPref == true)
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
     // 结束本次经期：经期活跃期内始终显示入口（提前结束或延后，2~10 天内可用）
     val activeLog = logs.firstOrNull { it.startDateEpochDay <= today }
@@ -252,9 +255,10 @@ private fun CycleOverviewScreen(
             }
 
             // ===== 圆环周期图 / 日历视图 =====
+            // 设置值未加载完成（首帧）时不渲染，保证首帧即正确视图、无闪变
             // Crossfade 内部按 TopStart 摆放子项，必须包一层全宽居中 Box，否则切换瞬间圆环会在左侧闪现
             // animateContentSize 让圆环/日历高度差过渡平滑，下方内容跟随滑动而不是跳变
-            Crossfade(
+            if (defaultCalendarPref != null) Crossfade(
                 targetState = showCalendar,
                 modifier = Modifier.animateContentSize(),
                 label = "cycle_view"
@@ -296,8 +300,8 @@ private fun CycleOverviewScreen(
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    ViewToggle("圆环", selected = !showCalendar) { showCalendar = false }
-                    ViewToggle("日历", selected = showCalendar) { showCalendar = true }
+                    ViewToggle("圆环", selected = !showCalendar) { manualCalendar = false }
+                    ViewToggle("日历", selected = showCalendar) { manualCalendar = true }
                 }
             }
 
