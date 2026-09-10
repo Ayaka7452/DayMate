@@ -373,21 +373,22 @@ private fun CycleOverviewScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // ===== 操作按钮：2×2 网格（结束经期 / 修订上次经期 / 开始新经期 / 补记历史经期） =====
-            // 经期进行中「结束本次经期」可点（一键把持续天数调整为到今天）；已到/已过记录结束日置灰；
-            // 修订上次经期从轻量文字入口升级为按钮，与大按钮并排，四个按钮两行对齐
+            // ===== 操作按钮：2×2 网格，上排「结束 / 开始」对称，下排「修订 / 补记」 =====
+            // 经期进行中（今天未到记录结束日）：「结束本次经期」可点，「开始新经期」置灰；
+            // 已到/已过结束日：结束侧置灰（经期已结束），开始侧恢复可点——两个主按钮恰好一活一灰
             if (lastLog != null) {
+                val endDay = activeLog?.let { it.startDateEpochDay + it.periodDays - 1 }
+                val ongoing = endDay != null && today < endDay
+                val pastEnd = endDay != null && today > endDay
+                val alreadyToday = endDay != null && today == endDay
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (activeLog != null && activeDiff != null) {
-                        val endDay = activeLog.startDateEpochDay + activeLog.periodDays - 1
-                        val alreadyToday = today == endDay
-                        val pastEnd = today > endDay
                         Button(
                             onClick = { showEndConfirm = true },
-                            enabled = !alreadyToday && !pastEnd,
+                            enabled = ongoing,
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
@@ -400,30 +401,43 @@ private fun CycleOverviewScreen(
                             )
                         }
                     }
-                    OutlinedButton(
-                        onClick = { editingLog = lastLog },
-                        modifier = if (activeLog != null && activeDiff != null) Modifier.weight(1f)
-                        else Modifier.fillMaxWidth()
+                    Button(
+                        onClick = { showRegister = true },
+                        enabled = !ongoing,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("修订上次经期", maxLines = 1)
+                        Text(if (ongoing) "经期进行中" else "开始新经期", maxLines = 1)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-            }
-
-            // ===== 开始新经期 / 补记历史经期：常驻主视图操作行 =====
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Button(
-                    onClick = { showRegister = true },
-                    modifier = Modifier.weight(1f)
-                ) { Text("开始新经期") }
-                OutlinedButton(
-                    onClick = { showBackfill = true },
-                    modifier = Modifier.weight(1f)
-                ) { Text("补记历史经期") }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { editingLog = lastLog },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("修订上次经期", maxLines = 1) }
+                    OutlinedButton(
+                        onClick = { showBackfill = true },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("补记历史经期", maxLines = 1) }
+                }
+            } else {
+                // 无任何记录时的空状态操作行
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { showRegister = true },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("开始新经期") }
+                    OutlinedButton(
+                        onClick = { showBackfill = true },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("补记历史经期") }
+                }
             }
 
             Spacer(Modifier.height(16.dp))
