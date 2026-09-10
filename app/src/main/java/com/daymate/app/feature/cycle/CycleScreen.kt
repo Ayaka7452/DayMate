@@ -308,35 +308,31 @@ private fun CycleOverviewScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // ===== 结束本次经期 / 修订上次经期 =====
+            // ===== 结束本次经期 =====
+            // 经期进行中可点（一键把持续天数调整为到今天）；已到记录结束日置灰；
+            // 已过结束日 → 经期按记录自动结束，大按钮保持置灰展示，不再允许把结束日拖到今天
             if (activeLog != null && activeDiff != null) {
                 val endDay = activeLog.startDateEpochDay + activeLog.periodDays - 1
                 val alreadyToday = today == endDay
-                if (today <= endDay) {
-                    // 经期进行中：显示结束按钮，一键把持续天数调整为到今天
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                container.cycleRepository.update(activeLog.copy(periodDays = activeDiff))
-                                scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
-                            }
-                        },
-                        enabled = !alreadyToday,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            if (alreadyToday) "本次经期已记录到今天（共 " + activeDiff + " 天）"
-                            else "结束本次经期（到今天，共 " + activeDiff + " 天）"
-                        )
-                    }
-                } else {
-                    // 已过记录的结束日 → 经期自动结束；入口换成修订，防止把早已结束的经期一键拖到今天
-                    OutlinedButton(
-                        onClick = { editingLog = activeLog },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("修订上次经期（" + formatRange(activeLog.startDateEpochDay, activeLog.periodDays) + "）")
-                    }
+                val pastEnd = today > endDay
+                Button(
+                    onClick = {
+                        scope.launch {
+                            container.cycleRepository.update(activeLog.copy(periodDays = activeDiff))
+                            scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                        }
+                    },
+                    enabled = !alreadyToday && !pastEnd,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        when {
+                            pastEnd -> "本次经期已结束（" + formatRange(activeLog.startDateEpochDay, activeLog.periodDays) +
+                                "，共 " + activeLog.periodDays + " 天）"
+                            alreadyToday -> "本次经期已记录到今天（共 " + activeDiff + " 天）"
+                            else -> "结束本次经期（到今天，共 " + activeDiff + " 天）"
+                        }
+                    )
                 }
                 Spacer(Modifier.height(10.dp))
             }
@@ -354,6 +350,18 @@ private fun CycleOverviewScreen(
                     onClick = { showBackfill = true },
                     modifier = Modifier.weight(1f)
                 ) { Text("补记历史经期") }
+            }
+            // 修订上次经期：轻量文字入口，微调最近一次记录的起止日期（与大按钮分开）
+            if (lastLog != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "修订上次经期（" + formatRange(lastLog.startDateEpochDay, lastLog.periodDays) + "）",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable { editingLog = lastLog }
+                        .padding(vertical = 4.dp)
+                )
             }
 
             Spacer(Modifier.height(16.dp))
