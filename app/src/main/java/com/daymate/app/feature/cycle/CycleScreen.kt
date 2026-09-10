@@ -133,27 +133,30 @@ fun CycleScreen(
         onDispose { activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE) }
     }
 
-    if (locked) {
-        CycleUnlockGate(
-            container = container,
-            onUnlocked = { unlockedByUser = true },
-            onExit = onExit
-        )
-        return
-    }
-    // 主视图 ⇄ 设置页淡入淡出，避免生硬跳变
-    Crossfade(targetState = showSettings, label = "cycle_pages") { settings ->
-        if (settings) {
-            CycleSettingsScreen(
+    // 密码门 ⇄ 内容淡入淡出，解锁后不生硬跳变
+    Crossfade(targetState = locked, label = "cycle_gate") { isLocked ->
+        if (isLocked) {
+            CycleUnlockGate(
                 container = container,
-                onBack = { showSettings = false }
+                onUnlocked = { unlockedByUser = true },
+                onExit = onExit
             )
         } else {
-            CycleOverviewScreen(
-                container = container,
-                onExit = onExit,
-                onOpenSettings = { showSettings = true }
-            )
+            // 主视图 ⇄ 设置页淡入淡出，避免生硬跳变
+            Crossfade(targetState = showSettings, label = "cycle_pages") { settings ->
+                if (settings) {
+                    CycleSettingsScreen(
+                        container = container,
+                        onBack = { showSettings = false }
+                    )
+                } else {
+                    CycleOverviewScreen(
+                        container = container,
+                        onExit = onExit,
+                        onOpenSettings = { showSettings = true }
+                    )
+                }
+            }
         }
     }
 }
@@ -1546,17 +1549,23 @@ private fun CycleCalendarMonth(
                         if (dayNum in 1..daysInMonth) {
                             val epochDay = month.withDayOfMonth(dayNum).toEpochDay()
                             val phase = CycleCalculator.phaseOfAnyDay(epochDay, logEntries, cycleDays)
-                            val bg = when (phase) {
-                                CycleCalculator.Phase.PERIOD -> periodColor
-                                CycleCalculator.Phase.FOLLICULAR -> follicularColor
-                                CycleCalculator.Phase.OVULATION -> ovulationColor
-                                CycleCalculator.Phase.LUTEAL -> lutealColor
+                            // 预测经期日：落在推算的下次经期窗口内但未登记——保持蓝色不点亮，
+                            // 仅用浅色底 + 空心圆点与已登记（实心点亮）和卵泡期区分
+                            val predictedPeriod =
+                                phase == CycleCalculator.Phase.PERIOD && !loggedDays.contains(epochDay)
+                            val bg = when {
+                                predictedPeriod -> periodColor.copy(alpha = 0.14f)
+                                phase == CycleCalculator.Phase.PERIOD -> periodColor
+                                phase == CycleCalculator.Phase.FOLLICULAR -> follicularColor
+                                phase == CycleCalculator.Phase.OVULATION -> ovulationColor
+                                else -> lutealColor
                             }
-                            val fg = when (phase) {
-                                CycleCalculator.Phase.PERIOD -> onPrimaryColor
-                                CycleCalculator.Phase.FOLLICULAR -> onFollicularColor
-                                CycleCalculator.Phase.OVULATION -> onOvulationColor
-                                CycleCalculator.Phase.LUTEAL -> plainTextColor
+                            val fg = when {
+                                predictedPeriod -> plainTextColor
+                                phase == CycleCalculator.Phase.PERIOD -> onPrimaryColor
+                                phase == CycleCalculator.Phase.FOLLICULAR -> onFollicularColor
+                                phase == CycleCalculator.Phase.OVULATION -> onOvulationColor
+                                else -> plainTextColor
                             }
                             Column(
                                 modifier = Modifier
@@ -1572,10 +1581,17 @@ private fun CycleCalendarMonth(
                                     color = fg,
                                     fontWeight = if (epochDay == today) FontWeight.Bold else FontWeight.Normal
                                 )
-                                if (loggedDays.contains(epochDay)) {
-                                    Box(Modifier.size(4.dp).background(fg, CircleShape))
-                                } else {
-                                    Spacer(Modifier.height(4.dp))
+                                when {
+                                    loggedDays.contains(epochDay) ->
+                                        Box(Modifier.size(4.dp).background(fg, CircleShape))
+                                    predictedPeriod ->
+                                        // 空心圆点：预测的经期日（登记后变实心）
+                                        Box(
+                                            Modifier
+                                                .size(6.dp)
+                                                .border(1.2.dp, periodColor, CircleShape)
+                                        )
+                                    else -> Spacer(Modifier.height(4.dp))
                                 }
                             }
                             if (epochDay == today) {
@@ -1592,7 +1608,7 @@ private fun CycleCalendarMonth(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "底色 = 当日所处阶段；圆点 = 已登记的经期日",
+            "底色 = 当日所处阶段；实心圆点 = 已登记的经期日；空心圆点 = 预测的经期日",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
             textAlign = TextAlign.Center,

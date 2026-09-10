@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.view.WindowManager
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -125,24 +126,32 @@ fun VaultScreen(
     // 以便从主页「移入 Vault」等操作能正确用密钥加密。仅重置密码时清空（见下方）。
     val handleExit: () -> Unit = onExit
 
-    when {
-        unlocked -> VaultListScreen(
-            container,
-            onExit = handleExit,
-            onReset = { unlocked = false },
-            onNavigate = onNavigate
-        )
-        !passwordSet -> VaultSetupScreen(
-            container,
-            scope = scope,
-            onUnlocked = { unlocked = true },
-            onExit = handleExit
-        )
-        else -> VaultUnlockScreen(
-            container,
-            onUnlocked = { unlocked = true },
-            onExit = handleExit
-        )
+    // 解锁门 ⇄ 内容淡入淡出：解锁/设密完成不生硬跳变
+    val gateState = when {
+        unlocked -> "list"
+        !passwordSet -> "setup"
+        else -> "unlock"
+    }
+    Crossfade(targetState = gateState, label = "vault_gate") { state ->
+        when (state) {
+            "list" -> VaultListScreen(
+                container,
+                onExit = handleExit,
+                onReset = { unlocked = false },
+                onNavigate = onNavigate
+            )
+            "setup" -> VaultSetupScreen(
+                container,
+                scope = scope,
+                onUnlocked = { unlocked = true },
+                onExit = handleExit
+            )
+            else -> VaultUnlockScreen(
+                container,
+                onUnlocked = { unlocked = true },
+                onExit = handleExit
+            )
+        }
     }
 }
 
