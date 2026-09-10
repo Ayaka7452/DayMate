@@ -39,6 +39,14 @@ object CycleCalculator {
      */
     const val EARLY_PERIOD_THRESHOLD_DAYS = 7
 
+    /**
+     * 相邻两次「经期」首日最小间隔（天）：不重叠但间隔不足该值时视为明显不合理。
+     * 医学依据：FIGO 正常月经频发界限为周期 <24 天；考虑个体差异后，
+     * 间隔 <15 天的两次出血基本不可能是两次独立经期（多为经间期/排卵期出血），
+     * 故取 15 天作为「明显不合理」的提示阈值；15 天以上的短周期由提前 7 天规则覆盖。
+     */
+    const val MIN_PERIOD_INTERVAL_DAYS = 15
+
     /** 排卵期窗口：排卵日前 5 天 ～ 排卵日后 1 天。 */
     const val OVULATION_BEFORE = 5L
     const val OVULATION_AFTER = 1L
