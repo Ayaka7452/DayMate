@@ -24,10 +24,12 @@ class CycleEventBridge(
     /** 基于最近一次登记与生效周期设置（自动均值优先，回落手动值），递推出今天及之后的下一次预测首日。 */
     suspend fun nextPredictedStart(): Long? {
         val logs = cycleRepository.getAll()
-        if (logs.isEmpty()) return null
-        val lastStart = logs.maxOf { it.startDateEpochDay }
+        // 特殊情况记录（带备注的单日出血标记）不参与预测锚定
+        val realLogs = logs.filter { it.note == null }
+        if (realLogs.isEmpty()) return null
+        val lastStart = realLogs.maxOf { it.startDateEpochDay }
         val cycleDays = cycleRepository.effectiveCycleDays(
-            logs,
+            realLogs,
             settingsRepository.cycleDays.first(),
             settingsRepository.cycleCycleAuto.first()
         )

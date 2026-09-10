@@ -220,7 +220,8 @@ private fun CycleOverviewScreen(
     }
 
     val today = LocalDate.now().toEpochDay()
-    val lastLog = logs.firstOrNull()
+    // 推算锚点只用真正的经期记录；特殊情况记录（带备注的单日标记）不作为「上次经期」
+    val lastLog = logs.firstOrNull { it.note == null }
     val scope = rememberCoroutineScope()
     var showRegister by remember { mutableStateOf(false) }
     var showBackfill by remember { mutableStateOf(false) }
@@ -239,7 +240,8 @@ private fun CycleOverviewScreen(
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
     // 结束本次经期：仅当今天仍落在该次经期记录的区间内时提供入口；
     // 今天已越过记录结束日 → 经期按记录自动结束，同位置换成「修订上次经期」供微调
-    val activeLog = logs.firstOrNull { it.startDateEpochDay <= today }
+    // 结束本次经期：只对真正的经期记录响应；特殊情况记录（备注标记的单日出血）不参与
+    val activeLog = logs.firstOrNull { it.note == null && it.startDateEpochDay <= today }
     val activeDiff = activeLog?.let { (today - it.startDateEpochDay + 1).toInt() }
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
 
@@ -435,7 +437,7 @@ private fun CycleOverviewScreen(
                 val nextStart = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
                 val overdue = today >= nextStart
                 val phase = CycleCalculator.phaseOf(today, lastLog.startDateEpochDay, periodDays, cycleDays)
-                val ovuRange = CycleCalculator.ovulationRange(nextStart)
+                val ovuRange = CycleCalculator.ovulationWindow(lastLog.startDateEpochDay, periodDays, nextStart)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     InfoCard(
                         "上次经期",
@@ -460,7 +462,7 @@ private fun CycleOverviewScreen(
                     )
                     InfoCard(
                         "排卵日",
-                        formatDate(CycleCalculator.ovulationDay(nextStart)),
+                        formatDate(CycleCalculator.effectiveOvulationDay(lastLog.startDateEpochDay, periodDays, nextStart)),
                         "窗口 " + formatDate(ovuRange.first) + " ~ " + formatDate(ovuRange.last),
                         Modifier.weight(1f)
                     )
@@ -712,14 +714,14 @@ private fun CycleRing(
             val ringSize = Size(size.width - stroke, size.height - stroke)
             val topLeft = Offset(stroke / 2, stroke / 2)
 
-            // 分段（0-based 天偏移，clamp 保证有序且总和 = cycleDays）
-            val ovuWinStart = maxOf(periodDays.toFloat(), (cycleDays - 20).toFloat())
-            val lutealStart = maxOf(ovuWinStart + 0.5f, (cycleDays - 13).toFloat())
+            // 分段：与日历着色共用同一套动态推算（经期过长时排卵日/窗口自动后移收窄，
+            // 卵泡期保底 2 天，黄体期最短 11 天），总和恒等于周期天数
+            val seg = CycleCalculator.phaseSegments(lastStart ?: 0L, periodDays, cycleDays)
             val segments = listOf(
-                periodDays.toFloat() to periodColor,
-                (ovuWinStart - periodDays) to follicularColor,
-                (lutealStart - ovuWinStart) to ovulationColor,
-                (cycleDays - lutealStart) to lutealColor
+                seg[0].toFloat() to periodColor,
+                seg[1].toFloat() to follicularColor,
+                seg[2].toFloat() to ovulationColor,
+                seg[3].toFloat() to lutealColor
             )
             // 底环
             drawArc(
@@ -871,7 +873,8 @@ private fun CycleSettingsScreen(
     var showNeedLog by remember { mutableStateOf(false) }
 
     val today = LocalDate.now().toEpochDay()
-    val lastLog = logs.firstOrNull()
+    // 推算锚点只用真正的经期记录；特殊情况记录（带备注的单日标记）不作为「上次经期」
+    val lastLog = logs.firstOrNull { it.note == null }
     // 生效参数：自动开启且数据足够时按近 3 次记录均值推算，否则回落到手动设置值
     val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
     val periodDays = container.cycleRepository.effectivePeriodDays(logs, periodManual, periodAuto)
@@ -1076,7 +1079,8 @@ private fun CycleSettingsScreen(
 
             Spacer(Modifier.height(24.dp))
             Text(
-                "⚠️ 本功能采用日历法推算（黄体期按固定 14 天近似，排卵日 = 预测下次经期首日 − 14 天）。" +
+                "⚠️ 本功能采用日历法推算（排卵日 ≈ 预测下次经期首日 − 14 天；经期较长时排卵日与阶段划分自动微调，" +
+                    "卵泡期保底 2 天、黄体期最短 11 天，均在医学共识波动区间内）。" +
                     "周期受压力、作息、疾病等影响存在波动，结果仅供参考，不能作为避孕或医学诊断依据；" +
                     "如有月经异常或健康疑问，请咨询医生。",
                 style = MaterialTheme.typography.labelSmall,
@@ -1724,7 +1728,8 @@ private fun CycleCalendarMonth(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "底色 = 当日所处阶段；实心圆点 = 已登记的经期日；空心圆点 = 尚未到来的经期日（含预测）",
+            "底色代表当天所处阶段。\n" +
+                "实心圆点 = 已经来的经期日（登记过的）；空心圆点 = 还没来的经期日（预测的下次经期，到来后变实心）",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
             textAlign = TextAlign.Center,

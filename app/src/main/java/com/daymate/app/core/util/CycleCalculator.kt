@@ -43,6 +43,12 @@ object CycleCalculator {
     const val OVULATION_BEFORE = 5L
     const val OVULATION_AFTER = 1L
 
+    /** 动态推算保底：卵泡期最少天数（经期过长时排卵日/窗口后移收窄，保证卵泡期不被吃光）。 */
+    const val MIN_FOLLICULAR_DAYS = 2L
+
+    /** 动态推算保底：黄体期最短天数（医学共识黄体期波动 11~17 天，压缩仍在合理区间）。 */
+    const val MIN_LUTEAL_DAYS = 11L
+
     /** 周期天数合法区间（超出提醒用户确认，但不强制拦截——身体情况因人而异）。 */
     fun isCycleDaysValid(days: Int) = days in MIN_CYCLE_DAYS..MAX_CYCLE_DAYS
 
@@ -87,22 +93,46 @@ object CycleCalculator {
     fun ovulationDay(nextStartEpochDay: Long): Long =
         nextStartEpochDay - LUTEAL_DAYS
 
+    /**
+     * 动态排卵日：标准口径为下次经期首日 − 14。
+     * 经期较长挤占卵泡期时排卵日自动后移（卵泡期保底 MIN_FOLLICULAR_DAYS 天，
+     * 黄体期最短 MIN_LUTEAL_DAYS 天——仍在医学共识 11~17 天区间内），
+     * 避免「经期一长，卵泡期直接消失、经期后立刻排卵」的怪象。
+     */
+    fun effectiveOvulationDay(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): Long {
+        val standard = nextStartEpochDay - LUTEAL_DAYS
+        // 卵泡期保底 2 天：排卵日不得早于经期结束次日 + 保底天数
+        val earliest = startEpochDay + periodDays + MIN_FOLLICULAR_DAYS
+        // 黄体期最短 11 天：排卵日不得晚于下次经期首日 − 11
+        val latest = nextStartEpochDay - MIN_LUTEAL_DAYS
+        return maxOf(standard, earliest).coerceAtMost(latest)
+    }
+
     /** 一次经期的月经期区间 [首日, 首日 + periodDays − 1]。 */
     fun periodRange(startEpochDay: Long, periodDays: Int): LongRange =
         startEpochDay..(startEpochDay + periodDays - 1)
 
-    /** 排卵期窗口 [排卵日 − 5, 排卵日 + 1]。 */
-    fun ovulationRange(nextStartEpochDay: Long): LongRange =
-        (ovulationDay(nextStartEpochDay) - OVULATION_BEFORE)..(ovulationDay(nextStartEpochDay) + OVULATION_AFTER)
+    /**
+     * 动态排卵期窗口：默认排卵日前 5 ～ 后 1 天；经期过后空间不足时窗口自动收窄
+     * （保证窗口之前仍留有至少 MIN_FOLLICULAR_DAYS 天卵泡期）。
+     */
+    fun ovulationWindow(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange {
+        val ovu = effectiveOvulationDay(startEpochDay, periodDays, nextStartEpochDay)
+        val periodEnd = startEpochDay + periodDays - 1
+        val before = OVULATION_BEFORE
+            .coerceAtMost(ovu - periodEnd - MIN_FOLLICULAR_DAYS - 1)
+            .coerceAtLeast(0L)
+        return (ovu - before)..(ovu + OVULATION_AFTER)
+    }
 
-    /** 黄体期区间 [排卵日, 下次经期首日 − 1]（下次经期当天回到月经期）。 */
-    fun lutealRange(nextStartEpochDay: Long): LongRange =
-        ovulationDay(nextStartEpochDay)..(nextStartEpochDay - 1)
+    /** 黄体期区间 [动态排卵日, 下次经期首日 − 1]（下次经期当天回到月经期）。 */
+    fun lutealRange(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange =
+        effectiveOvulationDay(startEpochDay, periodDays, nextStartEpochDay)..(nextStartEpochDay - 1)
 
-    /** 卵泡期区间 [月经期结束次日, 排卵日前一日]；经期过长时可能为空区间。 */
+    /** 卵泡期区间 [月经期结束次日, 排卵期窗口前一日]。 */
     fun follicularRange(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange {
         val from = startEpochDay + periodDays
-        val to = ovulationDay(nextStartEpochDay) - 1
+        val to = ovulationWindow(startEpochDay, periodDays, nextStartEpochDay).first - 1
         return if (from <= to) from..to else LongRange.EMPTY
     }
 
@@ -111,8 +141,8 @@ object CycleCalculator {
         val nextStart = nextStartAfter(lastStartEpochDay, cycleDays)
         return when {
             todayEpochDay in periodRange(lastStartEpochDay, periodDays) -> Phase.PERIOD
-            todayEpochDay in ovulationRange(nextStart) -> Phase.OVULATION
-            todayEpochDay in lutealRange(nextStart) -> Phase.LUTEAL
+            todayEpochDay in ovulationWindow(lastStartEpochDay, periodDays, nextStart) -> Phase.OVULATION
+            todayEpochDay in lutealRange(lastStartEpochDay, periodDays, nextStart) -> Phase.LUTEAL
             todayEpochDay in follicularRange(lastStartEpochDay, periodDays, nextStart) -> Phase.FOLLICULAR
             // 今天已在预测周期之外（下次经期理论上今天或之前来但还没登记）：
             // 若落在以 lastStart + periodDays 为终点的经期区间之后，视为黄体期延迟，仍按黄体期提示
@@ -135,20 +165,40 @@ object CycleCalculator {
         for ((s, pd) in logsDesc) {
             if (epochDay in periodRange(s, pd)) return Phase.PERIOD
         }
-        var anchor = logsDesc.lastOrNull { it.first <= epochDay }?.first
-        if (anchor == null) {
-            val first = logsDesc.last().first
-            val k = (first - epochDay + cycleDays - 1) / cycleDays
-            anchor = first - k * cycleDays
+        // 锚点 = 最后一个不晚于目标日的记录（含其持续天数）；记录都在未来时向前虚拟推算
+        var anchorStart = logsDesc.lastOrNull { it.first <= epochDay }?.first
+        var anchorPd = logsDesc.lastOrNull { it.first <= epochDay }?.second
+        if (anchorStart == null || anchorPd == null) {
+            val first = logsDesc.last()
+            val k = (first.first - epochDay + cycleDays - 1) / cycleDays
+            anchorStart = first.first - k * cycleDays
+            anchorPd = first.second
         } else {
-            while (anchor + cycleDays <= epochDay) anchor += cycleDays
+            while (anchorStart + cycleDays <= epochDay) anchorStart += cycleDays
         }
-        val nextStart = anchor + cycleDays
+        val nextStart = anchorStart + cycleDays
         return when {
-            epochDay in ovulationRange(nextStart) -> Phase.OVULATION
-            epochDay in lutealRange(nextStart) -> Phase.LUTEAL
+            epochDay in ovulationWindow(anchorStart, anchorPd, nextStart) -> Phase.OVULATION
+            epochDay in lutealRange(anchorStart, anchorPd, nextStart) -> Phase.LUTEAL
             else -> Phase.FOLLICULAR
         }
+    }
+
+    /**
+     * 四阶段天数分段（月经期/卵泡期/排卵期/黄体期），总和 = 周期天数。
+     * 圆环分段与日历着色共用同一套动态推算，保证两个视图一致。
+     */
+    fun phaseSegments(startEpochDay: Long, periodDays: Int, cycleDays: Int): List<Int> {
+        val nextStart = startEpochDay + cycleDays
+        val window = ovulationWindow(startEpochDay, periodDays, nextStart)
+        // 病态输入（超长经期+超短周期）下窗口可能落在经期区间内，clamp 保证分段有序
+        val ovuFirst = maxOf(window.first, startEpochDay + periodDays)
+        val ovuLast = maxOf(window.last, ovuFirst).coerceAtMost(startEpochDay + cycleDays - 1)
+        val period = periodDays
+        val follicular = (ovuFirst - startEpochDay - periodDays).toInt().coerceAtLeast(0)
+        val ovulation = (ovuLast - ovuFirst + 1).toInt().coerceAtLeast(0)
+        val luteal = (cycleDays - period - follicular - ovulation).coerceAtLeast(0)
+        return listOf(period, follicular, ovulation, luteal)
     }
 
     enum class Phase(val label: String) {

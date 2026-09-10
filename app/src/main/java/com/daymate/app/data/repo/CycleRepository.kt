@@ -32,14 +32,16 @@ class CycleRepository(
 
     /**
      * 近 3 次实测周期均值（天）；不足 2 次记录返回 null。
-     * 传入记录会先按首日降序排列再计算。
+     * 特殊情况记录（带备注的单日出血标记）不参与推算，只做日历标记。
      */
     fun averageCycleDays(logs: List<CycleLogEntity>): Int? =
-        CycleCalculator.averageCycleDays(logs.map { it.startDateEpochDay }.sortedDescending())
+        CycleCalculator.averageCycleDays(
+            logs.filter { it.note == null }.map { it.startDateEpochDay }.sortedDescending()
+        )
 
-    /** 近 3 次记录的经期持续天数均值（天）；不足 2 条记录视为数据不足，返回 null。 */
+    /** 近 3 次记录的经期持续天数均值（天）；不足 2 条记录视为数据不足，返回 null。特殊记录不参与。 */
     fun averagePeriodDays(logs: List<CycleLogEntity>): Int? =
-        CycleCalculator.averagePeriodDays(logs.map { it.periodDays })
+        CycleCalculator.averagePeriodDays(logs.filter { it.note == null }.map { it.periodDays })
 
     /**
      * 生效周期天数：自动开启且能算出均值（≥2 条有效记录）时用近 3 次均值，
