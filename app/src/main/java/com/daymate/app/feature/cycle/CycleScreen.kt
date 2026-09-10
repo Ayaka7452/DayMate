@@ -161,6 +161,9 @@ fun CycleScreen(
     }
 }
 
+/** 登记/补记与已有记录日期重叠时的二次确认信息（作为特殊情况记录，可附备注）。 */
+private data class PendingSpecialLog(val startDay: Long, val days: Int)
+
 // ============================ 主视图（圆环） ============================
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -185,6 +188,8 @@ private fun CycleOverviewScreen(
     var showRegister by remember { mutableStateOf(false) }
     var showBackfill by remember { mutableStateOf(false) }
     var showTips by remember { mutableStateOf(false) }
+    // 登记/补记与已有记录日期重叠时的二次确认（可能为非经期出血的特殊情况，可附备注）
+    var pendingSpecial by remember { mutableStateOf<PendingSpecialLog?>(null) }
     // 默认视图：首帧同步读一次偏好（DataStore 在启动阶段已被主题等读取过，此处走内存缓存，耗时极短）。
     // 首帧即为正确视图，彻底避免「先空白/先圆环再切日历」的闪变；手动切换只改本页状态，不写回设置
     val initialCalendar = remember {
@@ -462,11 +467,20 @@ private fun CycleOverviewScreen(
                     registerState.selectedDateMillis?.let { millis ->
                         val day = Instant.ofEpochMilli(millis)
                             .atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
-                        scope.launch {
-                            container.cycleRepository.add(
-                                CycleLogEntity(startDateEpochDay = day, periodDays = periodDays)
-                            )
-                            scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                        // 与已有记录重叠：同一时段重复登记经期通常不合理，转二次确认（特殊情况）
+                        val overlap = logs.any {
+                            day <= it.startDateEpochDay + it.periodDays - 1 &&
+                                day + periodDays - 1 >= it.startDateEpochDay
+                        }
+                        if (overlap) {
+                            pendingSpecial = PendingSpecialLog(startDay = day, days = periodDays)
+                        } else {
+                            scope.launch {
+                                container.cycleRepository.add(
+                                    CycleLogEntity(startDateEpochDay = day, periodDays = periodDays)
+                                )
+                                scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                            }
                         }
                     }
                     showRegister = false
@@ -494,11 +508,20 @@ private fun CycleOverviewScreen(
                     enabled = valid,
                     onClick = {
                         if (startDay != null) {
-                            scope.launch {
-                                container.cycleRepository.add(
-                                    CycleLogEntity(startDateEpochDay = startDay, periodDays = days)
-                                )
-                                scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                            // 与已有记录重叠：同一时段重复登记经期通常不合理，转二次确认（特殊情况）
+                            val overlap = logs.any {
+                                startDay <= it.startDateEpochDay + it.periodDays - 1 &&
+                                    startDay + days - 1 >= it.startDateEpochDay
+                            }
+                            if (overlap) {
+                                pendingSpecial = PendingSpecialLog(startDay = startDay, days = days)
+                            } else {
+                                scope.launch {
+                                    container.cycleRepository.add(
+                                        CycleLogEntity(startDateEpochDay = startDay, periodDays = days)
+                                    )
+                                    scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                                }
                             }
                         }
                         showBackfill = false
@@ -522,6 +545,10 @@ private fun CycleOverviewScreen(
                     when {
                         startDay == null || selEnd == null -> "选择这次经期的开始与结束日期"
                         !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
+                        startDay != null && logs.any {
+                            startDay <= it.startDateEpochDay + it.periodDays - 1 &&
+                                startDay + days - 1 >= it.startDateEpochDay
+                        } -> "与已有记录重叠：保存时需确认是否作为特殊情况记录"
                         else -> "将记录 " + formatRange(startDay, days) + "，共 " + days + " 天"
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -537,6 +564,48 @@ private fun CycleOverviewScreen(
         }
     }
 
+    // 重叠二次确认弹窗：登记/补记区间与已有记录重叠时出现，可选填备注作为特殊情况保存
+    pendingSpecial?.let { pending ->
+        var noteText by remember(pending) { mutableStateOf("可能为非经期出血") }
+        AlertDialog(
+            onDismissRequest = { pendingSpecial = null },
+            title = { Text("日期与已有经期记录重叠") },
+            text = {
+                Column {
+                    Text(
+                        "所选区间（" + formatRange(pending.startDay, pending.days) +
+                            "）与已有经期记录重叠，同一时段重复登记经期通常不合理。" +
+                            "若期间确实出现了出血，可能是排卵期出血等非经期出血，建议留意观察；如有疑虑请咨询医生。"
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = noteText,
+                        onValueChange = { noteText = it.take(50) },
+                        label = { Text("备注（可选）") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val note = noteText.trim().ifEmpty { null }
+                    scope.launch {
+                        container.cycleRepository.add(
+                            CycleLogEntity(
+                                startDateEpochDay = pending.startDay,
+                                periodDays = pending.days,
+                                note = note
+                            )
+                        )
+                        runCatching { container.cycleEventBridge.syncEvent() }
+                    }
+                    pendingSpecial = null
+                }) { Text("作为特殊情况记录") }
+            },
+            dismissButton = { TextButton(onClick = { pendingSpecial = null }) { Text("取消") } }
+        )
+    }
+
     // 修订上次经期弹窗（与历史记录「调整」共用同一交互）
     if (editingLog != null) {
         val log = editingLog!!
@@ -544,9 +613,11 @@ private fun CycleOverviewScreen(
             log = log,
             logs = logs,
             onDismiss = { editingLog = null },
-            onSave = { startDay, days ->
+            onSave = { startDay, days, note ->
                 scope.launch {
-                    container.cycleRepository.update(log.copy(startDateEpochDay = startDay, periodDays = days))
+                    container.cycleRepository.update(
+                        log.copy(startDateEpochDay = startDay, periodDays = days, note = note)
+                    )
                     runCatching { container.cycleEventBridge.syncEvent() }
                     editingLog = null
                 }
@@ -1002,9 +1073,11 @@ private fun CycleSettingsScreen(
             log = log,
             logs = logs,
             onDismiss = { editingLog = null },
-            onSave = { startDay, days ->
+            onSave = { startDay, days, note ->
                 scope.launch {
-                    container.cycleRepository.update(log.copy(startDateEpochDay = startDay, periodDays = days))
+                    container.cycleRepository.update(
+                        log.copy(startDateEpochDay = startDay, periodDays = days, note = note)
+                    )
                     runCatching { container.cycleEventBridge.syncEvent() }
                     editingLog = null
                 }
@@ -1089,12 +1162,13 @@ private fun CycleLogEditDialog(
     log: CycleLogEntity,
     logs: List<CycleLogEntity>,
     onDismiss: () -> Unit,
-    onSave: (startDay: Long, days: Int) -> Unit
+    onSave: (startDay: Long, days: Int, note: String?) -> Unit
 ) {
     val editState = rememberDateRangePickerState(
         initialSelectedStartDateMillis = log.startDateEpochDay * 86400000L,
         initialSelectedEndDateMillis = (log.startDateEpochDay + log.periodDays - 1) * 86400000L
     )
+    var noteText by remember(log.id) { mutableStateOf(log.note ?: "") }
     val selStart = editState.selectedStartDateMillis
     val selEnd = editState.selectedEndDateMillis
     val startDay = selStart?.let {
@@ -1114,7 +1188,11 @@ private fun CycleLogEditDialog(
         confirmButton = {
             TextButton(
                 enabled = valid && !overlap,
-                onClick = { if (startDay != null) onSave(startDay, days) }
+                onClick = {
+                    if (startDay != null) {
+                        onSave(startDay, days, noteText.trim().ifEmpty { null })
+                    }
+                }
             ) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
@@ -1144,7 +1222,16 @@ private fun CycleLogEditDialog(
             DateRangePicker(
                 state = editState,
                 showModeToggle = false,
-                modifier = Modifier.height(420.dp)
+                modifier = Modifier.height(360.dp)
+            )
+            OutlinedTextField(
+                value = noteText,
+                onValueChange = { noteText = it.take(50) },
+                label = { Text("备注（特殊情况说明，可选）") },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 4.dp)
             )
         }
     }
@@ -1392,6 +1479,13 @@ private fun CycleHistoryScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
+                            log.note?.let { note ->
+                                Text(
+                                    "备注：" + note,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                            }
                         }
                         TextButton(onClick = { onEdit(log) }) { Text("调整") }
                         IconButton(onClick = { onDelete(log) }) {
@@ -1549,19 +1643,19 @@ private fun CycleCalendarMonth(
                         if (dayNum in 1..daysInMonth) {
                             val epochDay = month.withDayOfMonth(dayNum).toEpochDay()
                             val phase = CycleCalculator.phaseOfAnyDay(epochDay, logEntries, cycleDays)
-                            // 预测经期日：落在推算的下次经期窗口内但未登记——保持蓝色不点亮，
-                            // 仅用浅色底 + 空心圆点与已登记（实心点亮）和卵泡期区分
-                            val predictedPeriod =
-                                phase == CycleCalculator.Phase.PERIOD && !loggedDays.contains(epochDay)
+                            // 未来经期日不点亮：预测的下次经期，或已登记但尚未到来的区间尾部——
+                            // 统一浅蓝底 + 空心圆点，与已到来（实心点亮）和卵泡期区分
+                            val futurePeriod =
+                                phase == CycleCalculator.Phase.PERIOD && epochDay > today
                             val bg = when {
-                                predictedPeriod -> periodColor.copy(alpha = 0.14f)
+                                futurePeriod -> periodColor.copy(alpha = 0.14f)
                                 phase == CycleCalculator.Phase.PERIOD -> periodColor
                                 phase == CycleCalculator.Phase.FOLLICULAR -> follicularColor
                                 phase == CycleCalculator.Phase.OVULATION -> ovulationColor
                                 else -> lutealColor
                             }
                             val fg = when {
-                                predictedPeriod -> plainTextColor
+                                futurePeriod -> plainTextColor
                                 phase == CycleCalculator.Phase.PERIOD -> onPrimaryColor
                                 phase == CycleCalculator.Phase.FOLLICULAR -> onFollicularColor
                                 phase == CycleCalculator.Phase.OVULATION -> onOvulationColor
@@ -1584,8 +1678,8 @@ private fun CycleCalendarMonth(
                                 when {
                                     loggedDays.contains(epochDay) ->
                                         Box(Modifier.size(4.dp).background(fg, CircleShape))
-                                    predictedPeriod ->
-                                        // 空心圆点：预测的经期日（登记后变实心）
+                                    futurePeriod ->
+                                        // 空心圆点：尚未到来的经期日（到来/登记确认后变实心）
                                         Box(
                                             Modifier
                                                 .size(6.dp)
@@ -1608,7 +1702,7 @@ private fun CycleCalendarMonth(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "底色 = 当日所处阶段；实心圆点 = 已登记的经期日；空心圆点 = 预测的经期日",
+            "底色 = 当日所处阶段；实心圆点 = 已登记的经期日；空心圆点 = 尚未到来的经期日（含预测）",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
             textAlign = TextAlign.Center,
