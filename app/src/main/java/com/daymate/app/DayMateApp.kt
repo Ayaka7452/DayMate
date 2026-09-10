@@ -1,6 +1,11 @@
 package com.ayaka7452.daymate
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.res.Configuration
 import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 import com.ayaka7452.daymate.core.AppContainer
@@ -38,6 +43,38 @@ class DayMateApp : Application() {
         // 小组件跨天精确刷新：应用起来后续订下一个午夜的刷新闹钟
         runCatching {
             com.ayaka7452.daymate.widget.WidgetRefreshScheduler.scheduleNextMidnight(this)
+        }
+        registerUiModeWatcher()
+    }
+
+    /**
+     * 系统深浅色切换时即时重绘小组件。
+     * ACTION_CONFIGURATION_CHANGED 自 Android 8.0 起只投递给「运行时注册」的接收器
+     * （manifest 静态注册收不到），故在进程存活期间动态注册；
+     * 切换深浅色会重建 Activity 但进程不死，因此该接收器几乎总能收到。
+     * 进程死亡期间被切换的情况，由启动时的 uiMode 对比兜底（见下）。
+     */
+    private fun registerUiModeWatcher() {
+        val prefs = getSharedPreferences("widget_uimode", MODE_PRIVATE)
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action != Intent.ACTION_CONFIGURATION_CHANGED) return
+                val mode = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+                if (prefs.getInt("last_ui_mode", -1) == mode) return // 非 uiMode 相关的配置变化，跳过
+                prefs.edit().putInt("last_ui_mode", mode).apply()
+                com.ayaka7452.daymate.widget.WidgetRenderer.onSystemConfigurationChanged(applicationContext)
+            }
+        }
+        runCatching {
+            registerReceiver(receiver, IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED))
+        }
+        // 进程刚启动：若系统深浅色在进程死亡期间被切换过，立即重绘一次
+        val mode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        if (prefs.getInt("last_ui_mode", -1) != mode) {
+            prefs.edit().putInt("last_ui_mode", mode).apply()
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                runCatching { com.ayaka7452.daymate.widget.WidgetRenderer.refreshAll(this@DayMateApp) }
+            }
         }
     }
 

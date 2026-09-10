@@ -56,6 +56,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
@@ -170,6 +171,13 @@ fun CycleScreen(
 
 /** 登记/补记在不合理时间时（与已有记录重叠 / 比预测经期提前超过阈值）的二次确认信息。 */
 private data class PendingSpecialLog(val startDay: Long, val days: Int, val reason: String)
+
+/** 日期选择器共用：禁选未来日期——经期的开始不可能是未来（登记/补记/修订统一限制）。 */
+@OptIn(ExperimentalMaterial3Api::class)
+private val pastAndTodayOnly = object : SelectableDates {
+    override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+        utcTimeMillis <= LocalDate.now().toEpochDay() * 86400000L
+}
 
 // ============================ 主视图（圆环） ============================
 
@@ -487,7 +495,8 @@ private fun CycleOverviewScreen(
     if (showRegister) {
         // 默认选中今天：直接点确定即登记今天，避免不触摸日期选择器时静默无效果
         val registerState = rememberDatePickerState(
-            initialSelectedDateMillis = today * 86400000L
+            initialSelectedDateMillis = today * 86400000L,
+            selectableDates = pastAndTodayOnly
         )
         DatePickerDialog(
             onDismissRequest = { showRegister = false },
@@ -515,7 +524,7 @@ private fun CycleOverviewScreen(
 
     // 补记历史经期：区间选择（几号到几号），纯补充记录
     if (showBackfill) {
-        val rangeState = rememberDateRangePickerState()
+        val rangeState = rememberDateRangePickerState(selectableDates = pastAndTodayOnly)
         val selStart = rangeState.selectedStartDateMillis
         val selEnd = rangeState.selectedEndDateMillis
         val startDay = selStart?.let {
@@ -587,7 +596,7 @@ private fun CycleOverviewScreen(
             title = { Text("确认作为特殊情况记录？") },
             text = {
                 Column {
-                    Text(pending.reason + "。可作为特殊情况记录并附备注。")
+                    Text(pending.reason + "。\n特殊情况只标记当天（单日记录），不会按经期天数向后延伸。可附备注说明。")
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = noteText,
@@ -601,10 +610,11 @@ private fun CycleOverviewScreen(
                 TextButton(onClick = {
                     val note = noteText.trim().ifEmpty { null }
                     scope.launch {
+                        // 特殊情况（非经期出血等）只标记当天：单日记录，不污染经期天数均值与预测
                         container.cycleRepository.add(
                             CycleLogEntity(
                                 startDateEpochDay = pending.startDay,
-                                periodDays = pending.days,
+                                periodDays = 1,
                                 note = note
                             )
                         )
@@ -1177,7 +1187,8 @@ private fun CycleLogEditDialog(
 ) {
     val editState = rememberDateRangePickerState(
         initialSelectedStartDateMillis = log.startDateEpochDay * 86400000L,
-        initialSelectedEndDateMillis = (log.startDateEpochDay + log.periodDays - 1) * 86400000L
+        initialSelectedEndDateMillis = (log.startDateEpochDay + log.periodDays - 1) * 86400000L,
+        selectableDates = pastAndTodayOnly
     )
     var noteText by remember(log.id) { mutableStateOf(log.note ?: "") }
     val selStart = editState.selectedStartDateMillis
