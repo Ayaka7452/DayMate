@@ -257,6 +257,9 @@ private fun CycleOverviewScreen(
     // 结束本次经期：只对真正的经期记录响应；特殊情况记录（备注标记的单日出血）不参与
     val activeLog = logs.firstOrNull { it.note == null && it.startDateEpochDay <= today }
     val activeDiff = activeLog?.let { (today - it.startDateEpochDay + 1).toInt() }
+    // 今天恰好是本次经期记录的最后一天（已结束/记录到今天）：阶段显示用「今日结束」而非「月经期」
+    val todayIsPeriodEnd =
+        activeLog != null && today == activeLog.startDateEpochDay + activeLog.periodDays - 1
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
 
     Scaffold(
@@ -344,7 +347,8 @@ private fun CycleOverviewScreen(
                             lastStart = lastLog?.startDateEpochDay,
                             periodDays = periodDays,
                             cycleDays = cycleDays,
-                            today = today
+                            today = today,
+                            todayIsPeriodEnd = todayIsPeriodEnd
                         )
                     }
                 }
@@ -406,7 +410,7 @@ private fun CycleOverviewScreen(
                         enabled = !ongoing,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (ongoing) "经期进行中" else "开始新经期", maxLines = 1)
+                        Text(if (ongoing) "月经期间，辛苦了" else "开始新经期", maxLines = 1)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -472,7 +476,7 @@ private fun CycleOverviewScreen(
                     )
                     InfoCard(
                         "当前阶段",
-                        phase.label,
+                        if (todayIsPeriodEnd) "今日结束" else phase.label,
                         "周期第 " + (today - lastLog.startDateEpochDay + 1) + " 天",
                         Modifier.weight(1f)
                     )
@@ -752,7 +756,8 @@ private fun CycleRing(
     lastStart: Long?,
     periodDays: Int,
     cycleDays: Int,
-    today: Long
+    today: Long,
+    todayIsPeriodEnd: Boolean = false
 ) {
     // 颜色在 Composable 体内解析（Canvas 绘制闭包里不能调用 composable）
     val periodColor = MaterialTheme.colorScheme.primary
@@ -827,12 +832,13 @@ private fun CycleRing(
             val phase = CycleCalculator.phaseOf(today, lastStart, periodDays, cycleDays)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    phase.label,
+                    if (todayIsPeriodEnd) "今日结束" else phase.label,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = when (phase) {
-                        CycleCalculator.Phase.PERIOD -> periodColor
-                        CycleCalculator.Phase.OVULATION -> ovulationColor
+                    color = when {
+                        todayIsPeriodEnd -> periodColor
+                        phase == CycleCalculator.Phase.PERIOD -> periodColor
+                        phase == CycleCalculator.Phase.OVULATION -> ovulationColor
                         else -> onSurfaceColor
                     }
                 )

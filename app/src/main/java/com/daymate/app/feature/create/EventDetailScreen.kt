@@ -232,7 +232,9 @@ private fun countdownDisplay(e: EventEntity): CountdownDisplay {
     val hasRef = e.refDays != null && e.refDays > 0
 
     // 主数字：优先按显示单位取整，不足一个单位退回更小单位
-    var n = diffDays
+    // 统一显示正数：天按绝对值，月/年因 Period 已按过去方向计算本就为正；
+    // 是否已过由下方 caption（距离目标日期 / 目标日期已过去）明确提示
+    var n = if (isFuture) diffDays else -diffDays
     var u = "天"
     when (e.displayUnit) {
         CountdownCalculator.UNIT_YEAR -> when {
