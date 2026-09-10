@@ -651,8 +651,7 @@ private fun CycleOverviewScreen(
                 text = {
                     Text(
                         "将把本次经期记录为 " + formatRange(log.startDateEpochDay, diff) + "，共 " + diff +
-                            " 天；今天（" + formatDate(today) + "）计为经期的最后一天，之后出血请单独补记。" +
-                            "如果想让它昨天就结束，请改用「修订上次经期」。"
+                            " 天；今天（" + formatDate(today) + "）计为经期的最后一天。如有错误，请进行补记或修订。"
                     )
                 },
                 confirmButton = {
