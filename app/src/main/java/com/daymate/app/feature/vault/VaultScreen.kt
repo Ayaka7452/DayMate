@@ -102,7 +102,9 @@ import android.widget.Toast
 import com.ayaka7452.daymate.feature.home.AddSheet
 import com.ayaka7452.daymate.feature.home.SelectionDot
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -114,8 +116,15 @@ fun VaultScreen(
     onExit: () -> Unit,
     onNavigate: (String) -> Unit
 ) {
+    // 密码状态：首帧同步读一次偏好（DataStore 已被主题读取预热），避免首帧按「未设密」
+    // 闪现设密页、下一帧才切到解锁门；后续仍跟随设置变化
+    val initialPasswordSet = remember {
+        runCatching {
+            runBlocking { container.settingsRepository.vaultPasswordSet.first() }
+        }.getOrDefault(false)
+    }
     val passwordSet by container.settingsRepository.vaultPasswordSet
-        .collectAsState(initial = false)
+        .collectAsState(initial = initialPasswordSet)
     // 提升到 VaultScreen 级别的 scope：设密时 passwordSet 翻转会先把 setup 子组合移除，
     // 若 setup 用自己的 rememberCoroutineScope 跑 onUnlocked()，协程会被取消，
     // 导致 unlocked 永远置不上、用户设完密码还要再输一遍。用稳定 scope 避免此问题。

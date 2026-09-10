@@ -373,17 +373,17 @@ fun HomeScreen(
                                     onClick = { menuExpanded = false; enterSelection() }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Vault") },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onNavigate(Routes.VAULT)
-                                    }
-                                )
-                                DropdownMenuItem(
                                     text = { Text("周期管家") },
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.CYCLE)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Vault") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigate(Routes.VAULT)
                                     }
                                 )
                                 DropdownMenuItem(

@@ -112,8 +112,15 @@ fun CycleScreen(
     container: AppContainer,
     onExit: () -> Unit
 ) {
+    // 密码开关：首帧同步读一次偏好（DataStore 已被主题读取预热，走内存缓存），
+    // 避免首帧按「未设密码」渲染内容、下一帧才切到密码门的闪现；后续仍跟随设置变化
+    val initialPasswordEnabled = remember {
+        runCatching {
+            runBlocking { container.settingsRepository.cyclePasswordEnabled.first() }
+        }.getOrDefault(false)
+    }
     val passwordEnabled by container.settingsRepository.cyclePasswordEnabled
-        .collectAsState(initial = false)
+        .collectAsState(initial = initialPasswordEnabled)
     // 本次会话是否已通过验证。锁定态必须派生：collectAsState 首帧 initial=false，
     // 若直接 mutableStateOf(!passwordEnabled) 会在数据到达前把 unlocked 固定为 true，密码门永远不弹
     var unlockedByUser by remember { mutableStateOf(false) }
