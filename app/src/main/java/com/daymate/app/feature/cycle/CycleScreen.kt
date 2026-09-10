@@ -168,8 +168,8 @@ fun CycleScreen(
     }
 }
 
-/** 登记/补记与已有记录日期重叠时的二次确认信息（作为特殊情况记录，可附备注）。 */
-private data class PendingSpecialLog(val startDay: Long, val days: Int)
+/** 登记/补记在不合理时间时（与已有记录重叠 / 比预测经期提前超过阈值）的二次确认信息。 */
+private data class PendingSpecialLog(val startDay: Long, val days: Int, val reason: String)
 
 // ============================ 主视图（圆环） ============================
 
@@ -188,6 +188,28 @@ private fun CycleOverviewScreen(
     // 生效参数：自动开启且数据足够时按近 3 次记录均值推算，否则回落到手动设置值
     val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
     val periodDays = container.cycleRepository.effectivePeriodDays(logs, periodManual, periodAuto)
+
+    // 登记/补记在不合理时间的判断：返回提示文案（null=合理，直接保存）
+    //  ① 与已有记录重叠：同一时段重复登记经期通常不合理
+    //  ② 比预测下次经期提前超过 7 天（FIGO：相邻周期波动 ≤7~9 天属正常，超此范围可能为非经期出血）
+    fun unreasonableLogReason(day: Long, days: Int): String? {
+        val last = logs.firstOrNull()?.startDateEpochDay
+            ?: return null
+        if (logs.any {
+                day <= it.startDateEpochDay + it.periodDays - 1 &&
+                    day + days - 1 >= it.startDateEpochDay
+            }
+        ) {
+            return "所选日期与已有经期记录重叠，同一时段重复登记经期通常不合理"
+        }
+        val next = CycleCalculator.nextStartAfter(last, cycleDays)
+        if (day > last && day < next - CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS) {
+            return "所选开始日期比预测下次经期（" + formatDate(next) + "）提前了 " + (next - day) +
+                " 天（提前超过 " + CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS +
+                " 天属异常出血范围），可能是排卵期出血等非经期出血，建议咨询医生"
+        }
+        return null
+    }
 
     val today = LocalDate.now().toEpochDay()
     val lastLog = logs.firstOrNull()
@@ -474,20 +496,14 @@ private fun CycleOverviewScreen(
                     registerState.selectedDateMillis?.let { millis ->
                         val day = Instant.ofEpochMilli(millis)
                             .atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
-                        // 与已有记录重叠：同一时段重复登记经期通常不合理，转二次确认（特殊情况）
-                        val overlap = logs.any {
-                            day <= it.startDateEpochDay + it.periodDays - 1 &&
-                                day + periodDays - 1 >= it.startDateEpochDay
-                        }
-                        if (overlap) {
-                            pendingSpecial = PendingSpecialLog(startDay = day, days = periodDays)
-                        } else {
-                            scope.launch {
+                        when (val prompt = unreasonableLogReason(day, periodDays)) {
+                            null -> scope.launch {
                                 container.cycleRepository.add(
                                     CycleLogEntity(startDateEpochDay = day, periodDays = periodDays)
                                 )
                                 scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
                             }
+                            else -> pendingSpecial = PendingSpecialLog(day, periodDays, prompt)
                         }
                     }
                     showRegister = false
@@ -515,20 +531,14 @@ private fun CycleOverviewScreen(
                     enabled = valid,
                     onClick = {
                         if (startDay != null) {
-                            // 与已有记录重叠：同一时段重复登记经期通常不合理，转二次确认（特殊情况）
-                            val overlap = logs.any {
-                                startDay <= it.startDateEpochDay + it.periodDays - 1 &&
-                                    startDay + days - 1 >= it.startDateEpochDay
-                            }
-                            if (overlap) {
-                                pendingSpecial = PendingSpecialLog(startDay = startDay, days = days)
-                            } else {
-                                scope.launch {
+                            when (val prompt = unreasonableLogReason(startDay, days)) {
+                                null -> scope.launch {
                                     container.cycleRepository.add(
                                         CycleLogEntity(startDateEpochDay = startDay, periodDays = days)
                                     )
                                     scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
                                 }
+                                else -> pendingSpecial = PendingSpecialLog(startDay, days, prompt)
                             }
                         }
                         showBackfill = false
@@ -552,10 +562,8 @@ private fun CycleOverviewScreen(
                     when {
                         startDay == null || selEnd == null -> "选择这次经期的开始与结束日期"
                         !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
-                        startDay != null && logs.any {
-                            startDay <= it.startDateEpochDay + it.periodDays - 1 &&
-                                startDay + days - 1 >= it.startDateEpochDay
-                        } -> "与已有记录重叠：保存时需确认是否作为特殊情况记录"
+                        startDay != null && unreasonableLogReason(startDay, days) != null ->
+                            "时间不合理（与已有记录重叠或提前过多）：保存时需确认是否作为特殊情况记录"
                         else -> "将记录 " + formatRange(startDay, days) + "，共 " + days + " 天"
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -576,14 +584,10 @@ private fun CycleOverviewScreen(
         var noteText by remember(pending) { mutableStateOf("可能为非经期出血") }
         AlertDialog(
             onDismissRequest = { pendingSpecial = null },
-            title = { Text("日期与已有经期记录重叠") },
+            title = { Text("确认作为特殊情况记录？") },
             text = {
                 Column {
-                    Text(
-                        "所选区间（" + formatRange(pending.startDay, pending.days) +
-                            "）与已有经期记录重叠，同一时段重复登记经期通常不合理。" +
-                            "若期间确实出现了出血，可能是排卵期出血等非经期出血，建议留意观察；如有疑虑请咨询医生。"
-                    )
+                    Text(pending.reason + "。可作为特殊情况记录并附备注。")
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = noteText,

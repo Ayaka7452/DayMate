@@ -32,6 +32,13 @@ object CycleCalculator {
     /** 黄体期固定长度（天）：排卵日 = 下次经期首日 − LUTEAL_DAYS。 */
     const val LUTEAL_DAYS = 14L
 
+    /**
+     * 提前天数阈值：距预测下次经期提前超过该天数登记经期，视为可能非经期出血。
+     * 医学依据：FIGO/ACOG 正常月经标准为周期 24~38 天、相邻周期波动 ≤7~9 天，
+     * 提前 7 天内的出血仍属正常波动；提前超过 7 天（周期 <21 天左右）属频发出血/异常范围。
+     */
+    const val EARLY_PERIOD_THRESHOLD_DAYS = 7
+
     /** 排卵期窗口：排卵日前 5 天 ～ 排卵日后 1 天。 */
     const val OVULATION_BEFORE = 5L
     const val OVULATION_AFTER = 1L
