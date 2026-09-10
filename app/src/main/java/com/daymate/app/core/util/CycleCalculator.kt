@@ -64,10 +64,10 @@ object CycleCalculator {
 
     /**
      * 近 N 次（最多 3 次）记录的经期持续天数均值：传入按日期降序记录的 periodDays 列表。
-     * 无记录时返回 null。单条记录也能得出均值（该条本身就是样本）。
+     * 与周期均值同口径：不足 2 条记录视为数据不满足测算要求，返回 null（回落手动值）。
      */
     fun averagePeriodDays(periodDaysDesc: List<Int>): Int? {
-        if (periodDaysDesc.isEmpty()) return null
+        if (periodDaysDesc.size < 2) return null
         val sample = periodDaysDesc.take(AVG_WINDOW)
         return Math.round(sample.sum().toDouble() / sample.size).toInt()
     }

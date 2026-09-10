@@ -89,7 +89,9 @@ import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.security.VaultCrypto
 import com.ayaka7452.daymate.core.util.CycleCalculator
 import com.ayaka7452.daymate.data.db.CycleLogEntity
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -180,13 +182,15 @@ private fun CycleOverviewScreen(
     var showRegister by remember { mutableStateOf(false) }
     var showBackfill by remember { mutableStateOf(false) }
     var showTips by remember { mutableStateOf(false) }
-    // 默认视图来自设置；手动切换只改本页状态，不写回设置。
-    // collectAsState initial=null：设置值加载完成前不渲染视图区——
-    // 若用 initial=false，默认日历的用户会先看到一帧圆环再淡出成日历（首帧闪变）
-    val defaultCalendarPref by container.settingsRepository.cycleDefaultCalendar
-        .collectAsState(initial = null as Boolean?)
-    var manualCalendar by remember(defaultCalendarPref) { mutableStateOf<Boolean?>(null) }
-    val showCalendar = manualCalendar ?: (defaultCalendarPref == true)
+    // 默认视图：首帧同步读一次偏好（DataStore 在启动阶段已被主题等读取过，此处走内存缓存，耗时极短）。
+    // 首帧即为正确视图，彻底避免「先空白/先圆环再切日历」的闪变；手动切换只改本页状态，不写回设置
+    val initialCalendar = remember {
+        runCatching {
+            runBlocking { container.settingsRepository.cycleDefaultCalendar.first() }
+        }.getOrDefault(false)
+    }
+    var manualCalendar by remember { mutableStateOf<Boolean?>(null) }
+    val showCalendar = manualCalendar ?: initialCalendar
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
     // 结束本次经期：仅当今天仍落在该次经期记录的区间内时提供入口；
     // 今天已越过记录结束日 → 经期按记录自动结束，同位置换成「修订上次经期」供微调
@@ -256,10 +260,10 @@ private fun CycleOverviewScreen(
             }
 
             // ===== 圆环周期图 / 日历视图 =====
-            // 设置值未加载完成（首帧）时不渲染，保证首帧即正确视图、无闪变
+            // 首帧即按默认视图渲染（偏好已在上方同步读取），无闪变
             // Crossfade 内部按 TopStart 摆放子项，必须包一层全宽居中 Box，否则切换瞬间圆环会在左侧闪现
             // animateContentSize 让圆环/日历高度差过渡平滑，下方内容跟随滑动而不是跳变
-            if (defaultCalendarPref != null) Crossfade(
+            Crossfade(
                 targetState = showCalendar,
                 modifier = Modifier.animateContentSize(),
                 label = "cycle_view"
@@ -837,7 +841,8 @@ private fun CycleSettingsScreen(
                 label = "周期天数",
                 value = cycleDays,
                 range = CycleCalculator.MIN_CYCLE_DAYS..CycleCalculator.MAX_CYCLE_DAYS,
-                enabled = !cycleAuto
+                // 数据不满足测算要求时生效值就是手动值，± 应保持可用
+                enabled = !cycleAuto || avg == null
             ) { v ->
                 scope.launch {
                     container.settingsRepository.setCycleDays(v)
@@ -864,7 +869,8 @@ private fun CycleSettingsScreen(
                 label = "经期持续天数",
                 value = periodDays,
                 range = CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS,
-                enabled = !periodAuto
+                // 数据不满足测算要求时生效值就是手动值，± 应保持可用
+                enabled = !periodAuto || periodAvg == null
             ) { v ->
                 scope.launch {
                     container.settingsRepository.setCyclePeriodDays(v)
