@@ -1735,7 +1735,7 @@ private fun CycleCalendarMonth(
                             val futurePeriod =
                                 phase == CycleCalculator.Phase.PERIOD && epochDay > today
                             val bg = when {
-                                futurePeriod -> periodColor.copy(alpha = 0.14f)
+                                futurePeriod -> periodColor.copy(alpha = 0.18f)
                                 phase == CycleCalculator.Phase.PERIOD -> periodColor
                                 phase == CycleCalculator.Phase.FOLLICULAR -> follicularColor
                                 phase == CycleCalculator.Phase.OVULATION -> ovulationColor

@@ -184,6 +184,9 @@ object CycleCalculator {
         } else {
             while (anchorStart + cycleDays <= epochDay) anchorStart += cycleDays
         }
+        // 锚点推进后的预测周期：目标日落在锚点经期区间内 → 预测的未来经期日
+        // （此前漏判，预测经期首日会被渲染成卵泡期/黄体期，日历上从未点亮）
+        if (epochDay in periodRange(anchorStart, anchorPd)) return Phase.PERIOD
         val nextStart = anchorStart + cycleDays
         return when {
             epochDay in ovulationWindow(anchorStart, anchorPd, nextStart) -> Phase.OVULATION
