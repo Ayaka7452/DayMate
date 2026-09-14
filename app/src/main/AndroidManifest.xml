@@ -6,6 +6,8 @@
     <!-- 小组件跨天/开机刷新：接收 BOOT_COMPLETED 必须声明该权限，否则广播不会投递 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!--WebDAV 备份可配置为 http://（局域网/自建 NAS）：
+        Android 9+ 默认拒绝明文流量，此处显式放开，否则 HTTP 服务器无法连接。-->
     <application
         android:name=".DayMateApp"
         android:allowBackup="false"
@@ -13,6 +15,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.DayMate">
 
         <activity

@@ -19,6 +19,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val VAULT_BIOMETRIC = booleanPreferencesKey("vault_biometric_enabled")
         private val DEFAULT_SORT = stringPreferencesKey("default_sort")        // remaining_asc 等
         private val AUTO_BACKUP = booleanPreferencesKey("auto_backup_enabled")  // 修改后自动备份，默认开启
+        private val BACKUP_TARGET = stringPreferencesKey("backup_target")      // 备份位置：local / both / cloud
         private val HOME_TOP_CARD = stringPreferencesKey("home_top_card")       // festival / event / off
         private val HOME_BADGE_EMOJI = stringPreferencesKey("home_badge_emoji") // 节日卡片右侧角标，默认 ☀️
         private val COLOR_MODE = stringPreferencesKey("color_mode")            // white(默认) / system / blue / green / orange / purple
@@ -71,7 +72,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
      *  - `both`：本地 + WebDAV 云端各留一份；
      *  - `cloud`：仅 WebDAV 云端（本地文件夹可留作手动导入导出）。
      */
-    val backupTarget: Flow<String> = dataStore.data.map { it[BACKUP_TARGET] ?: "local" }
+    val backupTarget: Flow<String> = dataStore.data.map { it[BACKUP_TARGET] ?: BACKUP_TARGET_LOCAL }
 
     suspend fun setBackupTarget(target: String) {
         dataStore.edit { it[BACKUP_TARGET] = target }
