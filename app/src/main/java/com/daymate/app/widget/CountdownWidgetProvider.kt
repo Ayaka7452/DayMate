@@ -32,9 +32,8 @@ class CountdownWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Intent.ACTION_CONFIGURATION_CHANGED ->
-                // 系统深浅色切换：立即重绘所有尺寸的小组件
-                WidgetRenderer.onSystemConfigurationChanged(context)
+            // 深浅色切换不在这里处理：CONFIGURATION_CHANGED 只投递给运行时注册的接收器，
+            // 本组件未在 manifest 声明该 action，由 DayMateApp.registerUiModeWatcher 负责重绘
             WidgetRefreshScheduler.ACTION_MIDNIGHT_REFRESH,
             Intent.ACTION_BOOT_COMPLETED -> {
                 // 跨天 / 开机：重绘并续订下一个午夜的闹钟

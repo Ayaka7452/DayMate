@@ -5,7 +5,6 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.Canvas
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -84,7 +83,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.security.VaultCrypto
@@ -199,7 +197,8 @@ private fun CycleOverviewScreen(
 
     // 登记/补记在不合理时间的判断：返回提示文案（null=合理，直接保存）
     //  ① 与已有记录重叠：同一时段重复登记经期通常不合理
-    //  ② 比预测下次经期提前超过 7 天（FIGO：相邻周期波动 ≤7~9 天属正常，超此范围可能为非经期出血）
+    //  ② 与任一真实经期首日间隔不足 MIN_PERIOD_INTERVAL_DAYS 天（不重叠）：两次独立经期不可能这么近
+    //  ③ 比预测下次经期提前超过 EARLY_PERIOD_THRESHOLD_DAYS 天（FIGO：相邻周期波动 ≤7~9 天属正常）
     fun unreasonableLogReason(day: Long, days: Int): String? {
         val last = logs.firstOrNull()?.startDateEpochDay
             ?: return null
@@ -252,9 +251,7 @@ private fun CycleOverviewScreen(
     var manualCalendar by remember { mutableStateOf<Boolean?>(null) }
     val showCalendar = manualCalendar ?: initialCalendar
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
-    // 结束本次经期：仅当今天仍落在该次经期记录的区间内时提供入口；
-    // 今天已越过记录结束日 → 经期按记录自动结束，同位置换成「修订上次经期」供微调
-    // 结束本次经期：只对真正的经期记录响应；特殊情况记录（备注标记的单日出血）不参与
+    // 结束本次经期只对真正的经期记录响应；特殊情况记录（备注标记的单日出血）不参与
     val activeLog = logs.firstOrNull { it.note == null && it.startDateEpochDay <= today }
     val activeDiff = activeLog?.let { (today - it.startDateEpochDay + 1).toInt() }
     // 今天恰好是本次经期记录的最后一天（已结束/记录到今天）：阶段显示用「今日结束」而非「月经期」
@@ -464,7 +461,6 @@ private fun CycleOverviewScreen(
             // ===== 关键日期（2×2 网格卡片，填满版面不留大空白） =====
             if (lastLog != null) {
                 val nextStart = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
-                val overdue = today >= nextStart
                 val phase = CycleCalculator.phaseOf(today, lastLog.startDateEpochDay, periodDays, cycleDays)
                 val ovuRange = CycleCalculator.ovulationWindow(lastLog.startDateEpochDay, periodDays, nextStart)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -879,29 +875,6 @@ private fun LegendDot(color: Color, label: String) {
             label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-        )
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String, highlight: Boolean = false) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            modifier = Modifier.width(96.dp)
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
-            color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
     }
 }

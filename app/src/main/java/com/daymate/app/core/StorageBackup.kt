@@ -4,7 +4,6 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
-import com.ayaka7452.daymate.core.StorageConfig
 import java.io.File
 
 /**
@@ -17,10 +16,30 @@ import java.io.File
  * 应对在线容器执行 wal_checkpoint(TRUNCATE) 让数据落盘到主文件（容器保持打开），因此备份
  * 只含单个 daymate.db；导入 [importExternal] 前应确保主库已关闭（close 容器），再复制文件、
  * 最后 rebuild 容器。导入兼容旧版三文件式备份（-wal / -shm 可选）。
+ *
+ * 关于重复备份文件：部分 SAF 提供方（SD 卡、第三方文件管理器的 DocumentsProvider）的
+ * deleteDocument 会静默失败或延迟生效，此时 createFile 会被系统自动改名成
+ * `daymate.db (1)`、`daymate.db (2)` 不断累积。为此本类统一按「命名模式」识别备份文件
+ * （见 [BACKUP_NAME_REGEX]），而不是只匹配固定的 `daymate.db`——既保证写入前清理干净，
+ * 也保证存在性探测不会因为文件被改名而漏判。
  */
 object StorageBackup {
-    private const val DB_NAME = "daymate.db"
+    /** 主备份文件名。云端备份（[com.ayaka7452.daymate.core.cloud.WebDavStore.REMOTE_DB]）与之同名。 */
+    const val DB_NAME = "daymate.db"
+
     private val SUFFIXES = listOf("", "-wal", "-shm")
+
+    /**
+     * 备份相关文件的命名模式：
+     *  - 本体 `daymate.db`；
+     *  - 旧版三文件导出的 `daymate.db-wal` / `daymate.db-shm`；
+     *  - SAF 自动改名产生的 `daymate.db (1)` / `daymate.db-wal (2)` 变体。
+     */
+    private val BACKUP_NAME_REGEX =
+        Regex("^" + Regex.escape(DB_NAME) + "(?:-(?:wal|shm))?(?:\\s*\\(\\d+\\))?$")
+
+    /** 导出互斥：自动备份的 flush() 与手动「立即备份」可能并发，交错执行会撞出重复文件。 */
+    private val exportLock = Any()
 
     /** 选中文件夹的备份探测结果。 */
     sealed interface BackupPreview {
@@ -36,7 +55,7 @@ object StorageBackup {
     fun previewBackup(ctx: Context, treeUri: Uri?): BackupPreview {
         val uri = treeUri ?: return BackupPreview.None
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return BackupPreview.None
-        val file = root.findFile(DB_NAME) ?: return BackupPreview.None
+        val file = findMainBackup(root) ?: return BackupPreview.None
         return if (isFileReadableSqlite(ctx, file.uri)) BackupPreview.Valid else BackupPreview.Invalid
     }
 
@@ -50,25 +69,31 @@ object StorageBackup {
         } catch (_: Throwable) { false }
     }
 
-    /** 备份文件夹中是否存在 daymate.db。 */
+    /** 本地文件是否为合法 SQLite 数据库（云端下载后、覆盖主库前校验）。 */
+    fun isSqliteFile(file: File): Boolean {
+        if (!file.exists()) return false
+        return try {
+            file.inputStream().use { ins ->
+                val header = ByteArray(16)
+                if (ins.read(header) != 16) return false
+                String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
+            }
+        } catch (_: Throwable) { false }
+    }
+
+    /** 备份文件夹中是否存在 main 备份文件。 */
     fun exists(ctx: Context): Boolean {
         val uri = StorageConfig.backupUri(ctx) ?: return false
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return false
-        return root.findFile(DB_NAME) != null
+        return findMainBackup(root) != null
     }
 
     /** 备份文件是否为合法 SQLite（用于导入前校验）。 */
     fun isBackupReadable(ctx: Context): Boolean {
         val uri = StorageConfig.backupUri(ctx) ?: return false
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return false
-        val file = root.findFile(DB_NAME) ?: return false
-        return try {
-            ctx.contentResolver.openInputStream(file.uri)?.use { ins ->
-                val header = ByteArray(16)
-                if (ins.read(header) != 16) return false
-                String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
-            } ?: false
-        } catch (_: Throwable) { false }
+        val file = findMainBackup(root) ?: return false
+        return isFileReadableSqlite(ctx, file.uri)
     }
 
     /**
@@ -79,20 +104,26 @@ object StorageBackup {
      */
     fun exportInternal(ctx: Context, internalDb: File, targetUri: Uri? = StorageConfig.backupUri(ctx)) {
         val uri = targetUri ?: return
-        val root = DocumentFile.fromTreeUri(ctx, uri) ?: return
         val src = File(internalDb.path)
         if (!src.exists()) return
-        // 覆盖前先删除旧文件，避免 SAF 自动重命名为 "daymate.db (1)"
-        root.findFile(DB_NAME)?.delete()
-        val target = root.createFile("application/octet-stream", DB_NAME) ?: return
-        src.inputStream().use { input ->
-            ctx.contentResolver.openOutputStream(target.uri)?.use { output ->
-                input.copyTo(output)
+        synchronized(exportLock) {
+            val root = DocumentFile.fromTreeUri(ctx, uri) ?: return
+            // 覆盖前清理：按名字模式删除所有旧备份（含被 SAF 改名的 "(1)/(2)" 变体与旧版 -wal/-shm），
+            // 否则 createFile 会被系统自动改名，越积越多。
+            purgeBackupFiles(root)
+            val target = root.createFile("application/octet-stream", DB_NAME)
+            if (target == null) {
+                purgeBackupFiles(root)
+                return
             }
-        }
-        // 复制成功后清掉旧版导出残留的 -wal / -shm（其内容早已在 checkpoint 时合并进主文件）
-        for (suffix in listOf("-wal", "-shm")) {
-            root.findFile(DB_NAME + suffix)?.delete()
+            src.inputStream().use { input ->
+                ctx.contentResolver.openOutputStream(target.uri)?.use { output ->
+                    input.copyTo(output)
+                }
+            }
+            // 写入后再清一次：若本次 createFile 仍被改名（说明旧文件确实删不掉），
+            // 就保留刚写入的这份、把其它同名残留清掉，尽量只留一份备份。
+            purgeBackupFiles(root, keep = target.uri)
         }
     }
 
@@ -105,7 +136,7 @@ object StorageBackup {
     fun importExternal(ctx: Context, internalDb: File, sourceUri: Uri? = StorageConfig.backupUri(ctx)): Boolean {
         val uri = sourceUri ?: return false
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return false
-        val src = root.findFile(DB_NAME) ?: return false
+        val src = findMainBackup(root) ?: return false
         for (suffix in SUFFIXES) {
             val target = File(internalDb.path + suffix)
             target.parentFile?.mkdirs()
@@ -115,7 +146,7 @@ object StorageBackup {
                 } ?: return false
             } else {
                 // -wal / -shm 为可选：存在则复制，不存在则清掉内部残留，让下次打开重建
-                val ext = root.findFile(DB_NAME + suffix)
+                val ext = findSidecar(root, suffix)
                 if (ext != null) {
                     ctx.contentResolver.openInputStream(ext.uri)?.use { input ->
                         target.outputStream().use { output -> input.copyTo(output) }
@@ -160,11 +191,8 @@ object StorageBackup {
     fun probeBackupDataRows(ctx: Context, treeUri: Uri?): Int {
         val uri = treeUri ?: return 0
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return 0
-        val src = root.findFile(DB_NAME) ?: return 0
+        val src = findMainBackup(root) ?: return 0
         val tmp = File(ctx.cacheDir, "daymate_probe.db")
-        val tmpWal = File(ctx.cacheDir, "daymate_probe.db-wal")
-        val tmpShm = File(ctx.cacheDir, "daymate_probe.db-shm")
-        listOf(tmp, tmpWal, tmpShm).forEach { it.delete() }
         return try {
             // 主文件复制失败（拿不到流 / IO 异常）→ 返回 -1，绝不按 0 行放行
             var copied = false
@@ -172,20 +200,54 @@ object StorageBackup {
                 tmp.outputStream().use { ins.copyTo(it) }
                 copied = true
             }
-            if (!copied) return -1
+            if (!copied) {
+                deleteProbeTemps(ctx)
+                return -1
+            }
             for (suffix in listOf("-wal", "-shm")) {
-                root.findFile(DB_NAME + suffix)?.let { ext ->
+                findSidecar(root, suffix)?.let { ext ->
                     ctx.contentResolver.openInputStream(ext.uri)?.use { ins ->
                         File(ctx.cacheDir, "daymate_probe.db$suffix").outputStream().use { ins.copyTo(it) }
                     }
                 }
             }
-            countDataRows(tmp).also {
-                tmp.delete(); tmpWal.delete(); tmpShm.delete()
-            }
+            countDataRows(tmp).also { deleteProbeTemps(ctx) }
         } catch (_: Throwable) {
-            tmp.delete(); tmpWal.delete(); tmpShm.delete()
+            deleteProbeTemps(ctx)
             -1
+        }
+    }
+
+    // ===== 内部工具 =====
+
+    /** 主备份文件：优先精确的 `daymate.db`，否则取改名变体中最近修改的一个。 */
+    private fun findMainBackup(root: DocumentFile): DocumentFile? {
+        val mains = matchingFiles(root).filterNot { isSidecar(it.name.orEmpty()) }
+        return mains.firstOrNull { it.name == DB_NAME } ?: mains.maxByOrNull { it.lastModified() }
+    }
+
+    /** 查找 `daymate.db-wal` / `daymate.db-shm`（含改名变体）。 */
+    private fun findSidecar(root: DocumentFile, suffix: String): DocumentFile? =
+        matchingFiles(root).firstOrNull { it.name.orEmpty().startsWith(DB_NAME + suffix) }
+
+    /** 目录中所有符合备份命名模式的条目。 */
+    private fun matchingFiles(root: DocumentFile): List<DocumentFile> =
+        root.listFiles().filter { BACKUP_NAME_REGEX.matches(it.name.orEmpty()) }
+
+    private fun isSidecar(name: String): Boolean =
+        name.contains("-wal") || name.contains("-shm")
+
+    /** 删除目录中所有备份相关文件，[keep] 指定的 Uri 除外。 */
+    private fun purgeBackupFiles(root: DocumentFile, keep: Uri? = null) {
+        for (f in matchingFiles(root)) {
+            if (keep != null && f.uri == keep) continue
+            runCatching { f.delete() }
+        }
+    }
+
+    private fun deleteProbeTemps(ctx: Context) {
+        for (name in listOf("daymate_probe.db", "daymate_probe.db-wal", "daymate_probe.db-shm")) {
+            File(ctx.cacheDir, name).delete()
         }
     }
 }

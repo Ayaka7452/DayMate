@@ -8,7 +8,6 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,20 +20,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import sh.calvin.reorderable.ReorderableItem
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -51,7 +47,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -59,7 +54,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -73,7 +67,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
@@ -82,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.core.security.BiometricKeyStore
 import com.ayaka7452.daymate.core.security.VaultCrypto
 import com.ayaka7452.daymate.core.security.VaultSession
 import com.ayaka7452.daymate.core.util.CountdownCalculator
@@ -89,7 +83,7 @@ import com.ayaka7452.daymate.data.db.VaultEventEntity
 import com.ayaka7452.daymate.data.db.VaultFolderEntity
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
-import com.ayaka7452.daymate.feature.common.ReorderActions
+import com.ayaka7452.daymate.feature.common.ReorderMenuItems
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.highlightedText
@@ -102,12 +96,15 @@ import android.widget.Toast
 import com.ayaka7452.daymate.feature.home.AddSheet
 import com.ayaka7452.daymate.feature.home.SelectionDot
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import javax.crypto.spec.SecretKeySpec
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -133,7 +130,6 @@ fun VaultScreen(
 
     // 退出 Vault 界面时不主动清空密钥：保留会话内解锁态，
     // 以便从主页「移入 Vault」等操作能正确用密钥加密。仅重置密码时清空（见下方）。
-    val handleExit: () -> Unit = onExit
 
     // 解锁门 ⇄ 内容淡入淡出：解锁/设密完成不生硬跳变
     val gateState = when {
@@ -145,7 +141,7 @@ fun VaultScreen(
         when (state) {
             "list" -> VaultListScreen(
                 container,
-                onExit = handleExit,
+                onExit = onExit,
                 onReset = { unlocked = false },
                 onNavigate = onNavigate
             )
@@ -153,12 +149,12 @@ fun VaultScreen(
                 container,
                 scope = scope,
                 onUnlocked = { unlocked = true },
-                onExit = handleExit
+                onExit = onExit
             )
             else -> VaultUnlockScreen(
                 container,
                 onUnlocked = { unlocked = true },
-                onExit = handleExit
+                onExit = onExit
             )
         }
     }
@@ -171,6 +167,7 @@ private fun VaultSetupScreen(
     onUnlocked: () -> Unit,
     onExit: () -> Unit
 ) {
+    val context = LocalContext.current
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var enableBiometric by remember { mutableStateOf(true) }
@@ -215,10 +212,24 @@ private fun VaultSetupScreen(
                     else -> {
                         scope.launch {
                             val salt = VaultCrypto.newSalt()
-                            val hash = VaultCrypto.hash(password, salt)
+                            // PBKDF2（10 万次迭代）+ KeyStore 操作都不应占用主线程；
+                            // deriveAll 一次派生同时得到验证 hash 与加密密钥（不再跑两遍）
+                            val (hash, key) = withContext(Dispatchers.Default) {
+                                VaultCrypto.deriveAll(password, salt)
+                            }
                             container.settingsRepository.setVaultPassword(hash, salt)
+                            VaultSession.unlock(key)
+                            if (enableBiometric) {
+                                // 托管会话密钥，否则指纹解锁后拿不到密钥，Vault 内容会显示成密文
+                                val wrapped = withContext(Dispatchers.IO) {
+                                    BiometricKeyStore.wrap(context, key.encoded)
+                                }
+                                // 托管失败（设备 Keystore 不可用）就关掉指纹，避免解锁后拿不到密钥
+                                if (!wrapped) enableBiometric = false
+                            } else {
+                                withContext(Dispatchers.IO) { BiometricKeyStore.clear(context) }
+                            }
                             container.settingsRepository.setVaultBiometric(enableBiometric)
-                            VaultSession.unlock(VaultCrypto.key(password, salt))
                             onUnlocked()
                         }
                     }
@@ -254,6 +265,9 @@ private fun VaultUnlockScreen(
                 .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
             BiometricManager.BIOMETRIC_SUCCESS
     }
+    // 必须已托管会话密钥，指纹解锁才有意义（否则解开后拿不到密钥，内容会显示成密文）
+    val biometricReady =
+        biometricAvailable && biometricEnabled && BiometricKeyStore.hasWrappedKey(context)
 
     fun authenticateWithBiometric() {
         val act = activity ?: return
@@ -263,7 +277,14 @@ private fun VaultUnlockScreen(
             executor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    onUnlocked()
+                    // 指纹验证只证明「是本人」，密钥需从 Keystore 托管的包裹值里解封
+                    val raw = BiometricKeyStore.unwrap(context)
+                    if (raw != null) {
+                        VaultSession.unlock(SecretKeySpec(raw, "AES"))
+                        onUnlocked()
+                    } else {
+                        error = "指纹凭据已失效，请改用密码解锁"
+                    }
                 }
             }
         )
@@ -303,16 +324,22 @@ private fun VaultUnlockScreen(
                     error = "请输入密码"
                     return@Button
                 }
-                val ok = try {
-                    VaultCrypto.hash(password, s) == h
-                } catch (e: Exception) {
-                    false
-                }
-                if (ok) {
-                    VaultSession.unlock(VaultCrypto.key(password, s))
+                val input = password
+                scope.launch {
+                    // PBKDF2（10 万次迭代）较重，放后台线程；一次派生同时得到 hash 与密钥
+                    val (computed, key) = withContext(Dispatchers.Default) {
+                        VaultCrypto.deriveAll(input, s)
+                    }
+                    if (computed != h) {
+                        error = "密码错误"
+                        return@launch
+                    }
+                    VaultSession.unlock(key)
+                    // 兼容旧版本：此前指纹解锁未托管密钥，这里补一次，之后指纹即可正常解密
+                    if (biometricEnabled && !BiometricKeyStore.hasWrappedKey(context)) {
+                        withContext(Dispatchers.IO) { BiometricKeyStore.wrap(context, key.encoded) }
+                    }
                     onUnlocked()
-                } else {
-                    error = "密码错误"
                 }
             },
             modifier = Modifier.fillMaxWidth()
@@ -321,7 +348,7 @@ private fun VaultUnlockScreen(
             Spacer(Modifier.width(8.dp))
             Text("解锁")
         }
-        if (biometricAvailable && biometricEnabled) {
+        if (biometricReady) {
             Spacer(Modifier.height(12.dp))
             OutlinedButton(
                 onClick = { authenticateWithBiometric() },
@@ -624,7 +651,8 @@ private fun VaultListScreen(
                                 }
                             },
                             dragHandle = handleModifier,
-                            onReorder = { action -> moveVaultFolder(folder, action) }
+                            // 非手动排序时重排项无意义（moveVaultFolder 内部也会直接返回），不展示菜单入口
+                            onReorder = if (manualSort) ({ action -> moveVaultFolder(folder, action) }) else null
                         )
                     }
                     ListItemDivider()
@@ -654,7 +682,7 @@ private fun VaultListScreen(
                             onMoveToMain = {
                                 scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                             },
-                            onReorder = { action -> moveVaultEvent(event, action) },
+                            onReorder = if (manualSort) ({ action -> moveVaultEvent(event, action) }) else null,
                             dragHandle = handleModifier
                         )
                     }
@@ -788,6 +816,8 @@ private fun VaultListScreen(
                         container.vaultFolderRepository.clearAll()
                         container.settingsRepository.clearVaultPassword()
                         VaultSession.lock()
+                        // 旧的会话密钥托管值已失效（新密码派生不同密钥），一并清除
+                        withContext(Dispatchers.IO) { BiometricKeyStore.clear(context) }
                         onReset()
                     }
                     showResetConfirm = false
@@ -901,7 +931,9 @@ fun VaultFolderScreen(
     var showEventDialog by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<VaultEventEntity?>(null) }
 
+    // folderTarget=null 表示「新建文件夹」（从移入文件夹的创建入口进入），非 null 表示重命名当前文件夹
     var showFolderDialog by remember { mutableStateOf(false) }
+    var folderTarget by remember { mutableStateOf<VaultFolderEntity?>(null) }
     var pendingMoveAfterCreate by remember { mutableStateOf(false) }
 
     var selectionMode by remember { mutableStateOf(false) }
@@ -940,7 +972,10 @@ fun VaultFolderScreen(
             )
             DropdownMenuItem(
                 text = { Text("重命名") },
-                onClick = { showFolderDialog = true }
+                onClick = {
+                    folderTarget = folder
+                    showFolderDialog = true
+                }
             )
             DropdownMenuItem(
                 text = { Text("删除文件夹") },
@@ -995,7 +1030,7 @@ fun VaultFolderScreen(
                             onMoveToMain = {
                                 scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                             },
-                            onReorder = { action -> moveVaultFolderEvent(event, action) },
+                            onReorder = if (manualSort) ({ action -> moveVaultFolderEvent(event, action) }) else null,
                             dragHandle = handleModifier
                         )
                     }
@@ -1016,27 +1051,43 @@ fun VaultFolderScreen(
 
     if (showFolderDialog) {
         FolderDialog(
-            initialName = folder?.name ?: "",
-            initialIcon = folder?.icon ?: "📁",
-            title = "编辑文件夹",
-            confirmLabel = "保存",
+            initialName = folderTarget?.name ?: "",
+            initialIcon = folderTarget?.icon ?: "📁",
+            title = if (folderTarget == null) "新建文件夹" else "编辑文件夹",
+            confirmLabel = if (folderTarget == null) "创建" else "保存",
             onDismiss = {
                 showFolderDialog = false
                 pendingMoveAfterCreate = false
             },
             onSave = { name, icon ->
                 scope.launch {
-                    folder?.let { container.vaultFolderRepository.update(it.copy(name = name, icon = icon)) }
-                    folder = container.vaultFolderRepository.getById(folderId)
+                    if (folderTarget == null) {
+                        // 从「移入文件夹 → 新建文件夹」进来：先建好目录，再把选中的事件移进去
+                        val newId = container.vaultFolderRepository.add(
+                            VaultFolderEntity(name = name, icon = icon)
+                        )
+                        if (pendingMoveAfterCreate) {
+                            container.vaultRepository.moveToFolder(selectedEventIds.toList(), newId)
+                            pendingMoveAfterCreate = false
+                            exitSelection()
+                        }
+                    } else {
+                        folderTarget?.let {
+                            container.vaultFolderRepository.update(it.copy(name = name, icon = icon))
+                            folder = container.vaultFolderRepository.getById(folderId)
+                        }
+                    }
                 }
                 showFolderDialog = false
             },
-            onDelete = {
-                scope.launch {
-                    folder?.let { container.vaultFolderRepository.delete(it) }
-                    onBack()
+            onDelete = if (folderTarget != null) {
+                {
+                    scope.launch {
+                        folderTarget?.let { container.vaultFolderRepository.delete(it) }
+                        onBack()
+                    }
                 }
-            }
+            } else null
         )
     }
 
@@ -1053,6 +1104,7 @@ fun VaultFolderScreen(
             },
             onCreateNew = {
                 showMoveDialog = false
+                folderTarget = null
                 pendingMoveAfterCreate = true
                 showFolderDialog = true
             }
@@ -1425,22 +1477,7 @@ private fun VaultEventRow(
                     onDismissRequest = { menuExpanded = false }
                 ) {
                     if (onReorder != null) {
-                        DropdownMenuItem(
-                            text = { Text("上移") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.UP) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("下移") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.DOWN) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("移到顶部") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("移到底部") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.BOTTOM) }
-                        )
+                        ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     DropdownMenuItem(
                         text = { Text("移出到主空间") },
@@ -1496,22 +1533,7 @@ private fun VaultFolderRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("上移") },
-                        onClick = { menuExpanded = false; onReorder(ReorderActions.UP) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("下移") },
-                        onClick = { menuExpanded = false; onReorder(ReorderActions.DOWN) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("移到顶部") },
-                        onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("移到底部") },
-                        onClick = { menuExpanded = false; onReorder(ReorderActions.BOTTOM) }
-                    )
+                    ReorderMenuItems(onReorder) { menuExpanded = false }
                 }
             }
         }

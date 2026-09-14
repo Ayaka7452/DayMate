@@ -23,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ayaka7452.daymate.data.festival.FestivalDay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter

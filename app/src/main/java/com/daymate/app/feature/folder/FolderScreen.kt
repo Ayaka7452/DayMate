@@ -1,28 +1,21 @@
 package com.ayaka7452.daymate.feature.folder
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.activity.compose.BackHandler
@@ -50,8 +43,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.Routes
@@ -61,14 +52,12 @@ import com.ayaka7452.daymate.data.db.FolderEntity
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import com.ayaka7452.daymate.feature.common.matchesQuery
-import com.ayaka7452.daymate.feature.common.ReorderActions
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import com.ayaka7452.daymate.feature.home.EventRow
-import com.ayaka7452.daymate.feature.home.SelectionDot
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
@@ -147,8 +136,9 @@ fun FolderScreen(
     }
 
     // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
-    val displayEvents = remember(eventList.toList(), defaultSort) {
-        sortEventsForDisplay(eventList.toList(), defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    val eventSnapshot = eventList.toList()
+    val displayEvents = remember(eventSnapshot, defaultSort) {
+        sortEventsForDisplay(eventSnapshot, defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
     }
 
     // 页内搜索过滤（标题 + 备注）
@@ -409,8 +399,9 @@ fun FolderScreen(
                 scope.launch {
                     folder?.let { container.folderRepository.update(it.copy(name = name, icon = icon)) }
                     folder = container.folderRepository.getById(folderId)
+                    // 写库完成后再关闭弹窗，否则列表可能来不及刷新（与主页一致）
+                    showFolderDialog = false
                 }
-                showFolderDialog = false
             },
             onDelete = {
                 scope.launch {

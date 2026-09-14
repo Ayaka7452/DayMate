@@ -47,16 +47,6 @@ object CountdownCalculator {
     fun daysUntil(targetEpochDay: Long, today: LocalDate = LocalDate.now()): Long =
         targetEpochDay - today.toEpochDay()
 
-    /** 每年重复：返回距离下一次发生的天数（今天则 0）。 */
-    fun daysUntilNextOccurrence(targetEpochDay: Long, today: LocalDate = LocalDate.now()): Long {
-        val target = LocalDate.ofEpochDay(targetEpochDay)
-        val thisYear = target.withYear(today.year)
-        if (thisYear.toEpochDay() >= today.toEpochDay()) {
-            return thisYear.toEpochDay() - today.toEpochDay()
-        }
-        return thisYear.plusYears(1).toEpochDay() - today.toEpochDay()
-    }
-
     /**
      * 按用户选择的单位格式化倒计时文本（事件列表行用）。
      * refDays 的单位跟随 unit（即用户在表单里按当前显示单位填写的对照值）。

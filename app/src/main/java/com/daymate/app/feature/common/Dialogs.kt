@@ -1,21 +1,14 @@
 package com.ayaka7452.daymate.feature.common
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -28,24 +21,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-
-private val FOLDER_ICONS = listOf(
-    "📁", "📂", "⭐", "❤️", "🎯", "🎁",
-    "📚", "💼", "🏠", "✈️", "🎓", "🍎",
-    // 维修 / 工具
-    "🔧", "🛠️", "🪛", "⚙️",
-    // 假期 / 旅行
-    "🏖️", "🌴", "🏕️", "🧳", "🗺️",
-    // 生活
-    "☕", "🛒", "🚗", "🎮", "🎬", "🌱", "🐾", "💊"
-)
 
 /**
  * 通用文件夹创建/编辑对话框。
  * - 新建：initialName/initialIcon 留默认，confirmLabel="创建"，onDelete=null
  * - 编辑：传入现有 name/icon，confirmLabel="保存"，onDelete 提供删除
+ *
+ * 图标选择复用 [EmojiPicker]（默认常用集，「更多」展开全量），与节日角标等保持同一交互。
  */
 @Composable
 fun FolderDialog(
@@ -89,29 +72,7 @@ fun FolderDialog(
                 Spacer(Modifier.height(12.dp))
                 Text("图标", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(FOLDER_ICONS) { em ->
-                        val isSel = em == icon
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSel) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .border(
-                                    if (isSel) 2.dp else 0.dp,
-                                    MaterialTheme.colorScheme.primary,
-                                    CircleShape
-                                )
-                                .clickable { icon = em },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(em, style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-                }
+                EmojiPicker(selected = icon, onSelect = { icon = it })
             }
         }
     )

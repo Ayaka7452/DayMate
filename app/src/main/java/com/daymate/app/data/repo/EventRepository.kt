@@ -73,8 +73,6 @@ class EventRepository(
         refreshSignal.tryEmit(Unit)
     }
 
-    suspend fun nextSortIndex(): Int = (dao.maxSortIndex() ?: -1) + 1
-
     /**
      * 自动锚定：把目标日期已过的事件滚动到下一次日期。返回滚动的事件数。
      *  - repeatRule（WEEKLY/MONTHLY/YEARLY）→ 按周期同位日期滚动；

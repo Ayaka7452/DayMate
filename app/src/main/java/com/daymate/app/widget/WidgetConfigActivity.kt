@@ -120,7 +120,9 @@ private fun WidgetConfigScreen(
     onConfirm: (Int) -> Unit,
     onCancel: () -> Unit
 ) {
-    val events by container.eventRepository.observeAll().collectAsState(initial = emptyList())
+    // 用 remember 固定 Flow 实例，避免每次重组新建 Flow 导致观察者反复重建
+    val events by remember { container.eventRepository.observeAll() }
+        .collectAsState(initial = emptyList())
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var selected by remember { mutableStateOf(WidgetPrefs.eventForWidget(ctx, appWidgetId)) }
     var opacity by remember { mutableStateOf(WidgetPrefs.opacityFor(ctx, appWidgetId).toFloat()) }

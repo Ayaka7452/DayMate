@@ -1,6 +1,5 @@
 package com.ayaka7452.daymate.widget
 
-import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
@@ -19,18 +18,11 @@ import kotlin.math.abs
 class CountdownWidgetListService : RemoteViewsService() {
 
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
-        ListFactory(applicationContext, intent)
+        ListFactory(applicationContext)
 
-    class ListFactory(
-        private val context: Context,
-        intent: Intent
-    ) : RemoteViewsFactory {
+    class ListFactory(private val context: Context) : RemoteViewsFactory {
 
         private data class Row(val title: String, val daysText: String, val isPast: Boolean, val eventId: Long)
-
-        @Suppress("unused")
-        private val appWidgetId: Int =
-            intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
 
         private val rows = mutableListOf<Row>()
         private var empty = false

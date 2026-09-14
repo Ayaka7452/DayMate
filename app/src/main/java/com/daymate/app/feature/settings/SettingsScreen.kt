@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,7 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -57,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.data.festival.FestivalRepository
+import com.ayaka7452.daymate.feature.common.EmojiPicker
 import com.ayaka7452.daymate.feature.setup.StorageSetupBody
 import com.ayaka7452.daymate.widget.WidgetRenderer
 import kotlinx.coroutines.launch
@@ -418,7 +417,10 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
-                        "范围：${java.time.LocalDate.now().year - 1}–${java.time.LocalDate.now().year + 1} 年 · $festivalStatus",
+                        run {
+                            val y = java.time.LocalDate.now().year
+                            "范围：${y - 1}–${y + 1} 年 · $festivalStatus"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -442,43 +444,21 @@ fun SettingsScreen(
         }
     }
 
-    // 节日卡片角标 emoji 选择弹窗
+    // 节日卡片角标 emoji 选择弹窗（与文件夹图标共用统一选择器：常用集 + 「更多」全量）
     if (showBadgeEmojiDialog) {
-        val emojiChoices = listOf(
-            "☀️", "🌙", "⭐", "✨", "⚡",
-            "🎉", "🎊", "🔥", "❤️", "🌸",
-            "🍀", "🎯", "🎄", "🏖️", "🎁"
-        )
         AlertDialog(
             onDismissRequest = { showBadgeEmojiDialog = false },
             title = { Text("节日卡片角标") },
             text = {
-                Column {
-                    emojiChoices.chunked(5).forEach { rowEmojis ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            rowEmojis.forEach { em ->
-                                val isSel = em == homeBadgeEmoji
-                                Text(
-                                    em,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    modifier = Modifier
-                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-                                        .background(
-                                            if (isSel) MaterialTheme.colorScheme.primaryContainer
-                                            else androidx.compose.ui.graphics.Color.Transparent
-                                        )
-                                        .clickable {
-                                            scope.launch {
-                                                container.settingsRepository.setHomeBadgeEmoji(em)
-                                            }
-                                            showBadgeEmojiDialog = false
-                                        }
-                                        .padding(6.dp)
-                                )
-                            }
+                EmojiPicker(
+                    selected = homeBadgeEmoji,
+                    onSelect = { em ->
+                        scope.launch {
+                            container.settingsRepository.setHomeBadgeEmoji(em)
                         }
+                        showBadgeEmojiDialog = false
                     }
-                }
+                )
             },
             confirmButton = {
                 TextButton(onClick = { showBadgeEmojiDialog = false }) { Text("关闭") }

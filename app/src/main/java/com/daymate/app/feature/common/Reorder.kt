@@ -1,5 +1,8 @@
 package com.ayaka7452.daymate.feature.common
 
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 
 /** 排序模式常量（对应 SettingsRepository.defaultSort 的取值）。 */
@@ -15,6 +18,31 @@ object ReorderActions {
     const val DOWN = "down"
     const val TOP = "top"
     const val BOTTOM = "bottom"
+}
+
+/**
+ * 行内「…」菜单里的四个重排项（上移 / 下移 / 移到顶部 / 移到底部）。
+ * 主页的事件行、文件夹行与 Vault 的事件行、文件夹行共用，避免同一段菜单代码复制四份。
+ * [dismissMenu] 在每次点击后收起菜单。
+ */
+@Composable
+fun ReorderMenuItems(onReorder: (String) -> Unit, dismissMenu: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text("上移") },
+        onClick = { dismissMenu(); onReorder(ReorderActions.UP) }
+    )
+    DropdownMenuItem(
+        text = { Text("下移") },
+        onClick = { dismissMenu(); onReorder(ReorderActions.DOWN) }
+    )
+    DropdownMenuItem(
+        text = { Text("移到顶部") },
+        onClick = { dismissMenu(); onReorder(ReorderActions.TOP) }
+    )
+    DropdownMenuItem(
+        text = { Text("移到底部") },
+        onClick = { dismissMenu(); onReorder(ReorderActions.BOTTOM) }
+    )
 }
 
 /**

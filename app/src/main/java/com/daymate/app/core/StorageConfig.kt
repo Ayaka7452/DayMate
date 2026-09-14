@@ -2,7 +2,6 @@ package com.ayaka7452.daymate.core
 
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.net.Uri
 
 /**
@@ -71,37 +70,5 @@ object StorageConfig {
         } else {
             seg
         }
-    }
-
-    /** 判断文件是否为合法的 SQLite 数据库（读取文件头 "SQLite format 3"）。 */
-    fun isReadableSqlite(file: java.io.File): Boolean {
-        if (!file.exists() || file.length() < 16) return false
-        return try {
-            file.inputStream().use { ins ->
-                val header = ByteArray(16)
-                if (ins.read(header) != 16) return false
-                String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
-            }
-        } catch (_: Throwable) { false }
-    }
-
-    /**
-     * 复制数据库主文件及其 -wal / -shm 附属文件（File -> File，用于内部临时操作）。
-     */
-    fun copyDatabase(from: java.io.File, to: java.io.File) {
-        to.parentFile?.mkdirs()
-        for (suffix in listOf("", "-wal", "-shm")) {
-            val src = java.io.File(from.path + suffix)
-            val dst = java.io.File(to.path + suffix)
-            if (src.exists()) src.copyTo(dst, overwrite = true)
-        }
-    }
-
-    /** 重启到主页面（备份位置切换/恢复后刷新全部界面与容器）。 */
-    fun restartToHome(ctx: Context) {
-        val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
-        intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        ctx.startActivity(intent)
-        (ctx as? android.app.Activity)?.finishAffinity()
     }
 }

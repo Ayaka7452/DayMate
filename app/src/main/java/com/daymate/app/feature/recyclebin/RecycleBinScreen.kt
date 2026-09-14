@@ -36,8 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
-import com.ayaka7452.daymate.data.db.EventEntity
-import com.ayaka7452.daymate.data.db.FolderEntity
 import com.ayaka7452.daymate.feature.common.matchesQuery
 import kotlinx.coroutines.launch
 
@@ -159,7 +157,6 @@ fun RecycleBinScreen(
                                 subtitle = "文件夹",
                                 onRestore = {
                                     scope.launch {
-                                        val ts = System.currentTimeMillis()
                                         container.eventRepository.restoreByFolders(listOf(folder.id))
                                         container.folderRepository.restoreByIds(listOf(folder.id))
                                     }

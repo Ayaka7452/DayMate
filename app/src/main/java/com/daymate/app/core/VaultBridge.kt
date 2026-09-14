@@ -6,8 +6,8 @@ import com.ayaka7452.daymate.data.repo.EventRepository
 import com.ayaka7452.daymate.data.repo.VaultRepository
 
 /**
- * 主空间事件 ↔ Vault 事件的跨库搬运。
- * 两个 Room 库（daymate.db / vault.db）互不可见，故以「目标库新建 + 源库删除」实现。
+ * 主空间事件 ↔ Vault 事件的搬运。两张表同在主库 daymate.db，但语义隔离
+ * （Vault 表的标题/备注为密文），故以「目标表新建 + 源表删除」实现。
  * folderId 落地为 null（进入对方根目录），其余字段原样保留。
  */
 class VaultBridge(

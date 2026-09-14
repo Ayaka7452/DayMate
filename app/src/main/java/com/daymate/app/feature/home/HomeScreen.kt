@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,7 +38,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,7 +71,7 @@ import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
-import com.ayaka7452.daymate.feature.common.ReorderActions
+import com.ayaka7452.daymate.feature.common.ReorderMenuItems
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.highlightedText
@@ -184,8 +182,9 @@ fun HomeScreen(
     }
 
     // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
-    val displayEvents = remember(eventList.toList(), defaultSort) {
-        sortEventsForDisplay(eventList.toList(), defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    val eventSnapshot = eventList.toList()
+    val displayEvents = remember(eventSnapshot, defaultSort) {
+        sortEventsForDisplay(eventSnapshot, defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
     }
 
     // 搜索数据源：全部未删除事件（含文件夹内的）；结果按剩余天数升序
@@ -966,22 +965,7 @@ fun EventRow(
                     onDismissRequest = { menuExpanded = false }
                 ) {
                     if (onReorder != null) {
-                        DropdownMenuItem(
-                            text = { Text("上移") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.UP) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("下移") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.DOWN) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("移到顶部") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("移到底部") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.BOTTOM) }
-                        )
+                        ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     if (onMoveToFolder != null) {
                         DropdownMenuItem(
@@ -1067,22 +1051,7 @@ fun FolderRow(
                     onDismissRequest = { menuExpanded = false }
                 ) {
                     if (onReorder != null) {
-                        DropdownMenuItem(
-                            text = { Text("上移") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.UP) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("下移") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.DOWN) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("移到顶部") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.TOP) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("移到底部") },
-                            onClick = { menuExpanded = false; onReorder(ReorderActions.BOTTOM) }
-                        )
+                        ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     DropdownMenuItem(
                         text = { Text("移入回收站") },

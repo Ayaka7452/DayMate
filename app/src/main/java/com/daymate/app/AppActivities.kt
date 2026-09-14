@@ -21,7 +21,6 @@ import com.ayaka7452.daymate.feature.create.EventDetailScreen
 import com.ayaka7452.daymate.feature.create.EventFormScreen
 import com.ayaka7452.daymate.feature.recyclebin.RecycleBinScreen
 import com.ayaka7452.daymate.feature.folder.FolderScreen
-import com.ayaka7452.daymate.feature.home.HomeScreen
 import com.ayaka7452.daymate.feature.settings.SettingsScreen
 import com.ayaka7452.daymate.feature.vault.VaultFolderScreen
 import com.ayaka7452.daymate.feature.vault.VaultScreen
@@ -252,6 +251,16 @@ class VaultFolderActivity : ComposeActivity() {
         val folderId = intent.getLongExtra("folderId", 0L)
         setDayMateContent {
             VaultFolderScreen(container = container, folderId = folderId, onBack = { finish() })
+        }
+    }
+}
+
+/** WebDAV 云端备份配置页（服务器地址 / 凭据 / 远程目录选择）。 */
+class WebDavActivity : ComposeActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setDayMateContent {
+            com.ayaka7452.daymate.feature.setup.WebDavSetupScreen(onBack = { finish() })
         }
     }
 }

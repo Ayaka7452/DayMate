@@ -31,6 +31,11 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val CYCLE_DEFAULT_CALENDAR = booleanPreferencesKey("cycle_default_calendar") // 周期管家默认视图（false=圆环，true=日历）
         private val CYCLE_CYCLE_AUTO = booleanPreferencesKey("cycle_cycle_auto")     // 周期天数自动按记录均值推算（默认开；手改即固定）
         private val CYCLE_PERIOD_AUTO = booleanPreferencesKey("cycle_period_auto")   // 经期天数自动按记录均值推算（默认开；手改即固定）
+
+        /** 备份位置取值：仅本地 SAF 文件夹 / 本地 + WebDAV 云端 / 仅 WebDAV 云端。 */
+        const val BACKUP_TARGET_LOCAL = "local"
+        const val BACKUP_TARGET_BOTH = "both"
+        const val BACKUP_TARGET_CLOUD = "cloud"
     }
 
     val themeMode: Flow<String> = dataStore.data.map { it[THEME] ?: "system" }
@@ -59,6 +64,18 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     /** 是否在每次数据库修改后自动备份到已配置的 SAF 备份文件夹（默认开启）。 */
     val autoBackupEnabled: Flow<Boolean> = dataStore.data.map { it[AUTO_BACKUP] ?: true }
+
+    /**
+     * 备份位置：
+     *  - `local`：仅本地 SAF 备份文件夹（默认，保持旧行为）；
+     *  - `both`：本地 + WebDAV 云端各留一份；
+     *  - `cloud`：仅 WebDAV 云端（本地文件夹可留作手动导入导出）。
+     */
+    val backupTarget: Flow<String> = dataStore.data.map { it[BACKUP_TARGET] ?: "local" }
+
+    suspend fun setBackupTarget(target: String) {
+        dataStore.edit { it[BACKUP_TARGET] = target }
+    }
 
     /** 主页顶部卡片内容：festival=下一个节假日（默认）/ event=最近的倒数日 / off=关闭。 */
     val homeTopCard: Flow<String> = dataStore.data.map { it[HOME_TOP_CARD] ?: "festival" }

@@ -118,15 +118,6 @@ class FestivalRepository(private val appContext: Context) {
     fun nextOccurrenceOf(name: String, after: LocalDate): LocalDate? =
         allDays().firstOrNull { it.name == name && it.date >= after }?.date
 
-    /** 接下来的放假节日（按名称去重、各取最早一次），供表单快选。 */
-    fun upcomingOffDays(from: LocalDate, limit: Int = 12): List<FestivalDay> {
-        val seen = mutableSetOf<String>()
-        return allDays()
-            .filter { it.date >= from && it.isOffDay }
-            .filter { seen.add(it.name) }
-            .take(limit)
-    }
-
     /**
      * 表单「跟随节日」快选：跨年列出所有已知节日（按名称去重），各取下一次日期——
      * 不以「今年」为界：今年已过的节日（如元旦、春节）也选得到，锚定到数据中的下一次。

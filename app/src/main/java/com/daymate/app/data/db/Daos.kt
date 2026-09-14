@@ -59,9 +59,6 @@ interface EventDao {
     @Query("DELETE FROM events WHERE folderId IN (:folderIds)")
     suspend fun hardDeleteEventsByFolders(folderIds: List<Long>)
 
-    @Query("SELECT MAX(sortIndex) FROM events")
-    suspend fun maxSortIndex(): Int?
-
     @Query("SELECT COUNT(*) FROM events WHERE isDeleted = 0")
     suspend fun countAll(): Int
 

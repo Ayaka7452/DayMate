@@ -1,0 +1,247 @@
+package com.ayaka7452.daymate.feature.common
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
+/**
+ * emoji 目录：全应用共用的表情符号表。
+ *
+ * [common] 是默认展示的一组（即各功能原先各自维护的那几个），[categories] 是按类别整理的
+ * 全量集合，展开后才展示。两者都经过 distinct()，避免重复项在两处同时出现。
+ *
+ * 说明：为了在低版本 Android（minSdk 26）上也能正常显示，这里刻意不收 Emoji 14.0 以后
+ * 新增的符号（旧系统会渲染成方框）。
+ */
+object EmojiCatalog {
+
+    /** 默认展示（与旧版文件夹图标 / 节日角标的常用集合一致）。 */
+    val common: List<String> = listOf(
+        "📁", "📂", "⭐", "❤️", "🎯", "🎁",
+        "📚", "💼", "🏠", "✈️", "🎓", "☀️",
+        "🌙", "✨", "🎉", "🔥", "🌸", "🍀",
+        "🏖️", "☕", "🚗", "🎮", "🌱", "🐾"
+    )
+
+    /** 全量，按类别分组（展开「更多」后展示）。 */
+    val categories: List<Pair<String, List<String>>> = listOf(
+        "表情与人物" to listOf(
+            "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊",
+            "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😙", "😋", "😛", "😜", "🤪",
+            "😝", "🤗", "🤭", "🤔", "🤐", "😐", "😑", "😶", "😏", "😒", "🙄", "😬",
+            "😌", "😔", "😪", "🤤", "😴", "😷", "🤒", "🤕", "🥳", "🥺", "😢", "😭",
+            "😤", "😠", "😡", "🤬", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓",
+            "🤯", "😵", "🤠", "🥸", "😎", "🤓", "🧐", "😕", "😟", "🙁", "😮", "😯",
+            "😲", "🤫", "🤥", "🧒", "👦", "👧", "👨", "👩", "👴", "👵", "👶", "🧓",
+            "🙋", "🤦", "🤷", "💁", "🙆", "🙅", "💪", "👏", "🙌", "🤝", "👍", "👎",
+            "👌", "✌️", "🤞", "🤟", "🤘", "👋", "🖐️", "✋", "👊", "✊", "🧠", "👀",
+            "👁️", "👅", "👄", "🦷", "👣"
+        ),
+        "动物与自然" to listOf(
+            "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮",
+            "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🐤", "🦆", "🦅", "🦉", "🦇", "🐺",
+            "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐢", "🐍", "🦎", "🦂",
+            "🦀", "🦐", "🦑", "🐙", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅",
+            "🐆", "🦓", "🦍", "🐘", "🦏", "🐪", "🐫", "🦒", "🐃", "🐄", "🐎", "🐖",
+            "🐑", "🐐", "🦌", "🐕", "🐩", "🐈", "🐓", "🦃", "🦚", "🦜", "🐇", "🐁",
+            "🐀", "🐿️", "🦔",
+            "🌵", "🎄", "🌲", "🌳", "🌴", "🌱", "🌿", "☘️", "🌷", "🌹", "🥀", "🌺",
+            "🌼", "🌻", "🌞", "🌝", "🌛", "🌜", "🌚", "🌕", "🌖", "🌗", "🌘", "🌑",
+            "🌒", "🌓", "🌔", "🌎", "🌍", "🌏", "🪐", "💫", "🌟", "⚡", "☄️", "💥",
+            "🌪️", "🌈", "🌤️", "⛅", "🌥️", "☁️", "🌦️", "🌧️", "⛈️", "🌩️", "🌨️", "❄️",
+            "☃️", "⛄", "🌬️", "💨", "💧", "💦", "☔", "☂️", "🌊"
+        ),
+        "食物与饮品" to listOf(
+            "🍏", "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍈", "🍒", "🍑",
+            "🥭", "🍍", "🥥", "🥝", "🍅", "🥑", "🥦", "🥬", "🥒", "🌶️", "🌽", "🥕",
+            "🧄", "🧅", "🥔", "🍠", "🥐", "🥯", "🍞", "🥖", "🥨", "🧀", "🥚", "🍳",
+            "🧈", "🥞", "🧇", "🥓", "🥩", "🍗", "🍖", "🌭", "🍔", "🍟", "🍕", "🥪",
+            "🥙", "🧆", "🌮", "🌯", "🥗", "🥘", "🍝", "🍜", "🍲", "🍛", "🍣", "🍱",
+            "🥟", "🍤", "🍙", "🍚", "🍘", "🍥", "🥠", "🍢", "🍡", "🍧", "🍨", "🍦",
+            "🥧", "🧁", "🎂", "🍰", "🍮", "🍭", "🍬", "🍫", "🍿", "🍩", "🍪", "🌰",
+            "🥜", "🍯", "🥛", "🍼", "🍵", "🧃", "🥤", "🍶", "🍺", "🍻", "🥂", "🍷",
+            "🥃", "🍸", "🍹", "🧉", "🍾"
+        ),
+        "活动与旅行" to listOf(
+            "⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🏓", "🏸",
+            "🥅", "🏒", "🏑", "🥍", "🏏", "🥊", "🥋", "🎽", "🛹", "🛼", "🛷", "⛸️",
+            "🥌", "🎿", "⛷️", "🏂", "🏋️", "🤸", "🤺", "🤾", "🏌️", "🏇", "🧘", "🏄",
+            "🏊", "🤽", "🚣", "🧗", "🚵", "🚴", "🏆", "🥇", "🥈", "🥉", "🏅", "🎖️",
+            "🏵️", "🎗️", "🎫", "🎟️", "🎪", "🤹", "🎭", "🩰", "🎨", "🎬", "🎤", "🎧",
+            "🎼", "🎹", "🥁", "🎷", "🎺", "🎸", "🪕", "🎻", "🎲", "♟️", "🎳", "🎰",
+            "🧩",
+            "🚕", "🚙", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "🚐", "🚚", "🚛", "🚜",
+            "🦯", "🦽", "🦼", "🛴", "🚲", "🛵", "🏍️", "🛺", "🚨", "🚔", "🚍", "🚘",
+            "🚖", "🚡", "🚠", "🚟", "🚃", "🚋", "🚞", "🚝", "🚄", "🚅", "🚈", "🚂",
+            "🚆", "🚇", "🚊", "🚉", "🛫", "🛬", "🛩️", "💺", "🛰️", "🚀", "🛸", "🚁",
+            "🛶", "⛵", "🚤", "🛥️", "🛳️", "⛴️", "🚢", "⚓", "⛽", "🚧", "🚦", "🚥",
+            "🗺️", "🗿", "🗽", "🗼", "🏰", "🏯", "🏟️", "🎡", "🎢", "🎠", "⛲", "⛱️",
+            "🏝️", "🏜️", "🌋", "⛰️", "🏔️", "🗻", "🏕️", "⛺", "🏡", "🏘️", "🏚️", "🏗️",
+            "🏭", "🏢", "🏬", "🏣", "🏤", "🏥", "🏦", "🏨", "🏪", "🏫", "🏩", "💒",
+            "🏛️", "⛪", "🕌", "🕍", "🛕", "🕋", "⛩️", "🛤️", "🛣️", "🗾", "🎑", "🏞️",
+            "🌅", "🌄", "🌠", "🎇", "🎆", "🌇", "🌆", "🏙️", "🌃", "🌌", "🌉", "🌁"
+        ),
+        "物品与工具" to listOf(
+            "⌚", "📱", "💻", "⌨️", "🖥️", "🖨️", "🖱️", "🖲️", "🕹️", "🗜️", "💽", "💾",
+            "💿", "📀", "📼", "📷", "📸", "📹", "🎥", "📽️", "🎞️", "📞", "☎️", "📟",
+            "📠", "📺", "📻", "🎙️", "🎚️", "🎛️", "🧭", "⏱️", "⏲️", "⏰", "🕰️", "⌛",
+            "⏳", "📡", "🔋", "🔌", "💡", "🔦", "🕯️", "🪔", "🧯", "🛢️", "💸", "💵",
+            "💴", "💶", "💷", "💰", "💳", "💎", "⚖️", "🧰", "🔧", "🔨", "⚒️", "🛠️",
+            "⛏️", "🔩", "⚙️", "🧱", "⛓️", "🧲", "🔫", "💣", "🧨", "🪓", "🔪", "🗡️",
+            "⚔️", "🛡️", "🚬", "⚰️", "⚱️", "🏺", "🔮", "📿", "🧿", "💈", "⚗️", "🔭",
+            "🔬", "🕳️", "🩹", "🩺", "💊", "💉", "🩸", "🧬", "🦠", "🧫", "🧪", "🌡️",
+            "🧹", "🧺", "🧻", "🚽", "🚰", "🚿", "🛁", "🛀", "🧼", "🪒", "🧽", "🧴",
+            "🛎️", "🔑", "🗝️", "🚪", "🪑", "🛋️", "🛏️", "🛌", "🧸", "🖼️", "🛍️", "🛒",
+            "🎈", "🎏", "🎀", "🎊", "🎎", "🏮", "🎐", "🧧", "✉️", "📩", "📨", "📧",
+            "💌", "📥", "📤", "📦", "🏷️", "📪", "📫", "📬", "📭", "📮", "📯", "📜",
+            "📃", "📄", "📑", "🧾", "📊", "📈", "📉", "🗒️", "🗓️", "📆", "📅", "🗑️",
+            "📇", "🗃️", "🗳️", "🗄️", "📋", "🗂️", "🗞️", "📰", "📓", "📔", "📒", "📕",
+            "📗", "📘", "📙", "📖", "🔖", "🧷", "🔗", "📎", "🖇️", "📐", "📏", "🧮",
+            "📌", "📍", "✂️", "🖊️", "🖋️", "✒️", "🖌️", "🖍️", "📝", "✏️", "🔍", "🔎",
+            "🔏", "🔐", "🔒", "🔓"
+        ),
+        "符号与标记" to listOf(
+            "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞",
+            "💓", "💗", "💖", "💘", "💝", "💟", "☮️", "✝️", "☪️", "🕉️", "☸️", "✡️",
+            "🔯", "🕎", "☯️", "☦️", "🛐", "⛎", "♈", "♉", "♊", "♋", "♌", "♍",
+            "♎", "♏", "♐", "♑", "♒", "♓", "🆔", "⚛️", "🉑", "☢️", "☣️", "📴",
+            "📳", "🈶", "🈚", "🈸", "🈺", "🈷️", "✴️", "🆚", "💮", "🉐", "㊙️", "㊗️",
+            "🈴", "🈵", "🈹", "🈲", "🅰️", "🅱️", "🆎", "🆑", "🅾️", "🆘", "❌", "⭕",
+            "🛑", "⛔", "📛", "🚫", "💯", "💢", "♨️", "🚷", "🚯", "🚳", "🚱", "🔞",
+            "📵", "🚭", "❗", "❕", "❓", "❔", "‼️", "⁉️", "🔅", "🔆", "〽️", "⚠️",
+            "🚸", "🔱", "⚜️", "🔰", "♻️", "✅", "🈯", "💹", "❇️", "✳️", "❎", "🌐",
+            "💠", "Ⓜ️", "🌀", "💤", "🏧", "🚾", "♿", "🅿️", "🈳", "🈂️", "🛂", "🛃",
+            "🛄", "🛅", "🚹", "🚺", "🚼", "🚻", "🚮", "🎦", "📶", "🈁", "🔣", "🔤",
+            "🔡", "🔠", "🆖", "🆗", "🆙", "🆒", "🆕", "🆓", "0️⃣", "1️⃣", "2️⃣", "3️⃣",
+            "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟", "🔢", "#️⃣", "*️⃣", "⏏️", "▶️",
+            "⏸️", "⏯️", "⏹️", "⏺️", "⏭️", "⏮️", "⏩", "⏪", "⏫", "⏬", "◀️", "🔼",
+            "🔽", "➡️", "⬅️", "⬆️", "⬇️", "↗️", "↘️", "↙️", "↖️", "↕️", "↔️", "↪️",
+            "↩️", "⤴️", "⤵️", "🔀", "🔁", "🔂", "🔄", "🔃", "🎵", "🎶", "➕", "➖",
+            "➗", "✖️", "♾️", "💲", "💱", "™️", "©️", "®️", "〰️", "➰", "➿", "🔚",
+            "🔙", "🔛", "🔝", "🔜", "✔️", "☑️", "🔘", "🔴", "🟠", "🟡", "🟢", "🔵",
+            "🟣", "⚫", "⚪", "🟤", "🔺", "🔻", "🔸", "🔹", "🔶", "🔷", "🔳", "🔲",
+            "▪️", "▫️", "◾", "◽", "◼️", "◻️", "🟥", "🟧", "🟨", "🟩", "🟦", "🟪",
+            "⬛", "⬜", "🟫", "🔈", "🔇", "🔉", "🔊", "🔔", "🔕", "📣", "📢", "💬",
+            "💭", "🗯️", "♠️", "♣️", "♥️", "♦️", "🃏", "🎴", "🀄", "🕐"
+        )
+    )
+
+    /** 全部 emoji（常用 + 分类），去重。 */
+    val all: List<String> = (common + categories.flatMap { it.second }).distinct()
+}
+
+/**
+ * 统一 emoji 选择器（文件夹图标/封面、节日卡片角标等共用）。
+ *
+ * 默认只展示 [EmojiCatalog.common]，点「更多」展开按类别分组的全量集合（区域限高、可滚动），
+ * 再点「收起」返回。若当前选中项不在常用集合里，会被临时补到最前面，保证始终可见可点。
+ */
+@Composable
+fun EmojiPicker(
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    columns: Int = 6,
+    expandedMaxHeight: Dp = 260.dp
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    // 当前选中项不在常用集合时补进默认视图，避免用户看不到自己选过的表情
+    val defaultShown = remember(selected) {
+        if (selected.isBlank() || EmojiCatalog.common.contains(selected)) EmojiCatalog.common
+        else listOf(selected) + EmojiCatalog.common
+    }
+
+    Column(modifier) {
+        if (!expanded) {
+            defaultShown.chunked(columns).forEach { row ->
+                EmojiGridRow(row, selected, onSelect)
+            }
+            TextButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("更多 emoji")
+            }
+        } else {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = expandedMaxHeight)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                for ((title, list) in EmojiCatalog.categories) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    )
+                    list.chunked(columns).forEach { row ->
+                        EmojiGridRow(row, selected, onSelect)
+                    }
+                }
+            }
+            TextButton(onClick = { expanded = false }, modifier = Modifier.fillMaxWidth()) {
+                Text("收起")
+            }
+        }
+    }
+}
+
+/** 一行 emoji 单元格。 */
+@Composable
+private fun EmojiGridRow(
+    items: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        for (em in items) {
+            val isSelected = em == selected
+            val shape = RoundedCornerShape(12.dp)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(shape)
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                    )
+                    .border(
+                        width = if (isSelected) 2.dp else 0.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = shape
+                    )
+                    .clickable { onSelect(em) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(em, style = MaterialTheme.typography.headlineSmall)
+            }
+        }
+    }
+    Spacer(Modifier.height(2.dp))
+}

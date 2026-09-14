@@ -55,8 +55,12 @@ fun EventDetailScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit
 ) {
-    val event by container.eventRepository.observeById(eventId).collectAsState(initial = null)
-    val folders by container.folderRepository.observeAll().collectAsState(initial = emptyList())
+    // 用 remember 固定 Flow 实例：否则每次重组都会新建 Flow，collectAsState 反复取消/重建观察者
+    // （编辑保存返回后可能漏掉本次变更，与 HomeScreen 同一处理）
+    val event by remember(eventId) { container.eventRepository.observeById(eventId) }
+        .collectAsState(initial = null)
+    val folders by remember { container.folderRepository.observeAll() }
+        .collectAsState(initial = emptyList())
     // 一次性存在性检查：查不到（或已在回收站）直接退出，避免停留在空详情页
     var exists by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(eventId) {

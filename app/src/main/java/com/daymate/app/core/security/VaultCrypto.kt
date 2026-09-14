@@ -42,6 +42,15 @@ object VaultCrypto {
     fun key(password: String, saltHex: String): SecretKey =
         SecretKeySpec(derive(password, saltHex), "AES")
 
+    /**
+     * 一次 PBKDF2 同时得到「验证用 hash」与「加密密钥」。
+     * 设置密码/解锁时两者都要用，各自调 [hash]/[key] 会把 10 万次迭代的派生跑两遍。
+     */
+    fun deriveAll(password: String, saltHex: String): Pair<String, SecretKey> {
+        val raw = derive(password, saltHex)
+        return raw.toHex() to SecretKeySpec(raw, "AES")
+    }
+
     fun newSalt(): String {
         val bytes = ByteArray(16)
         SecureRandom().nextBytes(bytes)

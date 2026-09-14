@@ -1,7 +1,5 @@
 package com.ayaka7452.daymate.core.util
 
-import java.time.LocalDate
-
 /**
  * 周期管家：经期/排卵期/黄体期推算。
  *
@@ -57,11 +55,6 @@ object CycleCalculator {
     /** 动态推算保底：黄体期最短天数（医学共识黄体期波动 11~17 天，压缩仍在合理区间）。 */
     const val MIN_LUTEAL_DAYS = 11L
 
-    /** 周期天数合法区间（超出提醒用户确认，但不强制拦截——身体情况因人而异）。 */
-    fun isCycleDaysValid(days: Int) = days in MIN_CYCLE_DAYS..MAX_CYCLE_DAYS
-
-    fun isPeriodDaysValid(days: Int) = days in MIN_PERIOD_DAYS..MAX_PERIOD_DAYS
-
     /** 相邻两次经期首日算出一个周期长度；不在 15~60 天内视为无效记录（漏记/异常周期）。 */
     fun cycleLengthBetween(prevStart: Long, nextStart: Long): Int? {
         val diff = (nextStart - prevStart).toInt()
@@ -96,10 +89,6 @@ object CycleCalculator {
     /** 预测下一次经期首日 = 已知首日 + 周期天数。 */
     fun nextStartAfter(lastStartEpochDay: Long, cycleDays: Int): Long =
         lastStartEpochDay + cycleDays
-
-    /** 排卵日 = 预测下次经期首日 − 14 天（黄体期固定近似）。 */
-    fun ovulationDay(nextStartEpochDay: Long): Long =
-        nextStartEpochDay - LUTEAL_DAYS
 
     /**
      * 动态排卵日：标准口径为下次经期首日 − 14。

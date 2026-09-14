@@ -65,7 +65,10 @@ fun EventFormScreen(
     // 所在文件夹：新建时预置入口传入的 folderId（主页=null 根目录，文件夹页=当前文件夹）；编辑时从事件加载
     var folderIdSel by remember { mutableStateOf<Long?>(folderId) }
     var showFolderPicker by remember { mutableStateOf(false) }
-    val folders by container.folderRepository.observeAll().collectAsState(initial = emptyList())
+    // 用 remember 固定 Flow 实例：否则每次重组都会新建 Flow，collectAsState 反复取消/重建观察者，
+    // 从其它页面返回时可能漏掉 Room 的变更通知（与 HomeScreen 同一处理）
+    val folders by remember { container.folderRepository.observeAll() }
+        .collectAsState(initial = emptyList())
     var epochDay by remember {
         mutableStateOf(prefillEpochDay ?: LocalDate.now().plusDays(7).toEpochDay())
     }

@@ -26,8 +26,8 @@ android {
         applicationId = "com.ayaka7452.daymate"
         minSdk = 26
         targetSdk = 34
-        versionCode = 64
-        versionName = "1.5.8"
+        versionCode = 65
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -101,6 +101,8 @@ dependencies {
     implementation(libs.kotlinx.datetime)
     implementation(libs.reorderable)
     implementation(libs.androidx.documentfile)
+    // WebDAV 云端备份：需要 PROPFIND / MKCOL 等自定义 HTTP 方法，HttpURLConnection 不支持
+    implementation(libs.okhttp)
 
     debugImplementation(libs.compose.ui.tooling)
 
