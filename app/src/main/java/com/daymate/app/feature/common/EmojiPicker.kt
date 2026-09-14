@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -179,10 +180,10 @@ fun EmojiPicker(
         else listOf(selected) + EmojiCatalog.common
     }
 
-    Column(modifier) {
+    Column(modifier.fillMaxWidth()) {
         if (!expanded) {
             defaultShown.chunked(columns).forEach { row ->
-                EmojiGridRow(row, selected, onSelect)
+                EmojiGridRow(row, selected, onSelect, columns)
             }
             TextButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("更多 emoji")
@@ -202,7 +203,7 @@ fun EmojiPicker(
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                     )
                     list.chunked(columns).forEach { row ->
-                        EmojiGridRow(row, selected, onSelect)
+                        EmojiGridRow(row, selected, onSelect, columns)
                     }
                 }
             }
@@ -213,20 +214,31 @@ fun EmojiPicker(
     }
 }
 
-/** 一行 emoji 单元格。 */
+/** 一行 emoji 单元格：格子在整行宽度内等分，末行补空占位以保持列对齐。 */
 @Composable
 private fun EmojiGridRow(
     items: List<String>,
     selected: String,
-    onSelect: (String) -> Unit
+    onSelect: (String) -> Unit,
+    columns: Int
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        for (em in items) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        // 末行不足 columns 个时补空占位，避免剩余的格子被拉宽
+        val cells = items + List((columns - items.size).coerceAtLeast(0)) { "" }
+        for (em in cells) {
+            if (em.isEmpty()) {
+                Box(Modifier.weight(1f).aspectRatio(1f))
+                continue
+            }
             val isSelected = em == selected
             val shape = RoundedCornerShape(12.dp)
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .weight(1f)
+                    .aspectRatio(1f)
                     .clip(shape)
                     .background(
                         if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
@@ -239,7 +251,11 @@ private fun EmojiGridRow(
                     .clickable { onSelect(em) },
                 contentAlignment = Alignment.Center
             ) {
-                Text(em, style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    em,
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
