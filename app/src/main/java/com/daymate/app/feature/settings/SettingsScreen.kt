@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.data.festival.FestivalRepository
+import com.ayaka7452.daymate.feature.common.EmojiCatalog
 import com.ayaka7452.daymate.feature.common.EmojiPicker
 import com.ayaka7452.daymate.feature.setup.StorageSetupBody
 import com.ayaka7452.daymate.widget.WidgetRenderer
@@ -457,7 +458,8 @@ fun SettingsScreen(
                             container.settingsRepository.setHomeBadgeEmoji(em)
                         }
                         showBadgeEmojiDialog = false
-                    }
+                    },
+                    presets = EmojiCatalog.festivalPresets
                 )
             },
             confirmButton = {

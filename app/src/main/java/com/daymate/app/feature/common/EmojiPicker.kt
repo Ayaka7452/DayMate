@@ -43,12 +43,29 @@ import androidx.compose.ui.unit.dp
  */
 object EmojiCatalog {
 
-    /** 默认展示（与旧版文件夹图标 / 节日角标的常用集合一致）。 */
-    val common: List<String> = listOf(
-        "📁", "📂", "⭐", "❤️", "🎯", "🎁",
-        "📚", "💼", "🏠", "✈️", "🎓", "☀️",
-        "🌙", "✨", "🎉", "🔥", "🌸", "🍀",
-        "🏖️", "☕", "🚗", "🎮", "🌱", "🐾"
+    /**
+     * 文件夹图标推荐（默认展示）。
+     *
+     * 侧重「分类 / 生活领域」，两两成对便于一眼分辨文件夹用途；**不含节日专属符号**
+     * （那是[festivalPresets] 的职责），也不把 📁/📂 之外的同义文件夹图标堆在一起。
+     */
+    val folderPresets: List<String> = listOf(
+        "📁", "📂", "🗂️", "🗃️", "💼", "🎓",
+        "🏠", "✈️", "🚗", "🎮", "📚", "🎵",
+        "📷", "💰", "🍳", "💪", "🎨", "🌱"
+    )
+
+    /**
+     * 节日卡片角标推荐（默认展示）。
+     *
+     * 侧重「节日 / 节令」，首位是 🎉，**不会出现文件夹图标**；
+     * 覆盖春节(🧧🏮🐉)、生日(🎂)、圣诞(🎄)、万圣(🎃)、跨年(🎆)、中秋(🌕)、七夕(🎋)
+     * 以及四季节令(🌸🍁❄️☀️)。
+     */
+    val festivalPresets: List<String> = listOf(
+        "🎉", "🎊", "🎁", "🧧", "🏮", "🐉",
+        "🎂", "🎄", "🎃", "🎆", "🌕", "🎋",
+        "🍀", "🌸", "🍁", "❄️", "☀️", "⭐"
     )
 
     /** 全量，按类别分组（展开「更多」后展示）。 */
@@ -154,30 +171,34 @@ object EmojiCatalog {
         )
     )
 
-    /** 全部 emoji（常用 + 分类），去重。 */
-    val all: List<String> = (common + categories.flatMap { it.second }).distinct()
+    /** 全部 emoji（两套推荐 + 分类），去重。 */
+    val all: List<String> =
+        (folderPresets + festivalPresets + categories.flatMap { it.second }).distinct()
 }
 
 /**
  * 统一 emoji 选择器（文件夹图标/封面、节日卡片角标等共用）。
  *
- * 默认只展示 [EmojiCatalog.common]，点「更多」展开按类别分组的全量集合（区域限高、可滚动），
- * 再点「收起」返回。若当前选中项不在常用集合里，会被临时补到最前面，保证始终可见可点。
+ * 默认只展示 [presets]：按使用场景传入 [EmojiCatalog.folderPresets]（文件夹）或
+ * [EmojiCatalog.festivalPresets]（节日角标）——两套推荐各有侧重，不共用同一份。
+ * 点「更多」展开按类别分组的全量集合（区域限高、可滚动），再点「收起」返回。
+ * 若当前选中项不在推荐集合里，会被临时补到最前面，保证始终可见可点。
  */
 @Composable
 fun EmojiPicker(
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    presets: List<String> = EmojiCatalog.folderPresets,
     columns: Int = 6,
     expandedMaxHeight: Dp = 260.dp
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    // 当前选中项不在常用集合时补进默认视图，避免用户看不到自己选过的表情
-    val defaultShown = remember(selected) {
-        if (selected.isBlank() || EmojiCatalog.common.contains(selected)) EmojiCatalog.common
-        else listOf(selected) + EmojiCatalog.common
+    // 当前选中项不在推荐集合时补进默认视图，避免用户看不到自己选过的表情
+    val defaultShown = remember(selected, presets) {
+        if (selected.isBlank() || presets.contains(selected)) presets
+        else listOf(selected) + presets
     }
 
     Column(modifier.fillMaxWidth()) {

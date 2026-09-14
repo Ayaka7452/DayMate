@@ -72,7 +72,11 @@ fun FolderDialog(
                 Spacer(Modifier.height(12.dp))
                 Text("图标", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(8.dp))
-                EmojiPicker(selected = icon, onSelect = { icon = it })
+                EmojiPicker(
+                    selected = icon,
+                    onSelect = { icon = it },
+                    presets = EmojiCatalog.folderPresets
+                )
             }
         }
     )
