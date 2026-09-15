@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -486,15 +485,11 @@ fun StorageSetupBody(
                 color = MaterialTheme.colorScheme.outline
             )
             Spacer(Modifier.height(8.dp))
-            Button(
+            OutlinedButton(
                 onClick = { treeLauncher.launch(null) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy
-            ) {
-                Icon(Icons.Filled.Folder, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("选择备份文件夹")
-            }
+            ) { Text("选择备份文件夹") }
             Spacer(Modifier.height(8.dp))
             TextButton(
                 onClick = { clear() },
