@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * 周期管家：经期登记记录的增删改查。
  * 记录本身即敏感数据——表放在主库 events 同库，导出备份会一并带走（与用户预期一致）；
- * 页面入口的隐私由「周期管家密码开关 + FLAG_SECURE」负责。
+ * 页面入口的隐私由「周期管家密码开关 + FLAG_SECURE（可在设置 → 隐私中放开）」负责。
  */
 class CycleRepository(
     private val dao: CycleLogDao,

@@ -137,6 +137,22 @@ fun VaultScreen(
         !passwordSet -> "setup"
         else -> "unlock"
     }
+
+    // 防截屏/最近任务缩略图遮挡：内容页跟随「设置 → 隐私」的开关（默认阻止），
+    // 但解锁页与设密页无论开关如何都始终阻止，避免密码被截屏/录屏。
+    val allowScreenshot by container.settingsRepository.allowScreenshotVault
+        .collectAsState(initial = false)
+    val screenshotActivity = LocalContext.current as? FragmentActivity
+    DisposableEffect(allowScreenshot, gateState) {
+        if (!allowScreenshot || gateState != "list") {
+            screenshotActivity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            screenshotActivity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose {
+            screenshotActivity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
     Crossfade(targetState = gateState, label = "vault_gate") { state ->
         when (state) {
             "list" -> VaultListScreen(
@@ -370,7 +386,6 @@ private fun VaultListScreen(
     onNavigate: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val activity = context as? FragmentActivity
     val eventsFlow = remember { container.vaultRepository.observeRoot() }
     val events by eventsFlow.collectAsState(initial = emptyList())
     val foldersFlow = remember { container.vaultFolderRepository.observeAll() }
@@ -514,10 +529,7 @@ private fun VaultListScreen(
         selectedEventIds.clear(); selectedFolderIds.clear(); selectionMode = false
     }
 
-    DisposableEffect(Unit) {
-        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
-    }
+    // 截图限制已提升到 VaultScreen 顶层（同时覆盖解锁页与设密页），此处不再重复设置。
 
     VaultScaffold(
         title = "🔒 Vault",
@@ -872,6 +884,19 @@ fun VaultFolderScreen(
     val allFolders by allFoldersFlow.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     val folderContext = LocalContext.current
+
+    // 防截屏/最近任务缩略图遮挡：跟随「设置 → 隐私 → 保险箱允许截图」（默认阻止）。
+    val allowScreenshot by container.settingsRepository.allowScreenshotVault
+        .collectAsState(initial = false)
+    val folderActivity = folderContext as? FragmentActivity
+    DisposableEffect(allowScreenshot) {
+        if (!allowScreenshot) {
+            folderActivity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            folderActivity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose { folderActivity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
 
     // 排序模式：manual 才允许手动调整顺序
     val defaultSort by container.settingsRepository.defaultSort

@@ -132,10 +132,18 @@ fun CycleScreen(
         if (!passwordEnabled) unlockedByUser = false
     }
 
-    // 防截屏/最近任务缩略图遮挡（与 Vault 一致）
+    // 防截屏/最近任务缩略图遮挡（与 Vault 一致）。
+    // 默认阻止，可在「设置 → 隐私 → 周期管家允许截图」放开；密码验证门（locked）
+    // 无论开关如何都始终阻止，避免密码被截屏。
+    val allowScreenshot by container.settingsRepository.allowScreenshotCycle
+        .collectAsState(initial = false)
     val activity = LocalContext.current as? androidx.fragment.app.FragmentActivity
-    DisposableEffect(Unit) {
-        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+    DisposableEffect(allowScreenshot, locked) {
+        if (!allowScreenshot || locked) {
+            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
         onDispose { activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE) }
     }
 

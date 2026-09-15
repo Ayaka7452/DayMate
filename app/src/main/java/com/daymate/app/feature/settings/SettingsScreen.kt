@@ -84,6 +84,10 @@ fun SettingsScreen(
 
     val autoBackup by container.settingsRepository.autoBackupEnabled
         .collectAsState(initial = true)
+    val allowScreenshotCycle by container.settingsRepository.allowScreenshotCycle
+        .collectAsState(initial = false)
+    val allowScreenshotVault by container.settingsRepository.allowScreenshotVault
+        .collectAsState(initial = false)
     val backupConfigured = StorageConfig.isBackupConfigured(ctx)
 
     // 节假日数据：不内置离线数据，由应用从可配置的数据源下载并缓存
@@ -352,6 +356,68 @@ fun SettingsScreen(
                     checked = autoBackup,
                     enabled = backupConfigured,
                     onCheckedChange = { scope.launch { container.settingsRepository.setAutoBackupEnabled(it) } }
+                )
+            }
+
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
+            // ===== 隐私：截图限制 =====
+            Text(
+                "隐私",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            Text(
+                "周期管家与保险箱默认禁止截屏/录屏，也不会出现在最近任务缩略图里。需要截图时可在下面放开。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("周期管家允许截图", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (allowScreenshotCycle) "已允许截屏/录屏；密码验证页仍会阻止"
+                        else "已阻止截屏/录屏与最近任务缩略图",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = allowScreenshotCycle,
+                    onCheckedChange = {
+                        scope.launch { container.settingsRepository.setAllowScreenshotCycle(it) }
+                    }
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("保险箱允许截图", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (allowScreenshotVault) "已允许截屏/录屏；解锁与设密页仍会阻止"
+                        else "已阻止截屏/录屏与最近任务缩略图",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = allowScreenshotVault,
+                    onCheckedChange = {
+                        scope.launch { container.settingsRepository.setAllowScreenshotVault(it) }
+                    }
                 )
             }
 

@@ -32,6 +32,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val CYCLE_DEFAULT_CALENDAR = booleanPreferencesKey("cycle_default_calendar") // 周期管家默认视图（false=圆环，true=日历）
         private val CYCLE_CYCLE_AUTO = booleanPreferencesKey("cycle_cycle_auto")     // 周期天数自动按记录均值推算（默认开；手改即固定）
         private val CYCLE_PERIOD_AUTO = booleanPreferencesKey("cycle_period_auto")   // 经期天数自动按记录均值推算（默认开；手改即固定）
+        private val ALLOW_SCREENSHOT_CYCLE = booleanPreferencesKey("allow_screenshot_cycle") // 周期管家允许截屏（默认关＝阻止）
+        private val ALLOW_SCREENSHOT_VAULT = booleanPreferencesKey("allow_screenshot_vault") // 保险箱允许截屏（默认关＝阻止）
 
         /** 备份位置取值：仅本地 SAF 文件夹 / 本地 + WebDAV 云端 / 仅 WebDAV 云端。 */
         const val BACKUP_TARGET_LOCAL = "local"
@@ -117,6 +119,30 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     /** 设置「修改后自动备份」开关。 */
     suspend fun setAutoBackupEnabled(enabled: Boolean) {
         dataStore.edit { it[AUTO_BACKUP] = enabled }
+    }
+
+    // ===== 隐私：截图限制 =====
+
+    /**
+     * 是否允许对「周期管家」页面截屏/录屏（默认 false＝阻止）。
+     * 放开后周期日历与记录可被截屏，也会出现在最近任务缩略图里；密码验证页始终阻止。
+     */
+    val allowScreenshotCycle: Flow<Boolean> =
+        dataStore.data.map { it[ALLOW_SCREENSHOT_CYCLE] ?: false }
+
+    /**
+     * 是否允许对「保险箱」内容页截屏/录屏（默认 false＝阻止）。
+     * 解锁页与设密页始终阻止，避免密码被截。
+     */
+    val allowScreenshotVault: Flow<Boolean> =
+        dataStore.data.map { it[ALLOW_SCREENSHOT_VAULT] ?: false }
+
+    suspend fun setAllowScreenshotCycle(allow: Boolean) {
+        dataStore.edit { it[ALLOW_SCREENSHOT_CYCLE] = allow }
+    }
+
+    suspend fun setAllowScreenshotVault(allow: Boolean) {
+        dataStore.edit { it[ALLOW_SCREENSHOT_VAULT] = allow }
     }
 
     /** 设置主页顶部卡片显示内容。 */
