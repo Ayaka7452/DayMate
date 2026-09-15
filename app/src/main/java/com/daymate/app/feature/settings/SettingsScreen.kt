@@ -773,6 +773,53 @@ private fun RepairResultCard(r: com.ayaka7452.daymate.core.DbRepair.RepairResult
             ResultLine("修复无效引用", if (r.fixedDanglingRefs > 0) "${r.fixedDanglingRefs} 处" else "无需修复")
             ResultLine("修补异常时间", if (r.fixedTimestamps > 0) "${r.fixedTimestamps} 条" else "无需修复")
 
+            // ===== 字段利用率：哪些字段在你的实际数据里从未被填过 =====
+            Spacer(Modifier.padding(vertical = 4.dp))
+            Text(
+                "从未填过值的字段",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            if (after.unusedFields.isEmpty()) {
+                Text("无——所有字段都有数据", style = MaterialTheme.typography.bodySmall)
+            } else {
+                after.unusedFields.forEach {
+                    Text(
+                        "· ${it.tableLabel}的「${it.fieldLabel}」（共 ${it.total} 条，0 条填过）",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Text(
+                    "这些字段都有对应功能，只是你的数据里没用过，不属于垃圾列，不会自动删除",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            // ===== 冗余数据：只提示，不自动清理 =====
+            Spacer(Modifier.padding(vertical = 4.dp))
+            Text(
+                "数据冗余检查",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            if (after.redundancies.isEmpty()) {
+                Text("未发现冗余数据", style = MaterialTheme.typography.bodySmall)
+            } else {
+                after.redundancies.forEach {
+                    Text("· ${it.label}：${it.count} 处", style = MaterialTheme.typography.bodySmall)
+                }
+                Text(
+                    "以上仅为提示，未做任何自动清理（避免误删你要保留的数据）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
             Spacer(Modifier.padding(vertical = 4.dp))
             Text(
                 "现有数据（未做任何删改）",

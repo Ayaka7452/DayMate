@@ -12,16 +12,17 @@ import java.io.File
  * 定位：给长期使用的库做一次「体检 + 整理」，**只做无损维护，绝不删除用户数据**——
  * 不碰事件/文件夹/保险箱的任何一行内容，回收站里的已删除条目也保持原样（仅在报告里列出数量）。
  *
- * 具体动作：
- *  - 诊断：文件占用、空闲页与碎片率、`PRAGMA integrity_check`、各表行数（含回收站条目）、
- *    悬空文件夹引用、异常时间戳、与当前代码不再匹配的僵尸列；
- *  - 修复：悬空引用置空（指向已不存在的文件夹本身已是无效状态）、异常时间戳补正（仅 0/负值这类
- *    不可能值）、`VACUUM` 内部重建文件以回收碎片；
- *  - 收尾：合并 WAL 后调用 [AutoBackupManager.flush]，把修好的库同步到本地文件夹与云端
- *    （自动备份带空数据护栏，而本流程不改行数，因此不会被误拦）。
+ * 扫描分三层，全部只读：
+ *  1. **物理层**：文件占用、空闲页与碎片率、`PRAGMA integrity_check`；
+ *  2. **结构层**：与当前代码不再匹配的僵尸列、悬空文件夹引用、异常时间戳；
+ *  3. **数据层**：逐列填充率（找出**从未被填过**的字段）+ 冗余数据检查
+ *     （重复条目、空标题、重名文件夹、越界取值、长期滞留回收站等）。
+ *
+ * 修复动作同样克制：悬空引用置空、明显异常的时间戳补正（仅 0/负值），然后 `VACUUM`
+ * 内部重建文件回收碎片；收尾调用 [AutoBackupManager.flush] 把修好的库同步到本地与云端备份。
  *
  * 关于 VACUUM：它是 SQLite 官方的维护操作，效果等价于「重新生成一份紧凑的数据库文件」，
- * 数据一行不动——这也是本工具不采用「导出重建」方案的原因：重建需要自行搬运数据，风险高得多，
+ * 数据一行不动。这也是本工具不采用「导出重建」方案的原因——重建需要自行搬运数据，风险高得多，
  * 而收益（回收空间）VACUUM 已经覆盖。
  */
 class DbRepair(
@@ -42,6 +43,24 @@ class DbRepair(
         val danglingRefs: Long
     )
 
+    /** 某个字段的填充情况——用于回答「哪些字段实际没被用起来」。 */
+    data class FieldUsage(
+        val table: String,
+        val tableLabel: String,
+        val column: String,
+        val fieldLabel: String,
+        /** 该列非空的行数（0 表示从未填过）。 */
+        val filled: Long,
+        /** 该表总行数。 */
+        val total: Long
+    )
+
+    /** 一项冗余数据检查的结果。 */
+    data class Redundancy(
+        val label: String,
+        val count: Long
+    )
+
     /** 一次体检的完整结果。 */
     data class Report(
         val dbBytes: Long,
@@ -54,6 +73,10 @@ class DbRepair(
         val tables: List<TableStat>,
         /** 与当前代码不再匹配的列（僵尸列）。 */
         val zombieColumns: List<String>,
+        /** 从未被填过任何值的字段。 */
+        val unusedFields: List<FieldUsage>,
+        /** 发现的冗余数据（只报告，不自动清理）。 */
+        val redundancies: List<Redundancy>,
         /** 创建/更新时间为 0 或负数的行数。 */
         val badTimestampRows: Long
     ) {
@@ -68,7 +91,7 @@ class DbRepair(
 
         /** 用户数据总行数（不含回收站）。 */
         val liveRows: Long
-            get() = tables.sumOf { it.rows - it.inRecycleBin }
+            get() = tables.sumOf { if (it.rows < 0) 0L else it.rows - it.inRecycleBin }
     }
 
     /** 修复结果。 */
@@ -105,13 +128,42 @@ class DbRepair(
         )
     )
 
+    /** 需要做填充率统计的可空字段（NOT NULL 列必然有值，没有统计意义）。 */
+    private data class FieldSpec(
+        val table: String,
+        val tableLabel: String,
+        val column: String,
+        val fieldLabel: String
+    )
+
+    private val trackedFields = listOf(
+        FieldSpec("events", "倒数日", "note", "备注"),
+        FieldSpec("events", "倒数日", "refDays", "对照天数"),
+        FieldSpec("events", "倒数日", "displayUnit", "显示单位"),
+        FieldSpec("events", "倒数日", "repeatRule", "循环规则"),
+        FieldSpec("events", "倒数日", "linkedFestival", "跟随节日"),
+        FieldSpec("events", "倒数日", "specialType", "功能标记"),
+        FieldSpec("events", "倒数日", "color", "自定义颜色"),
+        FieldSpec("events", "倒数日", "folderId", "所属文件夹"),
+        FieldSpec("folders", "文件夹", "icon", "图标"),
+        FieldSpec("folders", "文件夹", "color", "自定义颜色"),
+        FieldSpec("vault_events", "保险箱条目", "note", "备注"),
+        FieldSpec("vault_events", "保险箱条目", "refDays", "对照天数"),
+        FieldSpec("vault_events", "保险箱条目", "displayUnit", "显示单位"),
+        FieldSpec("vault_events", "保险箱条目", "repeatRule", "循环规则"),
+        FieldSpec("vault_events", "保险箱条目", "linkedFestival", "跟随节日"),
+        FieldSpec("vault_folders", "保险箱文件夹", "icon", "图标"),
+        FieldSpec("vault_folders", "保险箱文件夹", "color", "自定义颜色"),
+        FieldSpec("cycle_logs", "周期记录", "note", "异常标记")
+    )
+
     /** 只体检、不修改任何内容。 */
     suspend fun diagnose(): Report = withContext(Dispatchers.IO) { buildReport() }
 
     /**
      * 体检 → 无损修复 → 回收碎片 → 同步各备份点。
      * 修复动作全部是「让无效状态变有效」：悬空引用置空、不可能的时间戳补正，
-     * 不删除任何一条记录，也不改变回收站内容。
+     * 不删除任何一条记录，也不改变回收站内容；冗余数据只报告、不自动清理。
      */
     suspend fun repair(): RepairResult = withContext(Dispatchers.IO) {
         val before = buildReport()
@@ -132,13 +184,7 @@ class DbRepair(
 
             // 2) 异常时间戳补正：仅处理 0 / 负数这类不可能值（1970 年），不动正常时间
             val now = System.currentTimeMillis()
-            for ((table, cols) in listOf(
-                "events" to listOf("createdAt", "updatedAt"),
-                "folders" to listOf("createdAt"),
-                "vault_events" to listOf("createdAt", "updatedAt"),
-                "vault_folders" to listOf("createdAt"),
-                "cycle_logs" to listOf("createdAt", "updatedAt")
-            )) {
+            for ((table, cols) in timestampColumns()) {
                 for (col in cols) {
                     timestamps += d.compileStatement(
                         "UPDATE $table SET $col = $now WHERE $col IS NULL OR $col <= 0"
@@ -176,7 +222,7 @@ class DbRepair(
         )
     }
 
-    // ===== 内部 =====
+    // ===== 报告构建 =====
 
     private fun buildReport(): Report {
         val d = db.openHelper.writableDatabase
@@ -237,22 +283,8 @@ class DbRepair(
             TableStat("cycle_logs", "周期记录", count(d, "cycle_logs"), 0, 0)
         )
 
-        // 与代码不再匹配的列
-        val zombies = mutableListOf<String>()
-        for ((table, expected) in expectedColumns) {
-            val actual = columnsOf(d, table)
-            if (actual.isEmpty()) continue
-            for (col in actual - expected) zombies.add("$table.$col")
-        }
-
         var badTs = 0L
-        for ((table, cols) in listOf(
-            "events" to listOf("createdAt", "updatedAt"),
-            "folders" to listOf("createdAt"),
-            "vault_events" to listOf("createdAt", "updatedAt"),
-            "vault_folders" to listOf("createdAt"),
-            "cycle_logs" to listOf("createdAt", "updatedAt")
-        )) {
+        for ((table, cols) in timestampColumns()) {
             for (col in cols) badTs += count(d, "$table WHERE $col IS NULL OR $col <= 0")
         }
 
@@ -265,10 +297,113 @@ class DbRepair(
             integrityOk = integrityOk,
             integrityDetail = integrityDetail,
             tables = tables,
-            zombieColumns = zombies,
+            zombieColumns = scanZombieColumns(d),
+            unusedFields = scanUnusedFields(d),
+            redundancies = scanRedundancies(d),
             badTimestampRows = badTs
         )
     }
+
+    /** 与当前代码不再匹配的列。 */
+    private fun scanZombieColumns(d: androidx.sqlite.db.SupportSQLiteDatabase): List<String> {
+        val zombies = mutableListOf<String>()
+        for ((table, expected) in expectedColumns) {
+            val actual = columnsOf(d, table)
+            if (actual.isEmpty()) continue
+            for (col in actual - expected) zombies.add("$table.$col")
+        }
+        return zombies
+    }
+
+    /** 可空字段里从未被填过值的那些（回答「哪些字段实际没被用起来」）。 */
+    private fun scanUnusedFields(d: androidx.sqlite.db.SupportSQLiteDatabase): List<FieldUsage> {
+        val out = mutableListOf<FieldUsage>()
+        val totalCache = mutableMapOf<String, Long>()
+        for (spec in trackedFields) {
+            if (spec.column !in columnsOf(d, spec.table)) continue
+            val total = totalCache.getOrPut(spec.table) { count(d, spec.table) }
+            if (total <= 0) continue
+            val filled = runCatching {
+                d.compileStatement("SELECT COUNT(${spec.column}) FROM ${spec.table}")
+                    .simpleQueryForLong()
+            }.getOrDefault(-1L)
+            if (filled == 0L) {
+                out.add(
+                    FieldUsage(
+                        table = spec.table,
+                        tableLabel = spec.tableLabel,
+                        column = spec.column,
+                        fieldLabel = spec.fieldLabel,
+                        filled = filled,
+                        total = total
+                    )
+                )
+            }
+        }
+        return out
+    }
+
+    /** 冗余数据检查——**只统计不修改**，是否清理由用户自行决定。 */
+    private fun scanRedundancies(d: androidx.sqlite.db.SupportSQLiteDatabase): List<Redundancy> {
+        val out = mutableListOf<Redundancy>()
+        val staleCutoff = System.currentTimeMillis() - 30L * 24 * 3600 * 1000
+
+        fun add(label: String, sql: String) {
+            val n = runCatching { d.compileStatement(sql).simpleQueryForLong() }.getOrDefault(0L)
+            if (n > 0) out.add(Redundancy(label, n))
+        }
+
+        add(
+            "疑似重复的倒数日（标题、日期、所属文件夹完全相同）",
+            "SELECT COUNT(*) FROM (SELECT 1 FROM events WHERE isDeleted = 0 " +
+                "GROUP BY title, targetDateEpochDay, IFNULL(folderId, -1) HAVING COUNT(*) > 1)"
+        )
+        add(
+            "标题为空白的倒数日",
+            "SELECT COUNT(*) FROM events WHERE isDeleted = 0 AND TRIM(IFNULL(title, '')) = ''"
+        )
+        add(
+            "重名的文件夹",
+            "SELECT COUNT(*) FROM (SELECT 1 FROM folders WHERE isDeleted = 0 " +
+                "GROUP BY name HAVING COUNT(*) > 1)"
+        )
+        add(
+            "对照天数取值异常的倒数日",
+            "SELECT COUNT(*) FROM events WHERE refDays IS NOT NULL " +
+                "AND (refDays <= 0 OR refDays > 36500)"
+        )
+        add(
+            "目标日期超出合理范围的倒数日",
+            "SELECT COUNT(*) FROM events WHERE targetDateEpochDay < -200000 " +
+                "OR targetDateEpochDay > 100000"
+        )
+        add(
+            "持续天数异常的周期记录",
+            "SELECT COUNT(*) FROM cycle_logs WHERE periodDays < 1 OR periodDays > 15"
+        )
+        add(
+            "首日重复的周期记录",
+            "SELECT COUNT(*) FROM (SELECT 1 FROM cycle_logs " +
+                "GROUP BY startDateEpochDay HAVING COUNT(*) > 1)"
+        )
+        add(
+            "在回收站停留超过 30 天的条目",
+            "SELECT (SELECT COUNT(*) FROM events WHERE isDeleted = 1 AND deletedAt > 0 " +
+                "AND deletedAt < $staleCutoff) + (SELECT COUNT(*) FROM folders " +
+                "WHERE isDeleted = 1 AND deletedAt > 0 AND deletedAt < $staleCutoff)"
+        )
+        return out
+    }
+
+    // ===== 内部工具 =====
+
+    private fun timestampColumns(): List<Pair<String, List<String>>> = listOf(
+        "events" to listOf("createdAt", "updatedAt"),
+        "folders" to listOf("createdAt"),
+        "vault_events" to listOf("createdAt", "updatedAt"),
+        "vault_folders" to listOf("createdAt"),
+        "cycle_logs" to listOf("createdAt", "updatedAt")
+    )
 
     private fun checkpoint(d: androidx.sqlite.db.SupportSQLiteDatabase) {
         runCatching { d.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() } }
@@ -289,7 +424,7 @@ class DbRepair(
             d.query(sql).use { c -> if (c.moveToFirst()) c.getLong(0) else 0L }
         }.getOrDefault(0L)
 
-    /** 计数：任意异常都返回 -1（与备份护栏同策略——读不出来就不谎报 0）。 */
+    /** 计数：读不出来返回 -1（与备份护栏同策略——绝不谎报 0）。 */
     private fun count(d: androidx.sqlite.db.SupportSQLiteDatabase, from: String): Long =
         runCatching {
             d.compileStatement("SELECT COUNT(*) FROM $from").simpleQueryForLong()
