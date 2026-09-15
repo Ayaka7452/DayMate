@@ -687,16 +687,47 @@ private fun WidgetEventOption(
 }
 
 /**
- * 数据维护区块：一键体检 + 无损修复数据库，完成后把结果同步到各备份点。
+ * 数据维护区块：**先扫描 → 发现问题才弹框 → 用户确认后修复**。
+ *
+ * 修复前的安全网：已配置本地备份文件夹时，会自动留一份 `daymate.db.bak` 快照；
+ * 未配置则先弹出警告，让用户决定是先去设置备份还是继续。
  * 运行状态封装在本组件内部，避免给设置页主函数再堆一批 remember 变量。
  */
 @Composable
 private fun DataMaintenanceSection(container: AppContainer) {
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
-    var running by remember { mutableStateOf(false) }
+    var scanning by remember { mutableStateOf(false) }
+    var repairing by remember { mutableStateOf(false) }
+    var report by remember {
+        mutableStateOf<com.ayaka7452.daymate.core.DbRepair.Report?>(null)
+    }
     var result by remember {
         mutableStateOf<com.ayaka7452.daymate.core.DbRepair.RepairResult?>(null)
+    }
+    var showIssues by remember { mutableStateOf(false) }
+    var showNoBackupWarning by remember { mutableStateOf(false) }
+
+    val busy = scanning || repairing
+
+    fun runRepair() {
+        repairing = true
+        scope.launch {
+            val r = container.dbRepair.repair()
+            result = r
+            report = r.after ?: r.before
+            repairing = false
+            Toast.makeText(
+                ctx,
+                if (r.ok) {
+                    if (r.snapshotCreated) "修复完成：已留快照 daymate.db.bak，并同步到备份"
+                    else "修复完成，已同步到备份"
+                } else {
+                    "修复失败：${r.failureReason.orEmpty()}"
+                },
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     Text(
@@ -705,8 +736,7 @@ private fun DataMaintenanceSection(container: AppContainer) {
         modifier = Modifier.padding(top = 16.dp)
     )
     Text(
-        "为长期使用的数据库做体检与整理：回收被反复增删撑大的空间、修复指向已删除文件夹的无效引用。" +
-            "全程无损，不会删除任何事件、文件夹或保险箱内容。",
+        "先扫描数据库，确认结果后再决定是否修复。全程无损，不会删除任何事件、文件夹或保险箱内容。",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
         modifier = Modifier.padding(top = 4.dp)
@@ -715,17 +745,22 @@ private fun DataMaintenanceSection(container: AppContainer) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !running) {
-                running = true
+            .clickable(enabled = !busy) {
+                scanning = true
+                result = null
                 scope.launch {
-                    val r = container.dbRepair.repair()
-                    result = r
-                    running = false
-                    Toast.makeText(
-                        ctx,
-                        if (r.ok) "修复完成，已同步到备份" else "修复失败：${r.failureReason.orEmpty()}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    val rep = container.dbRepair.diagnose()
+                    report = rep
+                    scanning = false
+                    if (rep.hasFixableIssues) {
+                        showIssues = true
+                    } else {
+                        Toast.makeText(
+                            ctx,
+                            if (rep.hasAnything) "未发现需要修复的问题" else "未发现问题，数据库状态良好",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }
             .padding(vertical = 12.dp),
@@ -735,121 +770,223 @@ private fun DataMaintenanceSection(container: AppContainer) {
         Spacer(Modifier.width(12.dp))
         Column {
             Text(
-                if (running) "正在修复…" else "扫描并修复",
+                when {
+                    scanning -> "正在扫描…"
+                    repairing -> "正在修复…"
+                    else -> "扫描数据库"
+                },
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                "体检 → 修复无效引用 → 回收空间 → 同步备份",
+                "只读体检：占用与碎片、字段使用情况、无效引用、冗余数据",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )
         }
     }
 
-    result?.let { RepairResultCard(it) }
+    report?.let { MaintenanceReportCard(report = it, lastRepair = result) }
+
+    // 扫描到可修复问题 → 列出问题并询问是否修复
+    val scanned = report
+    if (showIssues && scanned != null) {
+        AlertDialog(
+            onDismissRequest = { showIssues = false },
+            title = { Text("发现需要修复的问题") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    scanned.issues.forEach {
+                        Text("· $it", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (scanned.notices.isNotEmpty()) {
+                        Spacer(Modifier.padding(vertical = 6.dp))
+                        Text(
+                            "以下仅供参考，修复不会处理：",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        scanned.notices.forEach {
+                            Text(
+                                "· $it",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                    Spacer(Modifier.padding(vertical = 6.dp))
+                    Text(
+                        "修复只做无损维护：修正无效引用、回收碎片占用的空间，你的数据一行都不会少。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showIssues = false
+                    if (StorageConfig.backupUri(ctx) == null) showNoBackupWarning = true else runRepair()
+                }) { Text("立即修复") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showIssues = false }) { Text("暂不修复") }
+            }
+        )
+    }
+
+    // 未指定本地备份文件夹 → 先警告，用户可先去设置或坚持修复
+    if (showNoBackupWarning) {
+        AlertDialog(
+            onDismissRequest = { showNoBackupWarning = false },
+            title = { Text("尚未设置本地备份") },
+            text = {
+                Text(
+                    "建议先在「数据备份」中指定一个本地备份文件夹。\n\n" +
+                        "设置后，修复前会自动在备份文件夹里留一份 daymate.db.bak 快照，" +
+                        "万一需要可随时回滚。\n\n" +
+                        "当前未指定备份，修复过程中不会留快照。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showNoBackupWarning = false
+                    runRepair()
+                }) { Text("仍然修复") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNoBackupWarning = false }) { Text("先去设置备份") }
+            }
+        )
+    }
 }
 
-/** 修复结果卡片：展示修复前后的占用对比与各项体检结论。 */
+/** 体检报告卡片：展示扫描结论；若刚执行过修复，则附上修复前后对比。 */
 @Composable
-private fun RepairResultCard(r: com.ayaka7452.daymate.core.DbRepair.RepairResult) {
-    val after = r.after
+private fun MaintenanceReportCard(
+    report: com.ayaka7452.daymate.core.DbRepair.Report,
+    lastRepair: com.ayaka7452.daymate.core.DbRepair.RepairResult?
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp)
     ) {
-        if (!r.ok || after == null) {
+        val after = lastRepair?.takeIf { it.ok }?.after
+        if (lastRepair != null && !lastRepair.ok) {
             Text(
-                "修复未完成：${r.failureReason ?: "未知原因"}（数据未受影响）",
+                "修复未完成：${lastRepair.failureReason ?: "未知原因"}（数据未受影响）",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+        }
+
+        if (lastRepair != null && after != null) {
+            ResultLine(
+                "数据库占用",
+                formatBytes(lastRepair.before.totalBytes) + " → " + formatBytes(after.totalBytes)
+            )
+            ResultLine(
+                "已回收空间",
+                formatBytes((lastRepair.before.totalBytes - after.totalBytes).coerceAtLeast(0))
+            )
+            ResultLine(
+                "修复无效引用",
+                if (lastRepair.fixedDanglingRefs > 0) "${lastRepair.fixedDanglingRefs} 处" else "无需修复"
+            )
+            ResultLine(
+                "修补异常时间",
+                if (lastRepair.fixedTimestamps > 0) "${lastRepair.fixedTimestamps} 条" else "无需修复"
+            )
+            ResultLine(
+                "修复前快照",
+                if (lastRepair.snapshotCreated) "已保存 daymate.db.bak" else "未创建（无本地备份）"
             )
         } else {
-            val saved = (r.before.totalBytes - after.totalBytes).coerceAtLeast(0)
-            ResultLine("数据库占用", formatBytes(r.before.totalBytes) + " → " + formatBytes(after.totalBytes))
-            ResultLine("已回收空间", formatBytes(saved))
-            ResultLine("结构完整性", if (after.integrityOk) "正常" else "异常：${after.integrityDetail.orEmpty()}")
-            ResultLine("残留无用字段", if (after.zombieColumns.isEmpty()) "无" else after.zombieColumns.joinToString("、"))
-            ResultLine("修复无效引用", if (r.fixedDanglingRefs > 0) "${r.fixedDanglingRefs} 处" else "无需修复")
-            ResultLine("修补异常时间", if (r.fixedTimestamps > 0) "${r.fixedTimestamps} 条" else "无需修复")
+            ResultLine("数据库占用", formatBytes(report.totalBytes))
+            ResultLine(
+                "可回收空间",
+                formatBytes(report.reclaimableBytes) + "（碎片 ${(report.freeRatio * 100).toInt()}%）"
+            )
+        }
 
-            // ===== 字段利用率：哪些字段在你的实际数据里从未被填过 =====
-            Spacer(Modifier.padding(vertical = 4.dp))
+        ResultLine(
+            "结构完整性",
+            if (report.integrityOk) "正常" else "异常：${report.integrityDetail.orEmpty()}"
+        )
+        ResultLine(
+            "残留无用字段",
+            if (report.zombieColumns.isEmpty()) "无" else report.zombieColumns.joinToString("、")
+        )
+        ResultLine("无效文件夹引用", if (report.danglingRefs > 0) "${report.danglingRefs} 处" else "无")
+
+        // ===== 字段利用率：哪些字段在实际数据里从未被填过 =====
+        Spacer(Modifier.padding(vertical = 4.dp))
+        Text(
+            "从未填过值的字段",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        if (report.unusedFields.isEmpty()) {
+            Text("无——所有字段都有数据", style = MaterialTheme.typography.bodySmall)
+        } else {
+            report.unusedFields.forEach {
+                Text(
+                    "· ${it.tableLabel}的「${it.fieldLabel}」（共 ${it.total} 条，0 条填过）",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Text(
-                "从未填过值的字段",
+                "这些字段都有对应功能，只是你的数据里没用过，不属于垃圾列，不会自动删除",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+
+        // ===== 冗余数据：只提示，不自动清理 =====
+        Spacer(Modifier.padding(vertical = 4.dp))
+        Text(
+            "数据冗余检查",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        if (report.redundancies.isEmpty()) {
+            Text("未发现冗余数据", style = MaterialTheme.typography.bodySmall)
+        } else {
+            report.redundancies.forEach {
+                Text("· ${it.label}：${it.count} 处", style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                "以上仅为提示，未做任何自动清理（避免误删你要保留的数据）",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+
+        // ===== 现有数据行数 =====
+        Spacer(Modifier.padding(vertical = 4.dp))
+        Text(
+            "现有数据（未做任何删改）",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        Text(
+            report.tables.joinToString(" · ") {
+                it.label + " " + (if (it.rows < 0) "?" else it.rows.toString())
+            },
+            style = MaterialTheme.typography.bodySmall
+        )
+        val recycled = report.tables.sumOf { if (it.inRecycleBin < 0) 0L else it.inRecycleBin }
+        if (recycled > 0) {
+            Text(
+                "回收站内另有 $recycled 条已删除条目，按你的要求保持原样（如需清理可在回收站中操作）",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)
             )
-            if (after.unusedFields.isEmpty()) {
-                Text("无——所有字段都有数据", style = MaterialTheme.typography.bodySmall)
-            } else {
-                after.unusedFields.forEach {
-                    Text(
-                        "· ${it.tableLabel}的「${it.fieldLabel}」（共 ${it.total} 条，0 条填过）",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Text(
-                    "这些字段都有对应功能，只是你的数据里没用过，不属于垃圾列，不会自动删除",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-
-            // ===== 冗余数据：只提示，不自动清理 =====
-            Spacer(Modifier.padding(vertical = 4.dp))
-            Text(
-                "数据冗余检查",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-            if (after.redundancies.isEmpty()) {
-                Text("未发现冗余数据", style = MaterialTheme.typography.bodySmall)
-            } else {
-                after.redundancies.forEach {
-                    Text("· ${it.label}：${it.count} 处", style = MaterialTheme.typography.bodySmall)
-                }
-                Text(
-                    "以上仅为提示，未做任何自动清理（避免误删你要保留的数据）",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-
-            Spacer(Modifier.padding(vertical = 4.dp))
-            Text(
-                "现有数据（未做任何删改）",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-            Text(
-                after.tables.joinToString(" · ") {
-                    it.label + " " + (if (it.rows < 0) "?" else it.rows.toString())
-                },
-                style = MaterialTheme.typography.bodySmall
-            )
-            val recycled = after.tables.sumOf { if (it.inRecycleBin < 0) 0L else it.inRecycleBin }
-            if (recycled > 0) {
-                Text(
-                    "回收站内另有 $recycled 条已删除条目，按你的要求保持原样（如需清理可在回收站中操作）",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            if (after.badTimestampRows > 0) {
-                Text(
-                    "注：修补异常时间只针对 1970 年这类不可能的值，正常时间未改动",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
         }
     }
 }

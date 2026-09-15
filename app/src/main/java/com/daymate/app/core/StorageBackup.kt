@@ -127,6 +127,53 @@ object StorageBackup {
         }
     }
 
+    /** 修复前快照的文件名后缀（`daymate.db.bak`）。 */
+    private const val SNAPSHOT_SUFFIX = ".bak"
+
+    /** 快照文件的命名模式（含 SAF 改名产生的 `(1)` 变体）。 */
+    private val SNAPSHOT_REGEX =
+        Regex("^" + Regex.escape(DB_NAME + SNAPSHOT_SUFFIX) + "(?:\\s*\\(\\d+\\))?$")
+
+    /**
+     * 在备份文件夹中留一份「修复前快照」`daymate.db.bak`（数据维护 → 修复前自动调用）。
+     *
+     * 与 [exportInternal] 刻意分开：快照不参与主备份的匹配（[BACKUP_NAME_REGEX] 不含 `.bak`），
+     * 因此既不会被下一次备份顺手清掉，也不会被误认成主备份参与恢复。
+     * @return 是否成功写入（未配置备份文件夹或写入失败时为 false，调用方据此提示用户）。
+     */
+    fun exportSnapshot(ctx: Context, internalDb: File, targetUri: Uri?): Boolean {
+        val uri = targetUri ?: return false
+        val src = File(internalDb.path)
+        if (!src.exists()) return false
+        synchronized(exportLock) {
+            val root = DocumentFile.fromTreeUri(ctx, uri) ?: return false
+            // 先清掉旧快照，避免 createFile 被系统改名成 `daymate.db.bak (1)`
+            purgeSnapshots(root)
+            val target = root.createFile("application/octet-stream", DB_NAME + SNAPSHOT_SUFFIX)
+                ?: run {
+                    purgeSnapshots(root)
+                    return false
+                }
+            return runCatching {
+                var written = false
+                src.inputStream().use { input ->
+                    ctx.contentResolver.openOutputStream(target.uri)?.use { output ->
+                        input.copyTo(output)
+                        written = true
+                    }
+                }
+                written
+            }.getOrDefault(false)
+        }
+    }
+
+    /** 删除目录中所有快照文件（`daymate.db.bak` 及其改名变体）。 */
+    private fun purgeSnapshots(root: DocumentFile) {
+        for (f in root.listFiles().filter { SNAPSHOT_REGEX.matches(it.name.orEmpty()) }) {
+            runCatching { f.delete() }
+        }
+    }
+
     /**
      * 从已配置的备份文件夹导入到内部主库。
      * @param internalDb 内部主库文件（通常 ctx.getDatabasePath("daymate.db")）。
