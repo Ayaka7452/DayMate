@@ -299,7 +299,7 @@ fun FolderScreen(
                     Text("📂", style = MaterialTheme.typography.displayMedium)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "这个文件夹还是空的",
+                        "此文件夹为空",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -457,7 +457,7 @@ fun FolderScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("移入回收站？") },
-            text = { Text("将把选中的 $totalSelected 项移入回收站，可在「回收站」中恢复或彻底删除。") },
+            text = { Text("将把选中的 $totalSelected 项移入回收站。可在「回收站」中恢复或彻底删除。") },
             confirmButton = {
                 TextButton(onClick = {
                     val ids = selectedEventIds.toList()
@@ -483,7 +483,7 @@ fun FolderScreen(
             onDismissRequest = { showFolderDeleteConfirm = false },
             title = { Text("移入回收站？") },
             text = {
-                Text("文件夹「${folder?.name ?: ""}」内的文件将移回主空间（不再属于该文件夹），仅文件夹本身会被移入回收站。")
+                Text("文件夹「${folder?.name ?: ""}」中的事件将移回主空间，仅文件夹本身进入回收站。")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -510,7 +510,7 @@ fun FolderScreen(
         AlertDialog(
             onDismissRequest = { vaultNeedSetup = false },
             title = { Text("Vault 尚未设置") },
-            text = { Text("请先进入 Vault 设置密码，之后才能将内容移入。") },
+            text = { Text("需先进入 Vault 设置密码，之后才能移入内容。") },
             confirmButton = {
                 TextButton(onClick = { vaultNeedSetup = false; onNavigate(Routes.VAULT) }) { Text("去设置") }
             },

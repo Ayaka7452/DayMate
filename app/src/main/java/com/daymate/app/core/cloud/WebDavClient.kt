@@ -259,7 +259,7 @@ class WebDavClient(private val config: WebDavConfig) {
 
     private fun describeNetworkError(e: Throwable): String = when (e) {
         is SSLHandshakeException ->
-            "TLS 握手失败：服务器证书不受信任（自建服务器可开启「允许自签名证书」）"
+            "TLS 握手失败：服务器证书不受信任。自建服务器可开启「允许自签名证书」。"
         is UnknownHostException -> "无法解析服务器地址，请检查域名是否正确"
         is ConnectException -> "无法连接服务器，请检查地址与端口"
         is SocketTimeoutException -> "连接超时，请检查网络或服务器状态"

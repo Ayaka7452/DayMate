@@ -106,12 +106,12 @@ class DbRepair(
             get() = buildList {
                 if (!integrityOk) add("数据库结构完整性异常：${integrityDetail ?: "未知"}")
                 if (zombieColumns.isNotEmpty()) {
-                    add("残留无用字段：${zombieColumns.joinToString("、")}")
+                    add("残留字段：${zombieColumns.joinToString("、")}")
                 }
-                if (danglingRefs > 0) add("指向已删除文件夹的无效引用：$danglingRefs 处")
-                if (badTimestampRows > 0) add("创建/更新时间为空或异常：$badTimestampRows 条")
+                if (danglingRefs > 0) add("无效的文件夹引用：$danglingRefs 处")
+                if (badTimestampRows > 0) add("时间字段为空或异常：$badTimestampRows 条")
                 if (reclaimableBytes > RECLAIM_THRESHOLD_BYTES) {
-                    add("碎片较多，约 ${formatBytes(reclaimableBytes)} 空间可回收")
+                    add("碎片占用约 ${formatBytes(reclaimableBytes)}，可回收")
                 }
             }
 
@@ -119,7 +119,7 @@ class DbRepair(
         val notices: List<String>
             get() = buildList {
                 redundancies.forEach { add("${it.label}：${it.count} 处") }
-                unusedFields.forEach { add("${it.tableLabel}的「${it.fieldLabel}」从未填过值") }
+                unusedFields.forEach { add("${it.tableLabel} · ${it.fieldLabel}：未使用") }
             }
 
         /**
@@ -408,12 +408,12 @@ class DbRepair(
         }
 
         add(
-            "疑似重复的倒数日（标题、日期、所属文件夹完全相同）",
+            "内容重复的倒数日",
             "SELECT COUNT(*) FROM (SELECT 1 FROM events WHERE isDeleted = 0 " +
                 "GROUP BY title, targetDateEpochDay, IFNULL(folderId, -1) HAVING COUNT(*) > 1)"
         )
         add(
-            "标题为空白的倒数日",
+            "标题为空的倒数日",
             "SELECT COUNT(*) FROM events WHERE isDeleted = 0 AND TRIM(IFNULL(title, '')) = ''"
         )
         add(
@@ -422,26 +422,26 @@ class DbRepair(
                 "GROUP BY name HAVING COUNT(*) > 1)"
         )
         add(
-            "对照天数取值异常的倒数日",
+            "对照天数异常",
             "SELECT COUNT(*) FROM events WHERE refDays IS NOT NULL " +
                 "AND (refDays <= 0 OR refDays > 36500)"
         )
         add(
-            "目标日期超出合理范围的倒数日",
+            "目标日期超出范围",
             "SELECT COUNT(*) FROM events WHERE targetDateEpochDay < -200000 " +
                 "OR targetDateEpochDay > 100000"
         )
         add(
-            "持续天数异常的周期记录",
+            "持续天数异常",
             "SELECT COUNT(*) FROM cycle_logs WHERE periodDays < 1 OR periodDays > 15"
         )
         add(
-            "首日重复的周期记录",
+            "首日重复",
             "SELECT COUNT(*) FROM (SELECT 1 FROM cycle_logs " +
                 "GROUP BY startDateEpochDay HAVING COUNT(*) > 1)"
         )
         add(
-            "在回收站停留超过 30 天的条目",
+            "回收站中超过 30 天的条目",
             "SELECT (SELECT COUNT(*) FROM events WHERE isDeleted = 1 AND deletedAt > 0 " +
                 "AND deletedAt < $staleCutoff) + (SELECT COUNT(*) FROM folders " +
                 "WHERE isDeleted = 1 AND deletedAt > 0 AND deletedAt < $staleCutoff)"

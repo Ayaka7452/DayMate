@@ -191,7 +191,7 @@ private fun VaultSetupScreen(
 
     VaultScaffold(title = "设置 Vault 密码", onExit = onExit, showMenu = false) {
         Text(
-            "首次进入，请设置密码（至少 6 位）。请牢记，此密码无法找回。",
+            "首次使用需设置密码（至少 6 位）。密码无法找回，请妥善保管。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
@@ -299,7 +299,7 @@ private fun VaultUnlockScreen(
                         VaultSession.unlock(SecretKeySpec(raw, "AES"))
                         onUnlocked()
                     } else {
-                        error = "指纹凭据已失效，请改用密码解锁"
+                        error = "指纹凭据已失效，请使用密码解锁"
                     }
                 }
             }
@@ -629,7 +629,7 @@ private fun VaultListScreen(
                     Text("🔒", style = MaterialTheme.typography.displayMedium)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Vault 是空的，点击 + 添加",
+                        "Vault 中尚无内容，点击 + 添加",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -790,7 +790,7 @@ private fun VaultListScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("删除 $totalSelected 项？") },
-            text = { Text("此操作不可撤销。删除文件夹时，其中的事件会自动移出到 Vault 根目录。") },
+            text = { Text("此操作不可撤销。文件夹中的事件将移出到 Vault 根目录。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -817,8 +817,8 @@ private fun VaultListScreen(
             title = { Text("重置 Vault 密码？") },
             text = {
                 Text(
-                    "此操作会清空 Vault 内的全部数据（事件与文件夹），且无法找回。" +
-                        "重置完成后你需要重新设置 Vault 密码。"
+                    "将清空 Vault 内的全部数据（事件与文件夹），且无法找回。" +
+                        "重置后需重新设置 Vault 密码。"
                 )
             },
             confirmButton = {
@@ -1023,7 +1023,7 @@ fun VaultFolderScreen(
                 Text("📂", style = MaterialTheme.typography.displayMedium)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "这个文件夹还是空的",
+                    "此文件夹为空",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -1160,7 +1160,7 @@ fun VaultFolderScreen(
             onDismissRequest = { showFolderDeleteConfirm = false },
             title = { Text("删除文件夹？") },
             text = {
-                Text("文件夹「${folder?.name ?: ""}」内的事件会移出到 Vault 根目录，仅文件夹本身被删除。此操作不可撤销。")
+                Text("文件夹「${folder?.name ?: ""}」中的事件将移出到 Vault 根目录，仅删除文件夹本身。此操作不可撤销。")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -1310,7 +1310,7 @@ private fun VaultEventDialog(
                     )
                 }
                 Text(
-                    "随时可更改；按月/按年不足一个完整单位时自动改用更小的单位显示",
+                    "随时可更改。按月或按年不足一个完整单位时，自动改用更小的单位显示。",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -1347,7 +1347,7 @@ private fun VaultEventDialog(
                     onValueChange = { refDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
                     label = { Text("对照${refUnitLabel}（可选）") },
                     placeholder = { Text("例如：8") },
-                    supportingText = { Text("目标日期已过去时，显示为「已过 X/N $refUnitLabel」，如 2/8；切换显示单位后请按新单位填写") },
+                    supportingText = { Text("目标日期已过去时显示为「已过 X/N $refUnitLabel」，如 2/8。切换显示单位后需按新单位填写。") },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                     ),
@@ -1380,7 +1380,7 @@ private fun VaultEventDialog(
             title = { Text("重置目标日期") },
             text = {
                 Text(
-                    "是否把目标日期重置为今天？\n当前：${
+                    "将目标日期重置为今天？\n当前：${
                         LocalDate.ofEpochDay(epochDay)
                             .format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
                     }"

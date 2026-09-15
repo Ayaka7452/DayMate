@@ -147,11 +147,11 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 val localReady = StorageConfig.isBackupConfigured(ctx)
                 report(
                     prefix + "，并已启用云端自动备份（本地 + 云端）。" +
-                        if (localReady) "数据改动后会自动上传。"
-                        else "本地备份文件夹尚未选择，目前只上传云端；需要本地副本可返回上一页选择。"
+                        if (localReady) "数据修改后会自动上传。"
+                        else "未选择本地备份文件夹，仅上传云端。需要本地副本可返回上一页选择。"
                 )
             } else {
-                report(prefix + "，云端自动备份已处于启用状态。")
+                report(prefix + "，云端自动备份已启用。")
             }
         }
     }
@@ -170,8 +170,8 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
         // 否则用户看到「已保存」会以为大功告成，实际主页永远不出现云图标。
         if (!directoryPicked) {
             report(
-                "已保存地址与凭据，但还没选定远程目录，云端备份不会启用。" +
-                    "请点下方「浏览并选择远程目录」选定存放位置（可选中根目录）。",
+                "已保存地址与凭据，但尚未选定远程目录，云端备份不会启用。" +
+                    "请使用下方「浏览并选择远程目录」选定存放位置，可选根目录。",
                 error = true
             )
             return
@@ -223,8 +223,8 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 )
             } else {
                 Text(
-                    "把备份同时存一份到你的 WebDAV 服务器（坚果云、Nextcloud、群晖、Alist 等）。" +
-                        "服务器地址填 WebDAV 根地址，程序会自动在其下逐级创建并写入 daymate.db。",
+                    "将备份同时上传到 WebDAV 服务器（坚果云、Nextcloud、群晖、Alist 等）。" +
+                        "填写 WebDAV 根地址，应用会在其下创建并写入 daymate.db。",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(16.dp))
@@ -264,7 +264,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                     Column(Modifier.weight(1f)) {
                         Text("允许自签名证书", style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "仅在你自建的 NAS 使用自签名 https 证书时开启",
+                            "仅自建 NAS 使用自签名 https 证书时开启",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -277,7 +277,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                     Button(
                         onClick = {
                             runRemote("测试连接", { CloudBackup.testConnection(configFor(directory)) }) {
-                                report("连接成功，凭据可用。记得点「保存」让配置生效。")
+                                report("连接成功，凭据可用。需点「保存」后生效。")
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -314,7 +314,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                     if (directoryPicked)
                         "当前远程目录：${if (directory.isBlank()) "（根目录）" else "/$directory"}"
                     else
-                        "尚未选定远程目录，云端备份不会启用。请点上方「浏览并选择远程目录」。",
+                        "尚未选定远程目录，云端备份不会启用。请使用上方「浏览并选择远程目录」。",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (directoryPicked) MaterialTheme.colorScheme.outline
                     else MaterialTheme.colorScheme.error
@@ -390,7 +390,7 @@ private fun BrowseSection(
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        "选中后，备份会写到该目录下的 ${WebDavStore.REMOTE_DB}。",
+        "选中后，备份将写入该目录下的 ${WebDavStore.REMOTE_DB}。",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline
     )

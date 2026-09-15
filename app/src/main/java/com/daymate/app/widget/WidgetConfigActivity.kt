@@ -164,7 +164,7 @@ private fun WidgetConfigScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                "选择这个小组件要显示的事件：",
+                "选择此小组件显示的事件：",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -173,7 +173,7 @@ private fun WidgetConfigScreen(
                 item {
                     OptionRow(
                         title = "自动（最近的倒数日）",
-                        subtitle = "总是显示最近的一个事件（2×2 组件将显示多事件列表）",
+                        subtitle = "始终显示最近的一个事件。2×2 组件显示多事件列表。",
                         selected = selected == 0L,
                         onClick = { selected = 0L }
                     )
@@ -210,7 +210,7 @@ private fun WidgetConfigScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Text(
-                "提示：以上配置仅对当前小组件生效。长按桌面上的小组件可随时重新打开此页（Android 12+）。",
+                "以上配置仅对当前小组件生效。长按桌面上的小组件可重新打开此页（Android 12 及以上）。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )

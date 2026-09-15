@@ -254,7 +254,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "控制主页列表顶部的卡片显示内容。",
+                "主页列表顶部卡片显示的内容。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)
@@ -281,7 +281,7 @@ fun SettingsScreen(
             }
             TextButton(onClick = {
                 scope.launch { container.settingsRepository.setHomeTopCard("festival") }
-                Toast.makeText(ctx, "已恢复默认（下一个节假日）", Toast.LENGTH_SHORT).show()
+                Toast.makeText(ctx, "已恢复默认设置", Toast.LENGTH_SHORT).show()
             }) { Text("恢复默认") }
 
             // 节日卡片右侧角标 emoji（卡片只显示放假节日，不需要「休/班」标记）
@@ -295,7 +295,7 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("节日卡片角标", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "卡片右侧的表情符号",
+                        "卡片右侧显示的表情符号",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -313,7 +313,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "主数据库保存在应用内部，安全且无需任何存储权限。可选择一个文件夹用于导出/恢复备份。",
+                "主数据库保存在应用内部，无需存储权限。所选文件夹用于导出与恢复备份。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
@@ -330,7 +330,7 @@ fun SettingsScreen(
                 Text("数据备份", style = MaterialTheme.typography.bodyLarge)
             }
             Text(
-                "当前备份位置：${StorageConfig.displayPath(StorageConfig.backupUri(ctx))}",
+                "备份位置：${StorageConfig.displayPath(StorageConfig.backupUri(ctx))}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(start = 8.dp, top = 2.dp)
@@ -347,7 +347,7 @@ fun SettingsScreen(
                 Column {
                     Text("修改后自动备份", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (backupConfigured) "每次修改数据后自动备份到所选文件夹" else "需先选择备份文件夹",
+                        if (backupConfigured) "数据修改后自动备份到所选文件夹" else "需先选择备份文件夹",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -369,7 +369,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "周期管家与保险箱默认禁止截屏/录屏，也不会出现在最近任务缩略图里。需要截图时可在下面放开。",
+                "周期管家与保险箱默认禁止截屏与录屏，也不会出现在最近任务缩略图中。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)
@@ -384,8 +384,8 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("周期管家允许截图", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (allowScreenshotCycle) "已允许截屏/录屏；密码验证页仍会阻止"
-                        else "已阻止截屏/录屏与最近任务缩略图",
+                        if (allowScreenshotCycle) "已允许截屏与录屏，密码验证页仍受限制"
+                        else "已阻止截屏、录屏与最近任务缩略图",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -407,8 +407,8 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("保险箱允许截图", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (allowScreenshotVault) "已允许截屏/录屏；解锁与设密页仍会阻止"
-                        else "已阻止截屏/录屏与最近任务缩略图",
+                        if (allowScreenshotVault) "已允许截屏与录屏，解锁与设密页仍受限制"
+                        else "已阻止截屏、录屏与最近任务缩略图",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -431,7 +431,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "由应用从数据源下载并缓存到本机；跟随节日、节日角标等功能依赖此数据。",
+                "由应用从所选数据源下载并缓存到本机。跟随节日与节日角标等功能需要该数据。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)
@@ -568,7 +568,7 @@ fun SettingsScreen(
                     }
                     WidgetEventOption(
                         title = "自定义 URL…",
-                        subtitle = "URL 中用 {year} 占位年份；需返回 holiday-cn 或 timor 格式",
+                        subtitle = "使用 {year} 作为年份占位符，需返回 holiday-cn 或 timor 格式",
                         selected = currentUrl != FestivalRepository.SOURCE_HOLIDAY_CN &&
                             currentUrl != FestivalRepository.SOURCE_TIMOR
                     ) {
@@ -594,7 +594,7 @@ fun SettingsScreen(
                     value = festivalCustomUrl,
                     onValueChange = { festivalCustomUrl = it },
                     label = { Text("URL（{year} 为年份占位符）") },
-                    supportingText = { Text("应用会自动识别 holiday-cn 与 timor.tech 两种数据格式") },
+                    supportingText = { Text("自动识别 holiday-cn 与 timor.tech 两种数据格式") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -736,7 +736,7 @@ private fun DataMaintenanceSection(container: AppContainer) {
         modifier = Modifier.padding(top = 16.dp)
     )
     Text(
-        "先扫描数据库，确认结果后再决定是否修复。全程无损，不会删除任何事件、文件夹或保险箱内容。",
+        "检查数据库完整性与冗余数据。仅报告，不修改现有内容。",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
         modifier = Modifier.padding(top = 4.dp)
@@ -755,7 +755,7 @@ private fun DataMaintenanceSection(container: AppContainer) {
                     if (rep.hasProblems) {
                         showIssues = true
                     } else {
-                        Toast.makeText(ctx, "未发现问题，数据库状态良好", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, "检查完成，未发现问题", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -767,14 +767,14 @@ private fun DataMaintenanceSection(container: AppContainer) {
         Column {
             Text(
                 when {
-                    scanning -> "正在扫描…"
+                    scanning -> "正在检查…"
                     repairing -> "正在修复…"
-                    else -> "扫描数据库"
+                    else -> "检查数据库"
                 },
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                "只读体检：占用与碎片、字段使用情况、无效引用、冗余数据",
+                "检查完整性、碎片、字段使用与冗余数据，不修改任何内容",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -792,7 +792,7 @@ private fun DataMaintenanceSection(container: AppContainer) {
         val fixable = scanned.hasFixableIssues
         AlertDialog(
             onDismissRequest = { showIssues = false },
-            title = { Text(if (fixable) "发现需要修复的问题" else "发现一些异常数据") },
+            title = { Text(if (fixable) "发现可修复的问题" else "发现异常数据") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     scanned.issues.forEach {
@@ -801,7 +801,7 @@ private fun DataMaintenanceSection(container: AppContainer) {
                     if (scanned.notices.isNotEmpty()) {
                         if (scanned.issues.isNotEmpty()) Spacer(Modifier.padding(vertical = 6.dp))
                         Text(
-                            if (fixable) "以下仅供参考，修复不会处理：" else "这些只是提示，不会自动清理：",
+                            if (fixable) "以下项目不会被修复：" else "以下项目不会自动清理：",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -816,7 +816,7 @@ private fun DataMaintenanceSection(container: AppContainer) {
                     if (fixable) {
                         Spacer(Modifier.padding(vertical = 6.dp))
                         Text(
-                            "修复只做无损维护：修正无效引用、回收碎片占用的空间，你的数据一行都不会少。",
+                            "修复仅执行无损维护：修正无效引用并回收碎片空间，不会删改任何数据。",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -829,12 +829,12 @@ private fun DataMaintenanceSection(container: AppContainer) {
                         if (StorageConfig.backupUri(ctx) == null) showNoBackupWarning = true else runRepair()
                     }) { Text("立即修复") }
                 } else {
-                    TextButton(onClick = { showIssues = false }) { Text("知道了") }
+                    TextButton(onClick = { showIssues = false }) { Text("好") }
                 }
             },
             dismissButton = {
                 if (fixable) {
-                    TextButton(onClick = { showIssues = false }) { Text("暂不修复") }
+                    TextButton(onClick = { showIssues = false }) { Text("取消") }
                 }
             }
         )
@@ -844,23 +844,21 @@ private fun DataMaintenanceSection(container: AppContainer) {
     if (showNoBackupWarning) {
         AlertDialog(
             onDismissRequest = { showNoBackupWarning = false },
-            title = { Text("尚未设置本地备份") },
+            title = { Text("未设置本地备份文件夹") },
             text = {
                 Text(
-                    "建议先在「数据备份」中指定一个本地备份文件夹。\n\n" +
-                        "设置后，修复前会自动在备份文件夹里留一份 daymate.db.bak 快照，" +
-                        "万一需要可随时回滚。\n\n" +
-                        "当前未指定备份，修复过程中不会留快照。"
+                    "修复前将不会创建 daymate.db.bak 快照。\n\n" +
+                        "如需保留快照，请先在「数据备份」中选择备份文件夹。"
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     showNoBackupWarning = false
                     runRepair()
-                }) { Text("仍然修复") }
+                }) { Text("继续修复") }
             },
             dismissButton = {
-                TextButton(onClick = { showNoBackupWarning = false }) { Text("先去设置备份") }
+                TextButton(onClick = { showNoBackupWarning = false }) { Text("取消") }
             }
         )
     }
@@ -880,7 +878,7 @@ private fun MaintenanceReportCard(
         val after = lastRepair?.takeIf { it.ok }?.after
         if (lastRepair != null && !lastRepair.ok) {
             Text(
-                "修复未完成：${lastRepair.failureReason ?: "未知原因"}（数据未受影响）",
+                "修复未完成：${lastRepair.failureReason ?: "未知原因"}。数据未受影响。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(bottom = 4.dp)
@@ -889,7 +887,7 @@ private fun MaintenanceReportCard(
 
         if (lastRepair != null && after != null) {
             ResultLine(
-                "数据库占用",
+                "数据库大小",
                 formatBytes(lastRepair.before.totalBytes) + " → " + formatBytes(after.totalBytes)
             )
             ResultLine(
@@ -897,11 +895,11 @@ private fun MaintenanceReportCard(
                 formatBytes((lastRepair.before.totalBytes - after.totalBytes).coerceAtLeast(0))
             )
             ResultLine(
-                "修复无效引用",
+                "已修复无效引用",
                 if (lastRepair.fixedDanglingRefs > 0) "${lastRepair.fixedDanglingRefs} 处" else "无需修复"
             )
             ResultLine(
-                "修补异常时间",
+                "已修复异常时间",
                 if (lastRepair.fixedTimestamps > 0) "${lastRepair.fixedTimestamps} 条" else "无需修复"
             )
             ResultLine(
@@ -909,7 +907,7 @@ private fun MaintenanceReportCard(
                 if (lastRepair.snapshotCreated) "已保存 daymate.db.bak" else "未创建（无本地备份）"
             )
         } else {
-            ResultLine("数据库占用", formatBytes(report.totalBytes))
+            ResultLine("数据库大小", formatBytes(report.totalBytes))
             ResultLine(
                 "可回收空间",
                 formatBytes(report.reclaimableBytes) + "（碎片 ${(report.freeRatio * 100).toInt()}%）"
@@ -929,22 +927,22 @@ private fun MaintenanceReportCard(
         // ===== 字段利用率：哪些字段在实际数据里从未被填过 =====
         Spacer(Modifier.padding(vertical = 4.dp))
         Text(
-            "从未填过值的字段",
+            "未使用的字段",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(top = 4.dp)
         )
         if (report.unusedFields.isEmpty()) {
-            Text("无——所有字段都有数据", style = MaterialTheme.typography.bodySmall)
+            Text("无，所有字段均有数据", style = MaterialTheme.typography.bodySmall)
         } else {
             report.unusedFields.forEach {
                 Text(
-                    "· ${it.tableLabel}的「${it.fieldLabel}」（共 ${it.total} 条，0 条填过）",
+                    "· ${it.tableLabel} · ${it.fieldLabel}（${it.total} 条记录均未填写）",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
             Text(
-                "这些字段都有对应功能，只是你的数据里没用过，不属于垃圾列，不会自动删除",
+                "以上字段均有对应功能，当前数据中未使用，不会被删除。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 2.dp)
@@ -954,19 +952,19 @@ private fun MaintenanceReportCard(
         // ===== 冗余数据：只提示，不自动清理 =====
         Spacer(Modifier.padding(vertical = 4.dp))
         Text(
-            "数据冗余检查",
+            "冗余数据",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(top = 4.dp)
         )
         if (report.redundancies.isEmpty()) {
-            Text("未发现冗余数据", style = MaterialTheme.typography.bodySmall)
+            Text("无", style = MaterialTheme.typography.bodySmall)
         } else {
             report.redundancies.forEach {
                 Text("· ${it.label}：${it.count} 处", style = MaterialTheme.typography.bodySmall)
             }
             Text(
-                "以上仅为提示，未做任何自动清理（避免误删你要保留的数据）",
+                "以上项目仅作提示，不会自动清理。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 2.dp)
@@ -976,7 +974,7 @@ private fun MaintenanceReportCard(
         // ===== 现有数据行数 =====
         Spacer(Modifier.padding(vertical = 4.dp))
         Text(
-            "现有数据（未做任何删改）",
+            "现有数据（未修改）",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(top = 4.dp)
@@ -990,7 +988,7 @@ private fun MaintenanceReportCard(
         val recycled = report.tables.sumOf { if (it.inRecycleBin < 0) 0L else it.inRecycleBin }
         if (recycled > 0) {
             Text(
-                "回收站内另有 $recycled 条已删除条目，按你的要求保持原样（如需清理可在回收站中操作）",
+                "回收站内另有 $recycled 条已删除条目，不做清理。可在「回收站」中处理。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)

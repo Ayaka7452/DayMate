@@ -110,7 +110,7 @@ fun RecycleBinScreen(
                 Text("🗑️", style = MaterialTheme.typography.displayMedium)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "回收站是空的",
+                    "回收站为空",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -186,7 +186,7 @@ fun RecycleBinScreen(
         AlertDialog(
             onDismissRequest = { clearConfirm = false },
             title = { Text("清空回收站？") },
-            text = { Text("将永久删除全部 ${binEvents.size + binFolders.size} 项，此操作不可恢复。") },
+            text = { Text("将永久删除全部 ${binEvents.size + binFolders.size} 项。此操作不可恢复。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -209,7 +209,7 @@ fun RecycleBinScreen(
         AlertDialog(
             onDismissRequest = { confirmTarget = null },
             title = { Text("彻底删除？") },
-            text = { Text("将永久删除该$name，不可恢复。") },
+            text = { Text("将永久删除该$name。此操作不可恢复。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {

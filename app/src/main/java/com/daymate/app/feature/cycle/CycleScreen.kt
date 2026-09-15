@@ -215,7 +215,7 @@ private fun CycleOverviewScreen(
                     day + days - 1 >= it.startDateEpochDay
             }
         ) {
-            return "所选日期与已有经期记录重叠，同一时段重复登记经期通常不合理"
+            return "与已有经期记录日期重叠"
         }
         // 与任一真实经期记录首日间隔不足 15 天（不重叠）：两次「经期」间隔过短，
         // 基本不可能是两次独立经期，多为经间期出血。特殊情况记录（带备注的单日标记）不参与判断
@@ -225,15 +225,15 @@ private fun CycleOverviewScreen(
         }
         if (tooClose != null) {
             val gap = kotlin.math.abs(tooClose.startDateEpochDay - day)
-            return "所选开始日期与已有经期记录（" + formatDate(tooClose.startDateEpochDay) + "）仅相差 " + gap +
-                " 天：间隔不足 " + CycleCalculator.MIN_PERIOD_INTERVAL_DAYS +
-                " 天的两次出血通常不是两次独立经期，可能是排卵期出血等非经期出血，建议咨询医生"
+            return "与已有经期记录（" + formatDate(tooClose.startDateEpochDay) + "）仅相差 " + gap +
+                " 天。间隔不足 " + CycleCalculator.MIN_PERIOD_INTERVAL_DAYS +
+                " 天的两次出血通常不是两次独立经期，可能是非经期出血。建议咨询医生。"
         }
         val next = CycleCalculator.nextStartAfter(last, cycleDays)
         if (day > last && day < next - CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS) {
-            return "所选开始日期比预测下次经期（" + formatDate(next) + "）提前了 " + (next - day) +
-                " 天（提前超过 " + CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS +
-                " 天属异常出血范围），可能是排卵期出血等非经期出血，建议咨询医生"
+            return "比预测下次经期（" + formatDate(next) + "）提前 " + (next - day) +
+                " 天。提前超过 " + CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS +
+                " 天属异常出血范围，建议咨询医生。"
         }
         return null
     }
@@ -290,7 +290,7 @@ private fun CycleOverviewScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.Start
         ) {
             Spacer(Modifier.height(12.dp))
 
@@ -307,7 +307,7 @@ private fun CycleOverviewScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.Start
                     ) {
                         Text(
                             "已到预测经期日（" + formatDate(predicted) + "）",
@@ -317,7 +317,7 @@ private fun CycleOverviewScreen(
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "请登记本次实际开始日期，推算会更准确",
+                            "登记实际开始日期可提高推算准确度",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
@@ -363,8 +363,7 @@ private fun CycleOverviewScreen(
 
             // ===== 视图切换：圆环 / 日历（放视图下方） =====
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
@@ -415,7 +414,7 @@ private fun CycleOverviewScreen(
                         enabled = !ongoing,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (ongoing) "月经期间，辛苦了" else "开始新经期", maxLines = 1)
+                        Text(if (ongoing) "经期中" else "开始新经期", maxLines = 1)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -502,16 +501,15 @@ private fun CycleOverviewScreen(
                 }
             } else {
                 Text(
-                    "还没有登记记录。\n点击「开始新经期」登记最近一次经期首日后，这里会显示完整的周期推算。",
+                    "尚无记录。登记最近一次经期首日后，此处将显示完整推算。",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "温馨提示...",
+                "周期说明",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable { showTips = true }
@@ -607,7 +605,7 @@ private fun CycleOverviewScreen(
                         startDay == null || selEnd == null -> "选择这次经期的开始与结束日期"
                         !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
                         startDay != null && unreasonableLogReason(startDay, days) != null ->
-                            "时间不合理（与已有记录重叠或提前过多）：保存时需确认是否作为特殊情况记录"
+                            "日期与已有记录重叠或提前过多，保存时需确认是否作为特殊情况记录"
                         else -> "将记录 " + formatRange(startDay, days) + "，共 " + days + " 天"
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -631,7 +629,7 @@ private fun CycleOverviewScreen(
             title = { Text("确认作为特殊情况记录？") },
             text = {
                 Column {
-                    Text(pending.reason + "。\n特殊情况只标记当天（单日记录），不会按经期天数向后延伸。可附备注说明。")
+                    Text(pending.reason + "。\n特殊情况仅标记当天，不按经期天数向后延伸。可附备注说明。")
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = noteText,
@@ -673,7 +671,7 @@ private fun CycleOverviewScreen(
                 text = {
                     Text(
                         "将把本次经期记录为 " + formatRange(log.startDateEpochDay, diff) + "，共 " + diff +
-                            " 天；今天（" + formatDate(today) + "）计为经期的最后一天。如有错误，请进行补记或修订。"
+                            " 天。今天（" + formatDate(today) + "）计为最后一天。如有错误，可进行补记或修订。"
                     )
                 },
                 confirmButton = {
@@ -716,20 +714,20 @@ private fun CycleOverviewScreen(
         AlertDialog(
             onDismissRequest = { showTips = false },
             confirmButton = {
-                TextButton(onClick = { showTips = false }) { Text("我知道了") }
+                TextButton(onClick = { showTips = false }) { Text("好") }
             },
-            title = { Text("温馨提示") },
+            title = { Text("周期说明") },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "这是什么？",
+                        "功能说明",
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "周期管家通过记录每次经期首日，用日历法推算你的月经周期：预测下次经期、排卵日与排卵期，并把下次经期同步为首页倒数事件。所有数据只保存在本机。",
+                        "周期管家记录每次经期首日，以日历法推算月经周期，预测下次经期、排卵日与排卵期，并将下次经期同步为首页倒数事件。所有数据仅保存在本机。",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -745,7 +743,7 @@ private fun CycleOverviewScreen(
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "每个人的周期长度、经期天数都不同，情绪、压力、作息、出行、疾病等都可能让周期提前或延后；日历法按平均值推算，与实际排卵时间可能有数天误差。请把这里的推算当作参考，不要作为避孕或医学诊断依据；如周期长期紊乱或伴有不适，请及时咨询医生。",
+                        "周期长度与经期天数因人而异，情绪、压力、作息、出行、疾病等均可能导致周期提前或延后。日历法按平均值推算，与实际排卵时间可能存在数天误差。推算结果仅供参考，不可作为避孕或医学诊断依据；如周期长期紊乱或伴有不适，请咨询医生。",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -965,7 +963,7 @@ private fun CycleSettingsScreen(
             ToggleRow(
                 title = "自动测算周期天数",
                 subtitle = when {
-                    cycleAuto && avg != null -> "当前周期天数为自动测算（近${CycleCalculator.AVG_WINDOW}次均值 $avg 天）"
+                    cycleAuto && avg != null -> "周期天数自动测算：近 ${CycleCalculator.AVG_WINDOW} 次均值 $avg 天"
                     cycleAuto -> "当前数据未满足测算要求，仍以手动设置为准"
                     else -> "已关闭，使用下方手动设置的值"
                 },
@@ -993,7 +991,7 @@ private fun CycleSettingsScreen(
             ToggleRow(
                 title = "自动测算经期持续天数",
                 subtitle = when {
-                    periodAuto && periodAvg != null -> "当前经期持续天数为自动测算（近${CycleCalculator.AVG_WINDOW}次均值 $periodAvg 天）"
+                    periodAuto && periodAvg != null -> "经期持续天数自动测算：近 ${CycleCalculator.AVG_WINDOW} 次均值 $periodAvg 天"
                     periodAuto -> "当前数据未满足测算要求，仍以手动设置为准"
                     else -> "已关闭，使用下方手动设置的值"
                 },
@@ -1045,7 +1043,7 @@ private fun CycleSettingsScreen(
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "进入周期管家时默认显示的视图；主视图里的手动切换不会改变这个设置。",
+                "进入周期管家时默认显示的视图。主视图中的手动切换不会改变此设置。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
             )
@@ -1054,7 +1052,7 @@ private fun CycleSettingsScreen(
 
             if (logs.isEmpty()) {
                 Text(
-                    "还没有记录。登记最近一次经期首日后，主视图会显示月经期、卵泡期、排卵期和黄体期的推算。",
+                    "尚无记录。登记最近一次经期首日后，主视图将显示四个阶段的推算。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -1099,7 +1097,7 @@ private fun CycleSettingsScreen(
             }
             ToggleRow(
                 title = "在主页显示快捷事件",
-                subtitle = "作为一个普通事件存在：可移动、放入文件夹、置顶；点击直达本功能，日期自动跟随预测滚动",
+                subtitle = "以普通事件的形式存在，可移动、放入文件夹、置顶。点击直达本功能，日期随预测自动更新。",
                 checked = eventEnabled,
                 enabled = true
             ) { want ->
@@ -1121,9 +1119,9 @@ private fun CycleSettingsScreen(
 
             Spacer(Modifier.height(24.dp))
             Text(
-                "温馨提示：本功能采用日历法推算（排卵日 ≈ 预测下次经期首日 − 14 天；经期较长时排卵日与阶段划分自动微调，" +
-                    "卵泡期保底 2 天、黄体期最短 11 天，均在医学共识波动区间内）。" +
-                    "周期受压力、作息、疾病等影响存在波动，结果仅供参考，不能作为避孕或医学诊断依据；" +
+                "本功能采用日历法推算：排卵日约为预测下次经期首日减 14 天。" +
+                    "经期较长时排卵日与阶段划分自动微调，卵泡期不短于 2 天、黄体期不短于 11 天，均在医学共识波动区间内。" +
+                    "周期受压力、作息、疾病等影响存在波动，结果仅供参考，不可作为避孕或医学诊断依据；" +
                     "如有月经异常或健康疑问，请咨询医生。",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -1157,7 +1155,7 @@ private fun CycleSettingsScreen(
         AlertDialog(
             onDismissRequest = { deletingLog = null },
             title = { Text("删除这条记录？") },
-            text = { Text(formatRange(log.startDateEpochDay, log.periodDays) + " 的经期记录将被删除，推算将基于剩余的记录进行。") },
+            text = { Text(formatRange(log.startDateEpochDay, log.periodDays) + " 的经期记录将被删除，推算将基于剩余记录进行。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -1201,9 +1199,9 @@ private fun CycleSettingsScreen(
         AlertDialog(
             onDismissRequest = { showPasswordNeedVault = false },
             title = { Text("需要先设置 Vault 密码") },
-            text = { Text("周期管家的密码保护复用 Vault 密码。请先进入 Vault 设置密码后，再回来开启。") },
+            text = { Text("周期管家的密码保护复用 Vault 密码。请先进入 Vault 设置密码，再返回此处开启。") },
             confirmButton = {
-                TextButton(onClick = { showPasswordNeedVault = false }) { Text("知道了") }
+                TextButton(onClick = { showPasswordNeedVault = false }) { Text("好") }
             }
         )
     }
@@ -1212,9 +1210,9 @@ private fun CycleSettingsScreen(
         AlertDialog(
             onDismissRequest = { showNeedLog = false },
             title = { Text("请先登记一次经期") },
-            text = { Text("快捷事件的日期来自周期推算，需要至少一次经期登记。请先回到主视图点「开始新经期」登记，登记后快捷事件会自动创建并显示在主页。") },
+            text = { Text("快捷事件的日期来自周期推算，需要至少一次经期登记。请先返回主视图点「开始新经期」登记，之后快捷事件会自动创建并显示在主页。") },
             confirmButton = {
-                TextButton(onClick = { showNeedLog = false }) { Text("知道了") }
+                TextButton(onClick = { showNeedLog = false }) { Text("好") }
             }
         )
     }
@@ -1517,7 +1515,7 @@ private fun CycleHistoryScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "还没有记录",
+                    "尚无记录",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
@@ -1771,10 +1769,9 @@ private fun CycleCalendarMonth(
         Spacer(Modifier.height(8.dp))
         Text(
             "底色代表当天所处阶段。\n" +
-                "实心圆点 = 已经来的经期日（登记过的）；空心圆点 = 还没来的经期日（预测的下次经期，到来后变实心）",
+                "实心圆点：已登记的经期日；空心圆点：预测的经期日，到来后变为实心。",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-            textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
     }

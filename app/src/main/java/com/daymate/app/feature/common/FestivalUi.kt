@@ -107,14 +107,14 @@ fun FestivalCountdownCard(
                 Column {
                     Text("节假日数据未下载", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "点击前往「设置 → 节假日数据」下载",
+                        "前往「设置 → 节假日数据」下载",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
             festival == null -> Text(
-                "数据中的法定节假日已全部结束，可到设置更新",
+                "已缓存的法定节假日已全部结束，可在设置中更新",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
             )
@@ -134,7 +134,7 @@ fun FestivalCountdownCard(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        "点击创建倒数事件",
+                        "创建倒数事件",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -202,7 +202,7 @@ fun EventCountdownCard(
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Text(
-                    "点击查看事件",
+                    "查看事件",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )

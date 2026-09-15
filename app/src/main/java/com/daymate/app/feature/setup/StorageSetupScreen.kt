@@ -390,7 +390,7 @@ fun StorageSetupBody(
                 if (StorageConfig.isBackupConfigured(ctx)) {
                     backupLocalNow()
                 } else {
-                    status = "本地备份未配置，本次只备份到云端。"
+                    status = "本地备份未配置，本次仅备份到云端。"
                 }
                 if (cloudCfg != null) startCloudBackup(cloudCfg)
             }
@@ -420,7 +420,7 @@ fun StorageSetupBody(
 
     fun clear() {
         StorageConfig.clearBackupFolder(ctx)
-        status = "已清除备份文件夹设置（外部文件未删除）。"
+        status = "已清除备份文件夹设置，外部文件未删除。"
     }
 
     Scaffold(
@@ -446,8 +446,8 @@ fun StorageSetupBody(
             horizontalAlignment = Alignment.Start
         ) {
             Text(
-                "DayMate 的主数据库保存在应用内部（安全、且不需要任何存储权限）。" +
-                    "你可以把数据备份到本地文件夹、WebDAV 云端，或两者都留一份，并随时从备份恢复。",
+                "主数据库保存在应用内部，无需存储权限。" +
+                    "可将数据备份到本地文件夹或 WebDAV 云端，并随时从备份恢复。",
                 style = MaterialTheme.typography.bodyLarge
             )
 
@@ -455,7 +455,7 @@ fun StorageSetupBody(
             SectionTitle("备份位置")
             BackupTargetRow(
                 label = "仅本地",
-                desc = "只写入所选文件夹（默认）",
+                desc = "仅写入所选文件夹（默认）",
                 selected = backupTarget == SettingsRepository.BACKUP_TARGET_LOCAL,
                 enabled = !busy,
                 onClick = { setTarget(SettingsRepository.BACKUP_TARGET_LOCAL) }
@@ -469,7 +469,7 @@ fun StorageSetupBody(
             )
             BackupTargetRow(
                 label = "仅云端",
-                desc = "只写入 WebDAV，不在本地留副本",
+                desc = "仅写入 WebDAV，本地不留副本",
                 selected = backupTarget == SettingsRepository.BACKUP_TARGET_CLOUD,
                 enabled = !busy,
                 onClick = { setTarget(SettingsRepository.BACKUP_TARGET_CLOUD) }
@@ -514,15 +514,15 @@ fun StorageSetupBody(
             Text(
                 when {
                     !cloudConfigured ->
-                        "尚未配置。支持坚果云、Nextcloud、群晖、Alist 等，http 与 https 均可。"
+                        "未配置。支持坚果云、Nextcloud、群晖、Alist 等，http 与 https 均可。"
                     cloudActive ->
                         "已配置：${WebDavStore.url(ctx)}\n远程目录：$cloudLocation" +
                             "/${WebDavStore.REMOTE_DB}"
                     else ->
                         "已配置：${WebDavStore.url(ctx)}\n远程目录：$cloudLocation" +
                             "/${WebDavStore.REMOTE_DB}\n" +
-                            "注意：当前备份位置为「仅本地」，云端备份没有启用——" +
-                            "在上方选「本地 + 云端」或「仅云端」后才会自动上传。"
+                            "当前备份位置为「仅本地」，云端备份未启用。" +
+                            "在上方选择「本地 + 云端」或「仅云端」后才会自动上传。"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = when {
@@ -587,9 +587,9 @@ fun StorageSetupBody(
                 text = {
                     Text(
                         if (canRestore)
-                            "所选文件夹已存在可用的 DayMate 备份（daymate.db）。若不确认就直接写入，会覆盖并丢失该备份。请选择处理方式："
+                            "所选文件夹中已有可用的 DayMate 备份（daymate.db）。直接写入将覆盖该备份，原有数据会丢失。"
                         else
-                            "所选文件夹已存在 daymate.db，但它不是有效的 DayMate 数据库。建议用当前数据覆盖，或取消选择。"
+                            "所选文件夹中的 daymate.db 不是有效的 DayMate 数据库。可覆盖它，或取消选择。"
                     )
                 },
                 confirmButton = {
@@ -630,7 +630,7 @@ fun StorageSetupBody(
                 onDismissRequest = { showRestoreConfirm = false },
                 title = { Text("从备份恢复") },
                 text = {
-                    Text("将用所选文件夹的备份数据替换当前应用内的全部数据（倒数日、Vault 等）。此操作不可撤销，确定继续？")
+                    Text("将用所选文件夹的备份替换当前应用内的全部数据。此操作不可撤销。")
                 },
                 confirmButton = {
                     TextButton(onClick = {
@@ -650,7 +650,7 @@ fun StorageSetupBody(
                 onDismissRequest = { overwriteTarget = null },
                 title = { Text("覆盖备份？") },
                 text = {
-                    Text("将用当前应用数据覆盖所选文件夹中的备份（替换其中的 daymate.db）。原有备份会被替换，此操作不可撤销。确定继续？")
+                    Text("将用当前应用数据覆盖所选文件夹中的备份。原有备份会被替换，此操作不可撤销。")
                 },
                 confirmButton = {
                     TextButton(onClick = {
@@ -672,13 +672,13 @@ fun StorageSetupBody(
                 title = { Text("操作已阻止") },
                 text = {
                     Text(
-                        "所选备份中含有数据，但当前应用内没有任何数据（倒数日、文件夹与 Vault 均为空）。" +
-                            "若继续，会用空数据覆盖备份，导致备份数据永久丢失。出于安全考虑，已禁止该操作。\n\n" +
-                            "如需取回备份数据，请改用「从备份恢复」；若确实要用当前（空）数据备份，请先在当前应用中创建一些内容。"
+                        "所选备份中含有数据，而当前应用内没有任何数据。" +
+                            "继续将用空数据覆盖备份，导致备份数据永久丢失，因此已阻止该操作。\n\n" +
+                            "如需取回备份，请使用「从备份恢复」；如确实要备份当前空数据，请先在应用中创建内容。"
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = { overwriteBlocked = false }) { Text("我知道了") }
+                    TextButton(onClick = { overwriteBlocked = false }) { Text("好") }
                 }
             )
         }
@@ -690,7 +690,7 @@ fun StorageSetupBody(
                 onDismissRequest = { cloudOverwriteTarget = null },
                 title = { Text("覆盖云端备份？") },
                 text = {
-                    Text("云端（${cloudTarget.directory.ifBlank { "根目录" }}/daymate.db）已有备份，将用当前应用数据替换它。确定继续？")
+                    Text("云端（${cloudTarget.directory.ifBlank { "根目录" }}/daymate.db）已有备份，将被当前应用数据替换。")
                 },
                 confirmButton = {
                     TextButton(onClick = {
@@ -711,12 +711,12 @@ fun StorageSetupBody(
                 title = { Text("操作已阻止") },
                 text = {
                     Text(
-                        "云端备份中含有数据，但当前应用内没有任何数据。若继续，会用空数据覆盖云端备份，导致备份永久丢失。" +
-                            "出于安全考虑，已禁止该操作。如需取回备份，请改用「从备份恢复」。"
+                        "云端备份中含有数据，而当前应用内没有任何数据。继续将用空数据覆盖云端备份，" +
+                            "导致备份永久丢失，因此已阻止该操作。如需取回备份，请使用「从备份恢复」。"
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = { cloudBlocked = false }) { Text("我知道了") }
+                    TextButton(onClick = { cloudBlocked = false }) { Text("好") }
                 }
             )
         }
@@ -727,7 +727,7 @@ fun StorageSetupBody(
                 onDismissRequest = { showCloudRestoreConfirm = false },
                 title = { Text("从云端备份恢复") },
                 text = {
-                    Text("将下载 WebDAV 上的 daymate.db 并替换当前应用内的全部数据。此操作不可撤销，确定继续？")
+                    Text("将下载 WebDAV 上的 daymate.db 并替换当前应用内的全部数据。此操作不可撤销。")
                 },
                 confirmButton = {
                     TextButton(onClick = {

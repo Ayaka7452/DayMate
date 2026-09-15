@@ -775,11 +775,11 @@ fun HomeScreen(
             title = { Text("移入回收站？") },
             text = {
                 Column {
-                    Text("将把 $totalSelected 项移入回收站，可在「回收站」中恢复或彻底删除（清空后不可恢复）。")
+                    Text("将把 $totalSelected 项移入回收站。可在「回收站」中恢复或彻底删除，清空后不可恢复。")
                     if (selectedFolderIds.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "注意：被删除文件夹内的文件将移回主空间（不再属于该文件夹），仅文件夹本身进入回收站。",
+                            "被删除文件夹中的事件将移回主空间，仅文件夹本身进入回收站。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -814,7 +814,7 @@ fun HomeScreen(
             onDismissRequest = { showFolderDeleteConfirm = false; folderToDelete = null },
             title = { Text("移入回收站？") },
             text = {
-                Text("文件夹「${folderToDelete!!.name}」内的文件将移回主空间（不再属于该文件夹），仅文件夹本身会被移入回收站。")
+                Text("文件夹「${folderToDelete!!.name}」中的事件将移回主空间，仅文件夹本身进入回收站。")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -843,7 +843,7 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { vaultNeedSetup = false },
             title = { Text("Vault 尚未设置") },
-            text = { Text("请先进入 Vault 设置密码，之后才能将内容移入。") },
+            text = { Text("需先进入 Vault 设置密码，之后才能移入内容。") },
             confirmButton = {
                 TextButton(onClick = { vaultNeedSetup = false; onNavigate(Routes.VAULT) }) { Text("去设置") }
             },
@@ -857,7 +857,7 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { vaultConfirmEventId = null },
             title = { Text("移入 Vault？") },
-            text = { Text("该事件将被移入 Vault 空间，之后需输入密码才能查看。") },
+            text = { Text("该事件将移入 Vault，之后需输入密码才能查看。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { vaultConfirmEventId?.let { container.vaultBridge.moveEventToVault(it) } }
@@ -874,7 +874,7 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { vaultConfirmBatch = false },
             title = { Text("移入 Vault？") },
-            text = { Text("将把选中的 ${selectedEventIds.size} 个事件移入 Vault（文件夹暂不支持移入 Vault）。") },
+            text = { Text("将把选中的 ${selectedEventIds.size} 个事件移入 Vault。文件夹暂不支持移入 Vault。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -1192,7 +1192,7 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         Text("📝", style = MaterialTheme.typography.displayMedium)
         Spacer(Modifier.height(12.dp))
         Text(
-            "轻点 + 创建你的第一个倒数日",
+            "轻点 + 创建第一个倒数日",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
@@ -1281,7 +1281,7 @@ private fun CloudBackupSheet(
             Text("云备份", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(4.dp))
             Text(
-                "数据改动后会自动上传到 WebDAV，覆盖云端上一份备份。",
+                "数据修改后自动上传到 WebDAV，覆盖云端上一份备份。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )

@@ -169,7 +169,7 @@ fun EventFormScreen(
             }
             if (folders.isEmpty()) {
                 Text(
-                    "还没有文件夹，事件将保存在主空间；主页可创建文件夹并批量移入",
+                    "尚无文件夹。事件将保存在主空间，可在主页创建文件夹后批量移入。",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -228,9 +228,9 @@ fun EventFormScreen(
             }
             Text(
                 if (linkedFestival != null) {
-                    "已跟随「$linkedFestival」：目标日期过后自动锚定到该节日的下一次日期，无需设置循环"
+                    "已跟随「$linkedFestival」。目标日期过后自动锚定到该节日的下一次日期，无需设置循环。"
                 } else {
-                    "目标日期过后自动锚定到下一周期：每周同一星期几、每月同一日、每年同月同日"
+                    "目标日期过后自动锚定到下一周期：每周同一星期几、每月同一日、每年同月同日。"
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -257,7 +257,7 @@ fun EventFormScreen(
                 }
             }
             Text(
-                "选择节日后，目标日期过后会自动更新到该节日的下一次日期（如春节每年变动）",
+                "选择后目标日期将自动更新到该节日的下一次日期（如春节每年变动）。",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
@@ -284,7 +284,7 @@ fun EventFormScreen(
                 )
             }
             Text(
-                "随时可更改；按月/按年不足一个完整单位时自动改用更小的单位显示",
+                "随时可更改。按月或按年不足一个完整单位时，自动改用更小的单位显示。",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
@@ -296,7 +296,7 @@ fun EventFormScreen(
                 onValueChange = { refDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
                 label = { Text("对照${refUnitLabel}（可选）") },
                 placeholder = { Text("例如：8") },
-                supportingText = { Text("目标日期已过去时，显示为「已过 X/N $refUnitLabel」，如 2/8；切换显示单位后请按新单位填写") },
+                supportingText = { Text("目标日期已过去时显示为「已过 X/N $refUnitLabel」，如 2/8。切换显示单位后需按新单位填写。") },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                 ),
@@ -381,7 +381,7 @@ fun EventFormScreen(
             title = { Text("重置目标日期") },
             text = {
                 Text(
-                    "是否把目标日期重置为今天？\n当前：${current.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))}"
+                    "将目标日期重置为今天？\n当前：${current.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))}"
                 )
             },
             confirmButton = {
@@ -435,7 +435,7 @@ fun EventFormScreen(
                 ) {
                     if (festivalOptions.isEmpty()) {
                         Text(
-                            "暂无节假日数据。\n请到「设置 → 节假日数据」选择数据源并下载后再使用跟随节日功能。",
+                            "尚无节假日数据。请先到「设置 → 节假日数据」选择数据源并下载。",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     } else {
@@ -458,7 +458,7 @@ fun EventFormScreen(
                                     Text(f.name, style = MaterialTheme.typography.bodyLarge)
                                     Text(
                                         if (f.isEstimate) {
-                                            "约 ${f.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))}（暂按去年推算，下载新数据后自动校正）"
+                                            "约 ${f.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))}，暂按去年推算，下载新数据后自动校正"
                                         } else {
                                             f.date.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
                                         },
