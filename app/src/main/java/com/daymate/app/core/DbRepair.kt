@@ -122,8 +122,13 @@ class DbRepair(
                 unusedFields.forEach { add("${it.tableLabel}的「${it.fieldLabel}」从未填过值") }
             }
 
-        /** 是否有任何值得告知用户的发现（可修复 + 仅提示）。 */
-        val hasAnything: Boolean get() = hasFixableIssues || notices.isNotEmpty()
+        /**
+         * 是否值得打断用户（弹框列明细）。口径：**可修复问题**，或检出了**冗余/异常数据**。
+         *
+         * 「从未填过值的字段」只作参考信息，单独不触发弹框 —— 它几乎在任何库上都能命中
+         * （总有某个可选字段没被填过），拿它当门槛等于没有过滤。
+         */
+        val hasProblems: Boolean get() = hasFixableIssues || redundancies.isNotEmpty()
     }
 
     /** 修复结果。 */

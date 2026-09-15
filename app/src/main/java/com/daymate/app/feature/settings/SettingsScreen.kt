@@ -752,14 +752,10 @@ private fun DataMaintenanceSection(container: AppContainer) {
                     val rep = container.dbRepair.diagnose()
                     report = rep
                     scanning = false
-                    if (rep.hasFixableIssues) {
+                    if (rep.hasProblems) {
                         showIssues = true
                     } else {
-                        Toast.makeText(
-                            ctx,
-                            if (rep.hasAnything) "未发现需要修复的问题" else "未发现问题，数据库状态良好",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(ctx, "未发现问题，数据库状态良好", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -785,23 +781,27 @@ private fun DataMaintenanceSection(container: AppContainer) {
         }
     }
 
-    report?.let { MaintenanceReportCard(report = it, lastRepair = result) }
+    // 报告明细只在「确认后真的执行过修复」时展示（修复回执）。
+    // 单纯体检没问题时只用一句 Toast 带过，不铺开报告——避免每次扫描都甩一大段文字。
+    result?.let { MaintenanceReportCard(report = it.after ?: it.before, lastRepair = it) }
 
-    // 扫描到可修复问题 → 列出问题并询问是否修复
+    // 扫描到问题才弹框列明细。仅有可修复问题时才给「立即修复」；
+    // 只有提示型发现（冗余/异常数据，修复不会处理）则只给「知道了」。
     val scanned = report
     if (showIssues && scanned != null) {
+        val fixable = scanned.hasFixableIssues
         AlertDialog(
             onDismissRequest = { showIssues = false },
-            title = { Text("发现需要修复的问题") },
+            title = { Text(if (fixable) "发现需要修复的问题" else "发现一些异常数据") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     scanned.issues.forEach {
                         Text("· $it", style = MaterialTheme.typography.bodyMedium)
                     }
                     if (scanned.notices.isNotEmpty()) {
-                        Spacer(Modifier.padding(vertical = 6.dp))
+                        if (scanned.issues.isNotEmpty()) Spacer(Modifier.padding(vertical = 6.dp))
                         Text(
-                            "以下仅供参考，修复不会处理：",
+                            if (fixable) "以下仅供参考，修复不会处理：" else "这些只是提示，不会自动清理：",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -813,21 +813,29 @@ private fun DataMaintenanceSection(container: AppContainer) {
                             )
                         }
                     }
-                    Spacer(Modifier.padding(vertical = 6.dp))
-                    Text(
-                        "修复只做无损维护：修正无效引用、回收碎片占用的空间，你的数据一行都不会少。",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    if (fixable) {
+                        Spacer(Modifier.padding(vertical = 6.dp))
+                        Text(
+                            "修复只做无损维护：修正无效引用、回收碎片占用的空间，你的数据一行都不会少。",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showIssues = false
-                    if (StorageConfig.backupUri(ctx) == null) showNoBackupWarning = true else runRepair()
-                }) { Text("立即修复") }
+                if (fixable) {
+                    TextButton(onClick = {
+                        showIssues = false
+                        if (StorageConfig.backupUri(ctx) == null) showNoBackupWarning = true else runRepair()
+                    }) { Text("立即修复") }
+                } else {
+                    TextButton(onClick = { showIssues = false }) { Text("知道了") }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showIssues = false }) { Text("暂不修复") }
+                if (fixable) {
+                    TextButton(onClick = { showIssues = false }) { Text("暂不修复") }
+                }
             }
         )
     }
