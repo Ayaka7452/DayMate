@@ -67,7 +67,7 @@ import java.io.File
  *
  * 备份位置三态（对应 [SettingsRepository.backupTarget]）：
  *  - 仅本地：只写 SAF 文件夹（默认，与旧版本行为一致）；
- *  - 本地 + 云端：两处各留一份；
+ *  - 本地与云端：同时在两处各备份一份；
  *  - 仅云端：只写 WebDAV（配置见 [WebDavSetupScreen]）。
  *
  * 导出（备份）只做 WAL 落盘、容器保持在线；导入/恢复才会 close + rebuild 容器，并以
@@ -179,7 +179,7 @@ fun StorageSetupBody(
     fun setTarget(t: String) {
         scope.launch { app.container.settingsRepository.setBackupTarget(t) }
         status = when (t) {
-            SettingsRepository.BACKUP_TARGET_BOTH -> "备份位置已设为「本地 + 云端」。"
+            SettingsRepository.BACKUP_TARGET_BOTH -> "备份位置已设为「同时在本地及云端备份」。"
             SettingsRepository.BACKUP_TARGET_CLOUD -> "备份位置已设为「仅云端」，自动备份只写 WebDAV。"
             else -> "备份位置已设为「仅本地」。"
         }
@@ -461,8 +461,8 @@ fun StorageSetupBody(
                 onClick = { setTarget(SettingsRepository.BACKUP_TARGET_LOCAL) }
             )
             BackupTargetRow(
-                label = "本地 + 云端",
-                desc = "本地文件夹与 WebDAV 各留一份",
+                label = "本地与云端",
+                desc = "同时在本地文件夹及 WebDAV 各备份一份",
                 selected = backupTarget == SettingsRepository.BACKUP_TARGET_BOTH,
                 enabled = !busy,
                 onClick = { setTarget(SettingsRepository.BACKUP_TARGET_BOTH) }
@@ -522,7 +522,7 @@ fun StorageSetupBody(
                         "已配置：${WebDavStore.url(ctx)}\n远程目录：$cloudLocation" +
                             "/${WebDavStore.REMOTE_DB}\n" +
                             "当前备份位置为「仅本地」，云端备份未启用。" +
-                            "在上方选择「本地 + 云端」或「仅云端」后才会自动上传。"
+                            "在上方选择「本地与云端」或「仅云端」后才会自动上传。"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = when {
@@ -546,7 +546,7 @@ fun StorageSetupBody(
             Text(
                 when (backupTarget) {
                     SettingsRepository.BACKUP_TARGET_CLOUD -> "目标：WebDAV 云端"
-                    SettingsRepository.BACKUP_TARGET_BOTH -> "目标：本地 + 云端（恢复时以本地备份为准）"
+                    SettingsRepository.BACKUP_TARGET_BOTH -> "目标：同时在本地及云端备份（恢复时以本地备份为准）"
                     else -> "目标：本地备份文件夹"
                 },
                 style = MaterialTheme.typography.bodySmall,

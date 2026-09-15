@@ -363,7 +363,8 @@ private fun CycleOverviewScreen(
 
             // ===== 视图切换：圆环 / 日历（放视图下方） =====
             Row(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
             ) {
                 Row(
                     modifier = Modifier
@@ -456,7 +457,10 @@ private fun CycleOverviewScreen(
             val legendOvulation = MaterialTheme.colorScheme.tertiary
             // 深色模式下用 onSurface 透明度（半透明白）而非固定半透明黑
             val legendLuteal = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
+            ) {
                 LegendDot(legendPeriod, "月经期")
                 LegendDot(legendFollicular, "卵泡期")
                 LegendDot(legendOvulation, "排卵期")
@@ -1772,6 +1776,7 @@ private fun CycleCalendarMonth(
                 "实心圆点：已登记的经期日；空心圆点：预测的经期日，到来后变为实心。",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
     }

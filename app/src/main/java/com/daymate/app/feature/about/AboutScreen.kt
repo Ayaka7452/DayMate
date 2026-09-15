@@ -61,7 +61,7 @@ fun AboutScreen(onBack: () -> Unit) {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "轻量的倒数日应用，记录值得期待的日子。",
+                "一款轻量的倒数日应用，记录你的期待与坚持。",
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(Modifier.height(24.dp))

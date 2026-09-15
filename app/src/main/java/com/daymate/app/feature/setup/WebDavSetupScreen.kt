@@ -64,7 +64,7 @@ import kotlinx.coroutines.withContext
  * 流程：填写服务器地址 / 用户名 / 密码 → 「测试连接」验证凭据与协议 →
  * 「浏览远程目录」在服务器上逐级挑选一个目录作为备份落点（**可选中根目录**）→ 保存。
  *
- * 保存成功且备份位置仍是「仅本地」时，自动切到「本地 + 云端」——否则用户配好了 WebDAV
+ * 保存成功且备份位置仍是「仅本地」时，自动切到「本地与云端」——否则用户配好了 WebDAV
  * 却因为备份位置没切而始终不生效（主页顶栏的云图标也不会出现）。
  * 未选定远程目录时配置不算完整，此时保存会明确提示「云端备份不会启用」。
  *
@@ -135,7 +135,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
     }
 
     /**
-     * 保存成功后的收尾：若备份位置仍是「仅本地」，自动切到「本地 + 云端」。
+     * 保存成功后的收尾：若备份位置仍是「仅本地」，自动切到「本地与云端」。
      * 否则用户配好了 WebDAV 却因为备份位置没切，云备份其实一直没生效（主页云图标也不出现）。
      */
     fun afterSaved(prefix: String) {
@@ -146,7 +146,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 repo.setBackupTarget(SettingsRepository.BACKUP_TARGET_BOTH)
                 val localReady = StorageConfig.isBackupConfigured(ctx)
                 report(
-                    prefix + "，并已启用云端自动备份（本地 + 云端）。" +
+                    prefix + "，并已启用云端自动备份（同时在本地及云端备份）。" +
                         if (localReady) "数据修改后会自动上传。"
                         else "未选择本地备份文件夹，仅上传云端。需要本地副本可返回上一页选择。"
                 )
