@@ -45,12 +45,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.ayaka7452.daymate.DayMateApp
+import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.core.cloud.CloudBackup
 import com.ayaka7452.daymate.core.cloud.WebDavConfig
 import com.ayaka7452.daymate.core.cloud.WebDavEntry
 import com.ayaka7452.daymate.core.cloud.WebDavException
 import com.ayaka7452.daymate.core.cloud.WebDavStore
+import com.ayaka7452.daymate.data.repo.SettingsRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -58,7 +62,11 @@ import kotlinx.coroutines.withContext
  * WebDAV 云端备份配置页。
  *
  * 流程：填写服务器地址 / 用户名 / 密码 → 「测试连接」验证凭据与协议 →
- * 「浏览远程目录」在服务器上逐级挑选一个目录作为备份落点 → 保存。
+ * 「浏览远程目录」在服务器上逐级挑选一个目录作为备份落点（**可选中根目录**）→ 保存。
+ *
+ * 保存成功且备份位置仍是「仅本地」时，自动切到「本地 + 云端」——否则用户配好了 WebDAV
+ * 却因为备份位置没切而始终不生效（主页顶栏的云图标也不会出现）。
+ * 未选定远程目录时配置不算完整，此时保存会明确提示「云端备份不会启用」。
  *
  * 密码不会明文落盘：由 [WebDavStore] 经 AndroidKeyStore 包裹后存储。
  * 支持 http（局域网 NAS）与 https，自签名证书需显式开启对应开关。
@@ -67,6 +75,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun WebDavSetupScreen(onBack: () -> Unit) {
     val ctx = LocalContext.current
+    val app = ctx.applicationContext as DayMateApp
     val scope = rememberCoroutineScope()
 
     var url by remember { mutableStateOf(WebDavStore.url(ctx)) }
@@ -74,6 +83,8 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
     var password by remember { mutableStateOf(WebDavStore.password(ctx)) }
     var directory by remember { mutableStateOf(WebDavStore.directory(ctx)) }
     var selfSigned by remember { mutableStateOf(WebDavStore.allowSelfSigned(ctx)) }
+    // 是否已在「远程目录浏览」里选定过目录（选中根目录也算）——决定配置是否算完整
+    var directoryPicked by remember { mutableStateOf(WebDavStore.isDirectoryPicked(ctx)) }
 
     var status by remember { mutableStateOf<String?>(null) }
     var isError by remember { mutableStateOf(false) }
@@ -123,17 +134,49 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
         }
     }
 
+    /**
+     * 保存成功后的收尾：若备份位置仍是「仅本地」，自动切到「本地 + 云端」。
+     * 否则用户配好了 WebDAV 却因为备份位置没切，云备份其实一直没生效（主页云图标也不出现）。
+     */
+    fun afterSaved(prefix: String) {
+        scope.launch {
+            val repo = app.container.settingsRepository
+            val current = repo.backupTarget.first()
+            if (current == SettingsRepository.BACKUP_TARGET_LOCAL) {
+                repo.setBackupTarget(SettingsRepository.BACKUP_TARGET_BOTH)
+                val localReady = StorageConfig.isBackupConfigured(ctx)
+                report(
+                    prefix + "，并已启用云端自动备份（本地 + 云端）。" +
+                        if (localReady) "数据改动后会自动上传。"
+                        else "本地备份文件夹尚未选择，目前只上传云端；需要本地副本可返回上一页选择。"
+                )
+            } else {
+                report(prefix + "，云端自动备份已处于启用状态。")
+            }
+        }
+    }
+
     fun save() {
         if (url.isBlank()) {
             report("请先填写服务器地址", error = true)
             return
         }
-        val saved = WebDavStore.save(ctx, configFor(directory))
-        if (saved) {
-            report("已保存 WebDAV 配置。")
-        } else {
+        val saved = WebDavStore.save(ctx, configFor(directory), directoryPicked)
+        if (!saved) {
             report("保存失败：系统密钥库不可用，密码未能安全存储", error = true)
+            return
         }
+        // 没选定远程目录时配置不算完整，云端备份不会启用——必须说清楚，
+        // 否则用户看到「已保存」会以为大功告成，实际主页永远不出现云图标。
+        if (!directoryPicked) {
+            report(
+                "已保存地址与凭据，但还没选定远程目录，云端备份不会启用。" +
+                    "请点下方「浏览并选择远程目录」选定存放位置（可选中根目录）。",
+                error = true
+            )
+            return
+        }
+        afterSaved("已保存 WebDAV 配置")
     }
 
     Scaffold(
@@ -163,10 +206,12 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                     onEnter = { loadEntries(it) },
                     onSelectCurrent = {
                         directory = browsePath
-                        val saved = WebDavStore.save(ctx, configFor(browsePath))
+                        directoryPicked = true
+                        val saved =
+                            WebDavStore.save(ctx, configFor(browsePath), directoryPicked = true)
                         browsing = false
                         if (saved) {
-                            report("已选择远程目录：/${browsePath}")
+                            afterSaved("已选择远程目录：/${browsePath}")
                         } else {
                             report("目录已选择，但密码未能安全存储（系统密钥库不可用）", error = true)
                         }
@@ -232,7 +277,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                     Button(
                         onClick = {
                             runRemote("测试连接", { CloudBackup.testConnection(configFor(directory)) }) {
-                                report("连接成功，凭据可用。")
+                                report("连接成功，凭据可用。记得点「保存」让配置生效。")
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -266,9 +311,13 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
 
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "当前远程目录：${if (directory.isBlank()) "（根目录）" else "/$directory"}",
+                    if (directoryPicked)
+                        "当前远程目录：${if (directory.isBlank()) "（根目录）" else "/$directory"}"
+                    else
+                        "尚未选定远程目录，云端备份不会启用。请点上方「浏览并选择远程目录」。",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = if (directoryPicked) MaterialTheme.colorScheme.outline
+                    else MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -312,7 +361,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                         showNewFolderDialog = false
                         if (name.isEmpty()) return@TextButton
                         val target = if (browsePath.isBlank()) name else "$browsePath/$name"
-                        runRemote("新建文件夹", { CloudBackup.ensureDirectory(configFor(directory), target) }) {
+                        runRemote("新建文件夹", { CloudBackup.ensureDirectory(configFor(browsePath), target) }) {
                             loadEntries(browsePath)
                         }
                     }) { Text("创建") }

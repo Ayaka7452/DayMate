@@ -3,6 +3,7 @@ package com.ayaka7452.daymate.feature.setup
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.ayaka7452.daymate.DayMateApp
 import com.ayaka7452.daymate.MainActivity
 import com.ayaka7452.daymate.WebDavActivity
@@ -104,6 +108,23 @@ fun StorageSetupBody(
     var cloudOverwriteTarget by remember { mutableStateOf<WebDavConfig?>(null) }
     var cloudBlocked by remember { mutableStateOf(false) }
     var showCloudRestoreConfirm by remember { mutableStateOf(false) }
+
+    /**
+     * WebDAV 配置是否完整。它存在 SharedPreferences 里、没有变更通知：从 WebDAV 配置页
+     * 返回本页时不会自动重组，若不重读就一直是「尚未配置」，让人误以为没保存成功。
+     * 这里用生命周期观察者在每次 ON_RESUME（即从配置页返回）时重读一遍。
+     */
+    var cloudConfigured by remember { mutableStateOf(WebDavStore.isConfigured(ctx)) }
+    DisposableEffect(ctx) {
+        val activity = ctx as? ComponentActivity
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                cloudConfigured = WebDavStore.isConfigured(ctx)
+            }
+        }
+        activity?.lifecycle?.addObserver(observer)
+        onDispose { activity?.lifecycle?.removeObserver(observer) }
+    }
 
     val scope = rememberCoroutineScope()
     val internalDb = remember { app.getDatabasePath("daymate.db") }
@@ -486,17 +507,29 @@ fun StorageSetupBody(
             Spacer(Modifier.height(16.dp))
 
             SectionTitle("WebDAV 云端备份")
-            val cloudConfigured = WebDavStore.isConfigured(ctx)
+            // 已配置但备份位置仍是「仅本地」时要说清楚——否则用户会以为配好就该自动上传
+            val cloudLocation = WebDavStore.directory(ctx).ifBlank { "（根目录）" }
+            val cloudActive =
+                cloudConfigured && backupTarget != SettingsRepository.BACKUP_TARGET_LOCAL
             Text(
-                if (cloudConfigured)
-                    "已配置：${WebDavStore.url(ctx)}\n远程目录：" +
-                        (WebDavStore.directory(ctx).ifBlank { "（根目录）" }) +
-                        "/${WebDavStore.REMOTE_DB}"
-                else
-                    "尚未配置。支持坚果云、Nextcloud、群晖、Alist 等，http 与 https 均可。",
+                when {
+                    !cloudConfigured ->
+                        "尚未配置。支持坚果云、Nextcloud、群晖、Alist 等，http 与 https 均可。"
+                    cloudActive ->
+                        "已配置：${WebDavStore.url(ctx)}\n远程目录：$cloudLocation" +
+                            "/${WebDavStore.REMOTE_DB}"
+                    else ->
+                        "已配置：${WebDavStore.url(ctx)}\n远程目录：$cloudLocation" +
+                            "/${WebDavStore.REMOTE_DB}\n" +
+                            "注意：当前备份位置为「仅本地」，云端备份没有启用——" +
+                            "在上方选「本地 + 云端」或「仅云端」后才会自动上传。"
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = if (cloudConfigured) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.outline
+                color = when {
+                    !cloudConfigured -> MaterialTheme.colorScheme.outline
+                    cloudActive -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.error
+                }
             )
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
