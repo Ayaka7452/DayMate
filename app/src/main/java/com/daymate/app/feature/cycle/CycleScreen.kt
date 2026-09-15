@@ -513,7 +513,7 @@ private fun CycleOverviewScreen(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "周期说明",
+                "温馨提示",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable { showTips = true }
@@ -720,7 +720,7 @@ private fun CycleOverviewScreen(
             confirmButton = {
                 TextButton(onClick = { showTips = false }) { Text("好") }
             },
-            title = { Text("周期说明") },
+            title = { Text("温馨提示") },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -740,6 +740,14 @@ private fun CycleOverviewScreen(
                     )
                     Text(
                         "· 月经期：经期出血的第 1 天到结束，通常 3～7 天，对应圆环的深色段。\n· 卵泡期：月经结束后到排卵前，卵泡逐渐发育成熟，是子宫内膜重新增厚的阶段。\n· 排卵期：排卵日一般在下次经期前 14 天左右，其前后各约 2 天是受孕概率最高的窗口。\n· 黄体期：排卵后到下次经期来临前，身体分泌孕激素维持内膜；未受孕则内膜脱落，进入下一个月经期。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        "日历标记",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        "· 日期底色代表当天所处阶段。\n· 实心圆点：已登记的经期日。\n· 空心圆点：预测的经期日，到来后变为实心。",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -1770,14 +1778,5 @@ private fun CycleCalendarMonth(
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "底色代表当天所处阶段。\n" +
-                "实心圆点：已登记的经期日；空心圆点：预测的经期日，到来后变为实心。",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
