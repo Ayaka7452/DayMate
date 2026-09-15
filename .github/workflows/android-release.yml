@@ -24,6 +24,11 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Google 已把遗留的 `tools` 包从 SDK 仓库下架，本 action 的默认值仍会去装它，
+          # 导致 sdkmanager 报 "Failed to find package 'tools'" 直接失败。
+          # 只装 platform-tools；platform / build-tools 由 Gradle 按需拉取。
+          packages: 'platform-tools'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
