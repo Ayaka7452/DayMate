@@ -2,6 +2,11 @@
 
 package com.ayaka7452.daymate.feature.home
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,8 +32,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -57,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -66,6 +75,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.Routes
 import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.core.CloudBackupState
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
@@ -85,6 +95,9 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
 import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,6 +119,11 @@ fun HomeScreen(
     // 节日卡片右侧角标 emoji（默认 ☀️）
     val homeBadgeEmoji by container.settingsRepository.homeBadgeEmoji
         .collectAsState(initial = "☀️")
+
+    // 云备份指示器：备份位置含云端（both/cloud）且 WebDAV 配置完整时常驻显示
+    val cloudEnabled by container.autoBackup.cloudEnabled.collectAsState(initial = false)
+    val cloudState by container.autoBackup.cloudState.collectAsState(initial = CloudBackupState.Idle)
+    var showCloudSheet by remember { mutableStateOf(false) }
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
@@ -357,6 +375,12 @@ fun HomeScreen(
                     actions = {
                         IconButton(onClick = { searchActive = true }) {
                             Icon(Icons.Default.Search, contentDescription = "搜索")
+                        }
+                        // 云备份指示器：仅在 WebDAV 已配置且备份位置含云端时出现，点击查看详情/手动备份
+                        if (cloudEnabled) {
+                            IconButton(onClick = { showCloudSheet = true }) {
+                                CloudBackupIndicator(state = cloudState)
+                            }
                         }
                         var menuExpanded by remember { mutableStateOf(false) }
                         Box {
@@ -651,6 +675,15 @@ fun HomeScreen(
                 pendingMoveAfterCreate = false
                 showFolderDialog = true
             }
+        )
+    }
+
+    if (showCloudSheet) {
+        CloudBackupSheet(
+            state = cloudState,
+            onDismiss = { showCloudSheet = false },
+            // 复用自动备份的完整流程（含空数据护栏），只是跳过 1.5s 防抖立即执行
+            onBackupNow = { container.autoBackup.flush() }
         )
     }
 
@@ -1163,5 +1196,128 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
+    }
+}
+
+// ===== 云备份指示器 =====
+
+/**
+ * 顶栏云备份图标（方案 A：云为恒定基底，右下角挂结果角标）。
+ *  - Idle    中性云
+ *  - Syncing 主题色旋转箭头
+ *  - Success 绿勾角标（停留 2s 后由 AutoBackupManager 回到 Idle）
+ *  - Failure 红叉角标（常驻，直到下次成功或手动备份）
+ */
+@Composable
+private fun CloudBackupIndicator(state: CloudBackupState, modifier: Modifier = Modifier) {
+    val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(modifier = modifier.size(24.dp), contentAlignment = Alignment.Center) {
+        if (state is CloudBackupState.Syncing) {
+            val transition = rememberInfiniteTransition(label = "cloud-sync")
+            val angle by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(tween(durationMillis = 900, easing = LinearEasing)),
+                label = "cloud-sync-angle"
+            )
+            Icon(
+                imageVector = Icons.Default.Sync,
+                contentDescription = "云备份中",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(20.dp)
+                    .rotate(angle)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Cloud,
+                contentDescription = "云备份",
+                tint = neutral,
+                modifier = Modifier.size(22.dp)
+            )
+            val badge = when (state) {
+                is CloudBackupState.Success -> Color(0xFF1D9E75) to Icons.Default.Check
+                is CloudBackupState.Failure -> MaterialTheme.colorScheme.error to Icons.Default.Close
+                else -> null
+            }
+            if (badge != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(13.dp)
+                        // 先铺一圈 surface 色作分隔，避免角标与云糊在一起
+                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                        .padding(1.dp)
+                        .background(badge.first, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = badge.second,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 云备份详情弹窗：当前状态、上次执行时间、失败原因与「立即备份」。 */
+@Composable
+private fun CloudBackupSheet(
+    state: CloudBackupState,
+    onDismiss: () -> Unit,
+    onBackupNow: () -> Unit
+) {
+    val fmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text("云备份", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "数据改动后会自动上传到 WebDAV，覆盖云端上一份备份。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.height(16.dp))
+
+            val (statusText, statusColor) = when (state) {
+                is CloudBackupState.Idle -> "已就绪" to MaterialTheme.colorScheme.onSurface
+                is CloudBackupState.Syncing -> "正在备份…" to MaterialTheme.colorScheme.primary
+                is CloudBackupState.Success ->
+                    "备份成功 · ${fmt.format(Date(state.at))}" to Color(0xFF1D9E75)
+                is CloudBackupState.Failure ->
+                    "备份失败 · ${fmt.format(Date(state.at))}" to MaterialTheme.colorScheme.error
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CloudBackupIndicator(state = state)
+                Spacer(Modifier.width(12.dp))
+                Text(statusText, style = MaterialTheme.typography.bodyLarge, color = statusColor)
+            }
+
+            if (state is CloudBackupState.Failure) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    state.reason,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            TextButton(
+                onClick = onBackupNow,
+                enabled = state !is CloudBackupState.Syncing,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("立即备份")
+            }
+        }
     }
 }

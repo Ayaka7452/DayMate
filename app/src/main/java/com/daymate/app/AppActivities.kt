@@ -50,6 +50,13 @@ abstract class ComposeActivity : FragmentActivity() {
         runCatching { container.autoBackup.flush() }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // WebDAV 配置存在 SharedPreferences 里，没有变更通知：回到前台重新评估一次，
+        // 这样在设置页配好 WebDAV 返回主页后，顶栏的云备份图标能立刻出现。
+        runCatching { container.autoBackup.refreshCloudConfig() }
+    }
+
     fun setDayMateContent(content: @Composable () -> Unit) {
         val repo = container.settingsRepository
         setContent {

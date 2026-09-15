@@ -8,13 +8,40 @@ import com.ayaka7452.daymate.core.cloud.WebDavConfig
 import com.ayaka7452.daymate.core.cloud.WebDavStore
 import com.ayaka7452.daymate.data.db.DayMateDatabase
 import com.ayaka7452.daymate.data.repo.SettingsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/**
+ * 云备份（WebDAV）的执行状态，供主页顶栏的云备份指示器展示。
+ *
+ * 注意语义：本应用只做**单向上传**（内部主库 → 云端覆盖），没有下载与合并，
+ * 因此这是「云备份」而非多设备双向「同步」。
+ */
+sealed interface CloudBackupState {
+    /** 常态：从未备份过，或上次成功后已回到常态。 */
+    data object Idle : CloudBackupState
+
+    /** 正在上传。 */
+    data object Syncing : CloudBackupState
+
+    /** 最近一次上传成功，[at] 为完成时刻（epoch millis）。 */
+    data class Success(val at: Long) : CloudBackupState
+
+    /** 最近一次上传失败，[reason] 为失败原因，[at] 为失败时刻（epoch millis）。 */
+    data class Failure(val reason: String, val at: Long) : CloudBackupState
+}
 
 /**
  * 自动备份管理器：当数据库发生用户修改时（Repository 写方法通知），经防抖后在后台把内部主库
@@ -39,7 +66,58 @@ class AutoBackupManager(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val debounceMs = 1500L
+
+    /** 成功态在 UI 上停留的时长；到点自动回到 [CloudBackupState.Idle]。 */
+    private val successLingerMs = 2000L
     private var backupJob: Job? = null
+
+    // ===== 云备份状态（主页顶栏指示器用） =====
+
+    private val _cloudState = MutableStateFlow<CloudBackupState>(CloudBackupState.Idle)
+
+    /** 最近一次云备份的执行状态；未启用云备份时恒为 [CloudBackupState.Idle]。 */
+    val cloudState: StateFlow<CloudBackupState> = _cloudState.asStateFlow()
+
+    /**
+     * WebDAV 配置是否完整。初始为 false——[WebDavStore.isConfigured] 会经 AndroidKeyStore
+     * 解密密码，不能在构造时于主线程同步执行，改由 [refreshCloudConfig] 在 IO 线程填充。
+     * 配置存于 SharedPreferences，**没有变更通知**，因此设置页改完配置后需要重新调用一次。
+     */
+    private val webDavConfigured = MutableStateFlow(false)
+
+    /** 备份位置是否包含云端（both / cloud）。 */
+    private val cloudTarget = MutableStateFlow(false)
+
+    /**
+     * 云备份是否已启用：备份位置含云端 **且** WebDAV 配置完整。
+     * 主页据此决定云备份图标是否常驻显示。
+     */
+    val cloudEnabled: StateFlow<Boolean> =
+        combine(cloudTarget, webDavConfigured) { target, configured -> target && configured }
+            .stateIn(scope, SharingStarted.Eagerly, false)
+
+    init {
+        // 首帧前先把 WebDAV 配置读出来（IO 线程，避开主线程的 KeyStore 解密）
+        scope.launch { refreshCloudConfig() }
+        // 跟随「备份位置」设置：切到仅本地时立即收起云备份指示器
+        scope.launch {
+            settings.backupTarget.collect { target ->
+                val enabled = target != SettingsRepository.BACKUP_TARGET_LOCAL
+                cloudTarget.value = enabled
+                if (!enabled) _cloudState.value = CloudBackupState.Idle
+            }
+        }
+    }
+
+    /** WebDAV 配置可能在设置页被改动（SharedPreferences 无变更通知），回到前台时调用以重新评估。 */
+    fun refreshCloudConfig() {
+        runCatching {
+            val configured = WebDavStore.isConfigured(context)
+            webDavConfigured.value = configured
+            // 取消配置后不应残留上次的失败角标
+            if (!configured) _cloudState.value = CloudBackupState.Idle
+        }
+    }
 
     /** 数据变更通知：非挂起，可直接在 Repository 写方法末尾调用。 */
     fun onDataChanged() {
@@ -90,7 +168,26 @@ class AutoBackupManager(
             runCatching { StorageBackup.exportInternal(context, internalDb, localUri) }
         }
         if (cloudCfg != null && cloudBackupAllowed(cloudCfg)) {
-            runCatching { CloudBackup.upload(internalDb, cloudCfg) }
+            _cloudState.value = CloudBackupState.Syncing
+            try {
+                CloudBackup.upload(internalDb, cloudCfg)
+                _cloudState.value = CloudBackupState.Success(System.currentTimeMillis())
+                // 勾停留片刻后回到常态；期间若又开始新一轮备份则不打扰（届时已是 Syncing）
+                scope.launch {
+                    delay(successLingerMs)
+                    if (_cloudState.value is CloudBackupState.Success) {
+                        _cloudState.value = CloudBackupState.Idle
+                    }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                // 失败必须留痕：主页常驻红叉角标，直到下次成功或用户手动重试
+                _cloudState.value = CloudBackupState.Failure(
+                    reason = t.message ?: t::class.java.simpleName,
+                    at = System.currentTimeMillis()
+                )
+            }
         }
     }
 
