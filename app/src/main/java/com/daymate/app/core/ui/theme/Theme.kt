@@ -12,10 +12,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-val PaperLight = Color(0xFFFAFAF7)
+// 浅色模式统一底色：Android 标准纯白（原 #FAFAF7 为暖纸白，蓝通道偏低会导致整体观感发黄）
+val PaperLight = Color(0xFFFFFFFF)
 val InkDark = Color(0xFF1A1A18)
 
-// 「默认」配色：纸白统一底色（背景 = 表面，避免顶部栏纯白与底部灰白的割裂感）+ 深青蓝控件
+// 「默认」配色：纯白统一底色（背景 = 表面，避免顶部栏与底部的割裂感）+ 深青蓝控件
 // 控件主色取自用户指定的 #00668C（截图采样），容器色为同色调 M3 派生
 private val LightColors = lightColorScheme(
     primary = Color(0xFF00668C),
