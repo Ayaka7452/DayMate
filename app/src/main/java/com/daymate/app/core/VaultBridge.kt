@@ -20,7 +20,6 @@ class VaultBridge(
             VaultEventEntity(
                 title = e.title,
                 targetDateEpochDay = e.targetDateEpochDay,
-                repeatYearly = e.repeatYearly,
                 note = e.note,
                 color = e.color,
                 refDays = e.refDays,
@@ -44,7 +43,6 @@ class VaultBridge(
             EventEntity(
                 title = v.title,
                 targetDateEpochDay = v.targetDateEpochDay,
-                repeatYearly = v.repeatYearly,
                 note = v.note,
                 color = v.color,
                 refDays = v.refDays,

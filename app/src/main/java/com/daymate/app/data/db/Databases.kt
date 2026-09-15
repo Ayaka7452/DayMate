@@ -14,7 +14,7 @@ import androidx.room.migration.Migration
         VaultFolderEntity::class,
         CycleLogEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -128,6 +128,161 @@ abstract class DayMateDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v8 -> v9：移除僵尸列 repeatYearly（events / vault_events 各一列）。
+         *
+         * 该列自 v6 引入 repeatRule（WEEKLY/MONTHLY/YEARLY）后已**无任何业务语义**：全项目没有任何一处
+         * 读取它做判断，仅 VaultBridge 搬运事件时原样透传、旧 vault.db 一次性迁移时赋值。剔除它可让每行
+         * 少存一个 INTEGER，并让表结构与代码重新对齐。
+         *
+         * 实现为「建新表 → 逐列复制 → 删旧表 → 改名 → 重建索引」，三个要点：
+         *  1. **按旧表实际存在的列拼 SELECT**——历史发布包出现过库结构与版本号不同步的设备
+         *     （见 MIGRATION_3_4 的注释），缺列一律以默认值补齐，避免 `no such column` 让迁移失败。
+         *     由于已移除破坏性回退，迁移失败将直接抛出而非静默清库，故健壮性是硬要求。
+         *  2. **语义搬运不丢功能**——旧数据中 repeatYearly=1 且 repeatRule 为空的行，改写为
+         *     repeatRule='YEARLY'，「每年重复」的行为原样保留。
+         *  3. **顺带修复悬空外键**——folderId 指向已不存在的文件夹时复制为 NULL：既清理了脏数据，
+         *     也避免外键约束让整条 INSERT 失败。
+         */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                rebuildWithoutRepeatYearly(
+                    db = db,
+                    table = "events",
+                    parentTable = "folders",
+                    targetColumns = listOf(
+                        "id", "title", "targetDateEpochDay", "note", "color", "folderId",
+                        "refDays", "displayUnit", "repeatRule", "linkedFestival", "specialType",
+                        "sortIndex", "isPinned", "isDeleted", "deletedAt", "createdAt", "updatedAt"
+                    ),
+                    fallbacks = mapOf(
+                        "title" to "''",
+                        "targetDateEpochDay" to "0",
+                        "sortIndex" to "0",
+                        "isPinned" to "0",
+                        "isDeleted" to "0",
+                        "deletedAt" to "0",
+                        "createdAt" to "0",
+                        "updatedAt" to "0"
+                    ),
+                    createSql = """
+                        CREATE TABLE events__v9 (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            title TEXT NOT NULL,
+                            targetDateEpochDay INTEGER NOT NULL,
+                            note TEXT,
+                            color INTEGER,
+                            folderId INTEGER,
+                            refDays INTEGER,
+                            displayUnit TEXT,
+                            repeatRule TEXT,
+                            linkedFestival TEXT,
+                            specialType TEXT,
+                            sortIndex INTEGER NOT NULL DEFAULT 0,
+                            isPinned INTEGER NOT NULL DEFAULT 0,
+                            isDeleted INTEGER NOT NULL DEFAULT 0,
+                            deletedAt INTEGER NOT NULL DEFAULT 0,
+                            createdAt INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            FOREIGN KEY(folderId) REFERENCES folders(id) ON DELETE SET NULL
+                        )
+                    """.trimIndent(),
+                    indexSql = "CREATE INDEX IF NOT EXISTS index_events_folderId ON events(folderId)"
+                )
+                rebuildWithoutRepeatYearly(
+                    db = db,
+                    table = "vault_events",
+                    parentTable = "vault_folders",
+                    targetColumns = listOf(
+                        "id", "title", "targetDateEpochDay", "note", "color", "folderId",
+                        "refDays", "displayUnit", "repeatRule", "linkedFestival",
+                        "sortIndex", "isPinned", "createdAt", "updatedAt"
+                    ),
+                    fallbacks = mapOf(
+                        "title" to "''",
+                        "targetDateEpochDay" to "0",
+                        "sortIndex" to "0",
+                        "isPinned" to "0",
+                        "createdAt" to "0",
+                        "updatedAt" to "0"
+                    ),
+                    createSql = """
+                        CREATE TABLE vault_events__v9 (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            title TEXT NOT NULL,
+                            targetDateEpochDay INTEGER NOT NULL,
+                            note TEXT,
+                            color INTEGER,
+                            folderId INTEGER,
+                            refDays INTEGER,
+                            displayUnit TEXT,
+                            repeatRule TEXT,
+                            linkedFestival TEXT,
+                            sortIndex INTEGER NOT NULL DEFAULT 0,
+                            isPinned INTEGER NOT NULL DEFAULT 0,
+                            createdAt INTEGER NOT NULL,
+                            updatedAt INTEGER NOT NULL,
+                            FOREIGN KEY(folderId) REFERENCES vault_folders(id) ON DELETE SET NULL
+                        )
+                    """.trimIndent(),
+                    indexSql = "CREATE INDEX IF NOT EXISTS index_vault_events_folderId ON vault_events(folderId)"
+                )
+            }
+        }
+
+        /**
+         * 重建一张事件表并丢弃 repeatYearly 列，见 [MIGRATION_8_9] 的说明。
+         * @param table 目标表名（重建完成后仍是该名字）。
+         * @param parentTable 外键指向的父表（folders / vault_folders），用于剔除悬空引用。
+         * @param targetColumns 重建后应有的列（顺序即复制顺序）。
+         * @param fallbacks 旧表缺列时的兜底表达式（未列出的一律按 NULL）。
+         * @param createSql 新表的建表语句（表名须为 `<table>__v9`）。
+         * @param indexSql 重建索引语句（DROP TABLE 会连带删掉旧索引）。
+         */
+        private fun rebuildWithoutRepeatYearly(
+            db: androidx.sqlite.db.SupportSQLiteDatabase,
+            table: String,
+            parentTable: String,
+            targetColumns: List<String>,
+            fallbacks: Map<String, String>,
+            createSql: String,
+            indexSql: String
+        ) {
+            val existing = mutableSetOf<String>()
+            db.query("PRAGMA table_info($table)").use { c ->
+                while (c.moveToNext()) existing.add(c.getString(1))
+            }
+            // 表不存在或结构异常（没有主键列）→ 交给 Room 按当前实体自行建表，不在此处硬造
+            if ("id" !in existing) return
+
+            val tmp = "${table}__v9"
+
+            fun exprFor(col: String): String {
+                if (col == "folderId") {
+                    // 悬空文件夹引用置空：修复脏数据 + 避免复制时撞外键约束
+                    return if (col in existing) {
+                        "CASE WHEN $col IN (SELECT id FROM $parentTable) THEN $col ELSE NULL END"
+                    } else "NULL"
+                }
+                val raw = if (col in existing) col else (fallbacks[col] ?: "NULL")
+                if (col == "repeatRule" && "repeatYearly" in existing) {
+                    // 旧的「每年重复」布尔位 → repeatRule='YEARLY'（表结构改变，行为不变）
+                    return "CASE WHEN COALESCE(repeatYearly, 0) = 1 AND ($raw) IS NULL " +
+                        "THEN 'YEARLY' ELSE $raw END"
+                }
+                return raw
+            }
+
+            db.execSQL(createSql)
+            db.execSQL(
+                "INSERT INTO $tmp (" + targetColumns.joinToString(", ") + ") " +
+                    "SELECT " + targetColumns.joinToString(", ") { exprFor(it) } + " FROM $table"
+            )
+            db.execSQL("DROP TABLE $table")
+            db.execSQL("ALTER TABLE $tmp RENAME TO $table")
+            db.execSQL(indexSql)
+        }
+
         /** 幂等加列：列已存在时跳过（防重复 ALTER TABLE 崩溃）。 */
         private fun addColumnIfMissing(
             db: androidx.sqlite.db.SupportSQLiteDatabase,
@@ -147,12 +302,16 @@ abstract class DayMateDatabase : RoomDatabase() {
             // 不直接碰外部存储路径，因此不需要 MANAGE_EXTERNAL_STORAGE 等任何存储权限。
             // 用户数据「备份到自选文件夹」由 StorageBackup 通过 SAF 持久化 URI 完成，
             // 与 Room 主库的物理位置解耦。
+            //
+            // 注意：此处**刻意不使用 fallbackToDestructiveMigration()**。
+            // 它会在「库结构与实体类不一致且无对应迁移」时直接删库重建——数据静默蒸发，
+            // 与「绝不丢用户数据」的原则冲突。改为让迁移必须显式提供：宁可抛错暴露问题
+            // （数据仍在文件里，可后续修复），也不要静默清空用户的倒数日。
             return Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
+                    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9
                 )
-                .fallbackToDestructiveMigration()
                 .build()
         }
     }

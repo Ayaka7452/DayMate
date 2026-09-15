@@ -132,7 +132,8 @@ class DayMateApp : Application() {
                                     id = c.getLong(0),
                                     title = c.getString(1),
                                     targetDateEpochDay = c.getLong(2),
-                                    repeatYearly = c.getInt(3) != 0,
+                                    // 旧库的「每年重复」布尔位 → 新字段 repeatRule='YEARLY'（v9 起已移除该列）
+                                    repeatRule = if (c.getInt(3) != 0) "YEARLY" else null,
                                     note = c.getString(4),
                                     color = if (c.isNull(5)) null else c.getInt(5),
                                     folderId = if (c.isNull(6) || fid !in folderIds) null else fid,

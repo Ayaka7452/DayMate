@@ -497,6 +497,12 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
+            // ===== 数据维护（体检 + 无损修复 + 回收碎片，完成后同步各备份点） =====
+            DataMaintenanceSection(container = container)
+
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -678,4 +684,149 @@ private fun WidgetEventOption(
             )
         }
     }
+}
+
+/**
+ * 数据维护区块：一键体检 + 无损修复数据库，完成后把结果同步到各备份点。
+ * 运行状态封装在本组件内部，避免给设置页主函数再堆一批 remember 变量。
+ */
+@Composable
+private fun DataMaintenanceSection(container: AppContainer) {
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    var running by remember { mutableStateOf(false) }
+    var result by remember {
+        mutableStateOf<com.ayaka7452.daymate.core.DbRepair.RepairResult?>(null)
+    }
+
+    Text(
+        "数据维护",
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 16.dp)
+    )
+    Text(
+        "为长期使用的数据库做体检与整理：回收被反复增删撑大的空间、修复指向已删除文件夹的无效引用。" +
+            "全程无损，不会删除任何事件、文件夹或保险箱内容。",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.outline,
+        modifier = Modifier.padding(top = 4.dp)
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !running) {
+                running = true
+                scope.launch {
+                    val r = container.dbRepair.repair()
+                    result = r
+                    running = false
+                    Toast.makeText(
+                        ctx,
+                        if (r.ok) "修复完成，已同步到备份" else "修复失败：${r.failureReason.orEmpty()}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Filled.Sync, contentDescription = null)
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(
+                if (running) "正在修复…" else "扫描并修复",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                "体检 → 修复无效引用 → 回收空间 → 同步备份",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+
+    result?.let { RepairResultCard(it) }
+}
+
+/** 修复结果卡片：展示修复前后的占用对比与各项体检结论。 */
+@Composable
+private fun RepairResultCard(r: com.ayaka7452.daymate.core.DbRepair.RepairResult) {
+    val after = r.after
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+    ) {
+        if (!r.ok || after == null) {
+            Text(
+                "修复未完成：${r.failureReason ?: "未知原因"}（数据未受影响）",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        } else {
+            val saved = (r.before.totalBytes - after.totalBytes).coerceAtLeast(0)
+            ResultLine("数据库占用", formatBytes(r.before.totalBytes) + " → " + formatBytes(after.totalBytes))
+            ResultLine("已回收空间", formatBytes(saved))
+            ResultLine("结构完整性", if (after.integrityOk) "正常" else "异常：${after.integrityDetail.orEmpty()}")
+            ResultLine("残留无用字段", if (after.zombieColumns.isEmpty()) "无" else after.zombieColumns.joinToString("、"))
+            ResultLine("修复无效引用", if (r.fixedDanglingRefs > 0) "${r.fixedDanglingRefs} 处" else "无需修复")
+            ResultLine("修补异常时间", if (r.fixedTimestamps > 0) "${r.fixedTimestamps} 条" else "无需修复")
+
+            Spacer(Modifier.padding(vertical = 4.dp))
+            Text(
+                "现有数据（未做任何删改）",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Text(
+                after.tables.joinToString(" · ") {
+                    it.label + " " + (if (it.rows < 0) "?" else it.rows.toString())
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+            val recycled = after.tables.sumOf { if (it.inRecycleBin < 0) 0L else it.inRecycleBin }
+            if (recycled > 0) {
+                Text(
+                    "回收站内另有 $recycled 条已删除条目，按你的要求保持原样（如需清理可在回收站中操作）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            if (after.badTimestampRows > 0) {
+                Text(
+                    "注：修补异常时间只针对 1970 年这类不可能的值，正常时间未改动",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+/** 结果卡片里的一行「标签 — 值」。 */
+@Composable
+private fun ResultLine(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
+        Text(value, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024L -> String.format("%.2f MB", bytes / 1048576.0)
+    bytes >= 1024L -> String.format("%.1f KB", bytes / 1024.0)
+    else -> "$bytes B"
 }
