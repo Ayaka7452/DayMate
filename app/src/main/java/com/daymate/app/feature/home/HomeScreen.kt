@@ -8,11 +8,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -76,7 +74,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -140,7 +137,7 @@ fun HomeScreen(
     var showCloudSheet by remember { mutableStateOf(false) }
 
     var showAddSheet by remember { mutableStateOf(false) }
-    // FAB 展开态：开关开启后，点 + 号先展开（月亮升起、+ 号左侧出现「新增」），再点一次才真正新建。
+    // FAB 展开态：开关开启后，长按 + 号展开（月亮从加号上方升起），单击 + 号仍是直接新建事件。
     // 让用户先看清右下角还有哪些入口，避免直接弹面板把人推到「事件 / 文件夹」二选一里。
     // 开关关闭时这个状态永远是 false，点 + 号一步新建，与改动前完全一致。
     var fabExpanded by remember { mutableStateOf(false) }
@@ -490,55 +487,30 @@ fun HomeScreen(
                             Icon(Icons.Filled.Nightlight, contentDescription = "周期管家")
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // 「新增」标签：贴在加号左侧、自右向左滑出，收起时宽度归零不占位。
-                        // 加号第一次点只展开、不弹面板，这个标签就是把「再点一次会发生什么」说清楚。
-                        AnimatedVisibility(
-                            visible = cycleEntryEnabled && fabExpanded,
-                            enter = fadeIn(tween(140)) + expandHorizontally(
-                                expandFrom = Alignment.End,
-                                animationSpec = tween(200)
-                            ),
-                            exit = fadeOut(tween(100)) + shrinkHorizontally(
-                                shrinkTowards = Alignment.End,
-                                animationSpec = tween(160)
-                            )
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    "新增",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .shadow(2.dp, RoundedCornerShape(10.dp))
-                                        .background(
-                                            MaterialTheme.colorScheme.surface,
-                                            RoundedCornerShape(10.dp)
-                                        )
-                                        .border(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                                            RoundedCornerShape(10.dp)
-                                        )
-                                        .padding(horizontal = 12.dp, vertical = 7.dp)
-                                )
-                                Spacer(Modifier.width(10.dp))
-                            }
-                        }
-                        FloatingActionButton(
-                            onClick = {
-                                if (cycleEntryEnabled && !fabExpanded) {
-                                    // 第一次：只展开，把右下角还有什么摊开给用户看
-                                    fabExpanded = true
-                                } else {
-                                    // 第二次（或开关关闭时）：执行新建
-                                    fabExpanded = false
-                                    showAddSheet = true
-                                }
-                            }
-                        ) {
+                    // 加号：单击直接新建事件，长按展开（再长按收起）周期管家入口。
+                    // 长按不挂在 FloatingActionButton 上——它内部自带 clickable 且只暴露 onClick，
+                    // 长按手势拿不到，外面再叠一层也会被它先吃掉。所以盖一层透明手势层接管点击，FAB 只负责画。
+                    // 万一遮挡失效，FAB 的 onClick 是空实现，最坏只是「点了没反应」，不会误触发别的动作。
+                    Box {
+                        FloatingActionButton(onClick = {}) {
                             Icon(Icons.Default.Add, contentDescription = "新建")
                         }
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                // 裁成 FAB 的圆角，否则按下时水波纹会从四角溢出方形边界
+                                .clip(RoundedCornerShape(16.dp))
+                                .combinedClickable(
+                                    onClick = {
+                                        fabExpanded = false
+                                        showAddSheet = true
+                                    },
+                                    onLongClick = {
+                                        // 开关关着时没有入口可展开，长按保持无动作
+                                        if (cycleEntryEnabled) fabExpanded = !fabExpanded
+                                    }
+                                )
+                        )
                     }
                 }
             }

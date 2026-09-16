@@ -802,7 +802,7 @@ private fun CycleOverviewScreen(
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "在日历上点选任意日期，即可为那天添加日常记录（性生活、出血与分泌物、身体症状、情绪，或自己填写）。日常记录只作留痕，不参与周期与排卵推算，也不会点亮经期圆点——随手记一条症状不会影响预测结果。",
+                        "在日历上点选任意日期，即可为那天添加日常记录（性生活、出血与分泌物、身体症状、情绪，或自己填写）。日常记录只作留痕，不参与周期与排卵推算，也不会点亮经期圆点，随手记一条症状不会影响预测结果。",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -1232,7 +1232,7 @@ private fun CycleSettingsScreen(
             }
             ToggleRow(
                 title = "在主页显示入口按钮",
-                subtitle = "开启后，点主页右下角的加号会先展开——露出「新增」提示与周期管家入口，再点一次才新建事件。",
+                subtitle = "开启后，长按主页右下角的加号，即可在加号上方展开周期管家入口。",
                 checked = entryEnabled,
                 enabled = true
             ) { want ->
