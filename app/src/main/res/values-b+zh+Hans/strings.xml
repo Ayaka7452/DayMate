@@ -118,11 +118,11 @@
     <string name="settings_auto_backup_desc_on">数据修改后自动备份到所选文件夹</string>
     <string name="settings_auto_backup_desc_off">需先选择备份文件夹</string>
     <string name="settings_privacy_section">隐私</string>
-    <string name="settings_privacy_desc">周期管家与保险箱默认禁止截屏与录屏，也不会出现在最近任务缩略图中。</string>
+    <string name="settings_privacy_desc">周期管家与 Vault 默认禁止截屏与录屏，也不会出现在最近任务缩略图中。</string>
     <string name="settings_cycle_screenshot_section">周期管家允许截图</string>
     <string name="settings_cycle_screenshot_on">已允许截屏与录屏，密码验证页仍受限制</string>
     <string name="settings_cycle_screenshot_off">已阻止截屏、录屏与最近任务缩略图</string>
-    <string name="settings_vault_screenshot_section">保险箱允许截图</string>
+    <string name="settings_vault_screenshot_section">Vault 允许截图</string>
     <string name="settings_vault_screenshot_on">已允许截屏与录屏，解锁与设密页仍受限制</string>
     <string name="settings_festival_section">节假日数据</string>
     <string name="settings_festival_desc">由应用从所选数据源下载并缓存到本机。跟随节日与节日角标等功能需要该数据。</string>
@@ -467,8 +467,8 @@
     <string name="cycle_warn_too_early">比预测下次经期（%1$s）提前 %2$d 天。提前超过 %3$d 天属异常出血范围，建议咨询医生。</string>
     <string name="db_t_events">倒数日</string>
     <string name="db_t_folders">文件夹</string>
-    <string name="db_t_vault_events">保险箱条目</string>
-    <string name="db_t_vault_folders">保险箱文件夹</string>
+    <string name="db_t_vault_events">Vault 条目</string>
+    <string name="db_t_vault_folders">Vault 文件夹</string>
     <string name="db_t_cycle_logs">周期记录</string>
     <string name="db_t_cycle_notes">日常记录</string>
     <string name="db_f_note">备注</string>

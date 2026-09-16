@@ -118,11 +118,11 @@
     <string name="settings_auto_backup_desc_on">変更後に選択したフォルダへ自動バックアップ</string>
     <string name="settings_auto_backup_desc_off">先にバックアップフォルダを選択してください</string>
     <string name="settings_privacy_section">プライバシー</string>
-    <string name="settings_privacy_desc">サイクル管理と金庫は初期設定でスクリーンショットと画面録画が禁止され、最近のタスクのサムネイルにも表示されません。</string>
+    <string name="settings_privacy_desc">サイクル管理と Vault は初期設定でスクリーンショットと画面録画が禁止され、最近のタスクのサムネイルにも表示されません。</string>
     <string name="settings_cycle_screenshot_section">サイクル管理でのスクリーンショットを許可</string>
     <string name="settings_cycle_screenshot_on">スクリーンショットと録画を許可、パスワード認証画面は制限されたまま</string>
     <string name="settings_cycle_screenshot_off">スクリーンショット、録画、最近のタスクのサムネイルをブロック</string>
-    <string name="settings_vault_screenshot_section">金庫でのスクリーンショットを許可</string>
+    <string name="settings_vault_screenshot_section">Vault でのスクリーンショットを許可</string>
     <string name="settings_vault_screenshot_on">スクリーンショットと録画を許可、ロック解除とパスワード設定画面は制限されたまま</string>
     <string name="settings_festival_section">祝日データ</string>
     <string name="settings_festival_desc">アプリが選択したソースからダウンロードし、端末にキャッシュします。祝日の追跡や祝日バッジなどの機能に必要です。</string>
@@ -467,8 +467,8 @@
     <string name="cycle_warn_too_early">予測された次の月経（%1$s）より %2$d 日早いです。%3$d 日を超える早まりは異常出血の範囲です。医師への相談をおすすめします。</string>
     <string name="db_t_events">カウントダウン</string>
     <string name="db_t_folders">フォルダ</string>
-    <string name="db_t_vault_events">金庫の項目</string>
-    <string name="db_t_vault_folders">金庫のフォルダ</string>
+    <string name="db_t_vault_events">Vault の項目</string>
+    <string name="db_t_vault_folders">Vault のフォルダ</string>
     <string name="db_t_cycle_logs">周期の記録</string>
     <string name="db_t_cycle_notes">デイリーログ</string>
     <string name="db_f_note">メモ</string>
