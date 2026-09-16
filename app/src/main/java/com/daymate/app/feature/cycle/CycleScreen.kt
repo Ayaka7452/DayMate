@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
@@ -296,6 +298,8 @@ private fun CycleOverviewScreen(
     var lastDetailDay by remember { mutableStateOf<Long?>(null) }
     var showAddNote by remember { mutableStateOf(false) }
     var showDeleteNote by remember { mutableStateOf(false) }
+    // 正在修改的那条日常记录（null = 未打开修改弹窗）。修改入口挂在选中日详情区的每一行右侧。
+    var editingNote by remember { mutableStateOf<CycleNoteEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -424,12 +428,19 @@ private fun CycleOverviewScreen(
             // 位置紧贴日历下方：点选的即时反馈要离被点的格子近，不能等滚到页面底部才看见。
             // 展开/收起走纵向滑动而非瞬间出现——高度突变会让下方那排按钮整块跳一下，看着像页面重排。
             // 内嵌 animateContentSize：换一天时记录条数不同导致高度变化，也让它平滑过渡而不是硬切。
+            // 时长刻意偏长（展开 300ms / 收起 360ms）并配 FastOutSlowIn：这块卡片是「点一下才出现」
+            // 的提示区，速度一快就像页面重排闪了一下；缓出曲线让收尾变慢，收起时是被"送走"而不是"被抽走"。
+            // 淡入淡出比滑动略快且先结束——几何动画还在收尾时文字已经化开，不会出现文字被压扁的过程。
             AnimatedVisibility(
                 visible = showCalendar && selectedDay != null,
-                enter = expandVertically(expandFrom = Alignment.Top, animationSpec = tween(220)) +
-                    fadeIn(animationSpec = tween(180)),
-                exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(200)) +
-                    fadeOut(animationSpec = tween(140))
+                enter = expandVertically(
+                    expandFrom = Alignment.Top,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)),
+                exit = shrinkVertically(
+                    shrinkTowards = Alignment.Top,
+                    animationSpec = tween(360, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
             ) {
                 // 退出动画期间 selectedDay 已置 null，用「最后一次选中日」兜底渲染，避免内容中途跳变
                 val detailDay = selectedDay ?: lastDetailDay ?: today
@@ -443,6 +454,7 @@ private fun CycleOverviewScreen(
                         today = today,
                         onCollapse = { selectedDay = null },
                         onAdd = { showAddNote = true },
+                        onEdit = { editingNote = it },
                         onDelete = { showDeleteNote = true }
                     )
                 }
@@ -853,6 +865,19 @@ private fun CycleOverviewScreen(
             onConfirm = { newNotes ->
                 scope.launch { container.cycleNoteRepository.addAll(newNotes) }
                 showAddNote = false
+            }
+        )
+    }
+
+    // 修改记录弹窗：入口在选中日详情区每一行右侧的铅笔
+    val noteToEdit = editingNote
+    if (noteToEdit != null) {
+        EditNoteDialog(
+            note = noteToEdit,
+            onDismiss = { editingNote = null },
+            onConfirm = { updated ->
+                scope.launch { container.cycleNoteRepository.update(updated) }
+                editingNote = null
             }
         )
     }
@@ -2146,9 +2171,13 @@ private fun noteCategoryColor(category: String): Color = when (NoteCatalog.Categ
     NoteCatalog.Category.CUSTOM -> MaterialTheme.colorScheme.secondary
 }
 
-/** 一条日常记录：左侧大类色条 + 名称 +（可选）补充说明。 */
+/**
+ * 一条日常记录：左侧大类色条 + 名称 +（可选）补充说明 +（可选）修改入口。
+ *
+ * [onEdit] 只在选中日详情区传入——历史页是只读列表，不给入口（那里只做浏览与删除）。
+ */
 @Composable
-private fun NoteRow(note: CycleNoteEntity) {
+private fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2163,7 +2192,8 @@ private fun NoteRow(note: CycleNoteEntity) {
         )
         Spacer(Modifier.width(10.dp))
         Text(NoteCatalog.displayLabel(note.presetKey, note.label), style = MaterialTheme.typography.bodyMedium)
-        note.note?.let { extra ->
+        val extra = note.note
+        if (extra != null) {
             Spacer(Modifier.width(8.dp))
             Text(
                 extra,
@@ -2173,6 +2203,19 @@ private fun NoteRow(note: CycleNoteEntity) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+        } else if (onEdit != null) {
+            // 没有补充说明时，补一段弹性空白把修改按钮顶到行尾，两种行型的按钮位置才一致
+            Spacer(Modifier.weight(1f))
+        }
+        if (onEdit != null) {
+            IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = Tr.s(R.string.common_edit),
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                )
+            }
         }
     }
 }
@@ -2193,6 +2236,8 @@ private fun CycleDayDetail(
     /** 收起详情区（＝取消选中）。点「今天」同样会展开详情，所以这个按钮的语义是「收起」，不是「回到今天」。 */
     onCollapse: () -> Unit,
     onAdd: () -> Unit,
+    /** 修改某一条已有记录（入口就挂在那一行右侧）。 */
+    onEdit: (CycleNoteEntity) -> Unit,
     onDelete: () -> Unit
 ) {
     val (phaseLabel, sub) = describeDay(day, logs, cycleDays, today)
@@ -2253,7 +2298,7 @@ private fun CycleDayDetail(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                 )
             } else {
-                dayNotes.forEach { NoteRow(it) }
+                dayNotes.forEach { n -> NoteRow(n, onEdit = { onEdit(n) }) }
             }
 
             Spacer(Modifier.height(12.dp))
@@ -2381,6 +2426,8 @@ private fun AddNoteDialog(
                             }
                         }
                     }
+                    // 勾选后即时显示对应的小字提示（取消勾选即消失），出去再补一条记录就太晚了
+                    NoteCatalog.hintsOf(selectedKeys).forEach { NoteHint(it) }
                 }
 
                 OutlinedTextField(
@@ -2501,6 +2548,152 @@ private fun DeleteNotesDialog(
                 ),
                 onClick = { onConfirm(checkedIds.toList()) }
             ) { Text(stringResource(R.string.cycle_delete_selected_n, checkedIds.size)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
+    )
+}
+
+/**
+ * 预置项小字提示：带一层极浅底色的注记块。
+ *
+ * 用带底色的块而不是裸文本，是因为它紧跟在选中态 chip 下面——裸文本会被读成
+ * 「又一个没选中的选项」；浅底把它明确划成「补充说明」而不是「可点项」。
+ */
+@Composable
+private fun NoteHint(resId: Int) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Text(
+            stringResource(resId),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+        )
+    }
+}
+
+/**
+ * 修改记录弹窗：入口在选中日详情区每一行的右侧。
+ *
+ * 与添加弹窗共用 chip 外观与字段，但**预置项是单选**——一条记录只承载一个预置项
+ * （添加时勾多个会落成多条记录），改成多选就无法表达「改的是哪一条」。
+ * 自定义记录回落到自定义文本输入框，与添加弹窗的语义一致。
+ *
+ * 保存时保留原记录的 id / 日期 / 创建时间，只替换内容字段：id 不变才是原地更新，
+ * 否则会变成「删旧增新」，历史排序与创建时间会一起乱掉。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EditNoteDialog(
+    note: CycleNoteEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (CycleNoteEntity) -> Unit
+) {
+    // 以 note.id 作 remember key：连续修改不同记录时，上一次的草稿必须重来一遍
+    var category by remember(note.id) {
+        mutableStateOf(
+            NoteCatalog.categoryOfPreset(note.presetKey) ?: NoteCatalog.Category.of(note.category)
+        )
+    }
+    var selectedKey by remember(note.id) { mutableStateOf(note.presetKey) }
+    // 自定义记录才有内容文本；预置项记录的 label 是写入时的语言文本，不该回填进输入框
+    var customText by remember(note.id) {
+        mutableStateOf(if (note.presetKey == null) note.label else "")
+    }
+    var noteText by remember(note.id) { mutableStateOf(note.note.orEmpty()) }
+
+    val isCustom = category == NoteCatalog.Category.CUSTOM
+    val canSave = if (isCustom) customText.trim().isNotEmpty() else selectedKey != null
+
+    fun switchTo(c: NoteCatalog.Category) {
+        category = c
+        selectedKey = null
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.cycle_edit_note_title, formatDate(note.dateEpochDay))) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    NoteCatalog.selectable.forEach { c ->
+                        NoteChip(stringResource(c.labelRes), selected = category == c) { switchTo(c) }
+                    }
+                    NoteChip(
+                        stringResource(R.string.cycle_chip_custom),
+                        selected = isCustom
+                    ) { switchTo(NoteCatalog.Category.CUSTOM) }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                if (isCustom) {
+                    OutlinedTextField(
+                        value = customText,
+                        onValueChange = { customText = it.take(NoteCatalog.MAX_LABEL_LENGTH) },
+                        label = { Text(stringResource(R.string.cycle_label_content)) },
+                        placeholder = { Text(stringResource(R.string.cycle_placeholder_example)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        stringResource(R.string.cycle_select_one),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        NoteCatalog.presets[category].orEmpty().forEach { p ->
+                            // 单选且不提供取消：点已选中的项保持原样，避免出现「记录没有内容」的中间态
+                            NoteChip(stringResource(p.labelRes), selected = p.key == selectedKey) {
+                                selectedKey = p.key
+                            }
+                        }
+                    }
+                    NoteCatalog.hintsOf(listOfNotNull(selectedKey)).forEach { NoteHint(it) }
+                }
+
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it.take(NoteCatalog.MAX_NOTE_LENGTH) },
+                    label = { Text(stringResource(R.string.cycle_label_extra_note)) },
+                    placeholder = { Text(stringResource(R.string.cycle_placeholder_extra)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = canSave,
+                onClick = {
+                    val key = selectedKey
+                    onConfirm(
+                        note.copy(
+                            category = if (isCustom) NoteCatalog.CUSTOM_KEY else category.key,
+                            presetKey = if (isCustom) null else key,
+                            // 预置项按当前语言重新落文案；自定义项就是用户输入本身
+                            label = if (isCustom) customText.trim()
+                            else key?.let { k -> NoteCatalog.presetResOf(k)?.let { Tr.s(it) } }
+                                ?: note.label,
+                            note = noteText.trim().ifEmpty { null }
+                        )
+                    )
+                }
+            ) { Text(stringResource(R.string.common_save)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )

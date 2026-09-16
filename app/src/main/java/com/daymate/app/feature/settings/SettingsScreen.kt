@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -114,6 +115,14 @@ fun SettingsScreen(
     var festivalOffsetDraft by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var autoUpdateCurrent by remember { mutableStateOf(festivalRepo.autoUpdateCurrent()) }
     var showBadgeEmojiDialog by remember { mutableStateOf(false) }
+
+    // 节日数据变更信号（切源 / 下载完成 / 启动时自动补下都会 +1）：在这台页面上重新读一次
+    // 源名与缓存状态。没有它，切完区域自动下载完成后这里仍显示「未下载」，直到退出重进。
+    val festivalVersion by festivalRepo.version.collectAsState()
+    LaunchedEffect(festivalVersion) {
+        festivalSourceLabel = festivalRepo.sourceLabel()
+        festivalStatus = festivalRepo.dataStatusText()
+    }
 
     // ===== 界面语言 =====
     // 存储在 SharedPreferences（不是 DataStore）：attachBaseContext 是同步调用，
@@ -193,6 +202,19 @@ fun SettingsScreen(
         }
         ctx.startActivity(intent)
         (ctx as? android.app.Activity)?.finish()
+    }
+
+    /**
+     * 切换节日数据源。
+     *
+     * 换源和下载**必须成对发生**：只把 URL 换掉，列表里还是上一个源的数据，
+     * 用户得自己再点一次「下载数据」、再重启 App 才看到新国家的节日。
+     * 下载挂在容器的应用级作用域上，因此设置页在确认后立刻重启任务栈（换语言那一支）
+     * 也打断不了它。
+     */
+    fun switchRegionNow(region: FestivalRegion) {
+        container.switchFestivalRegion(region)
+        festivalSourceLabel = festivalRepo.sourceLabel()
     }
 
     fun chooseLanguage(lang: AppLanguage) {
@@ -739,29 +761,39 @@ fun SettingsScreen(
             pendingFromLanguage = false
             if (needRestart) restartForLanguage()
         }
+        /**
+         * 这里**刻意不用 `stringResource` 而用 `Tr.s`**。
+         *
+         * 由「换语言」触发的这一支里，语言在 [chooseLanguage] 就写进存储了，只是 Activity 还没重建——
+         * 而 `stringResource` 读的是当前 Activity 的 base context（attachBaseContext 早就包好了旧语言），
+         * 于是会出现「界面刚切成 English，却弹出一个中文的节日源确认框」这种自相矛盾。
+         * `Tr.s` 每次都按存储里的语言重新取词，拿到的正是用户刚选的那门语言。
+         *
+         * 顺带把 [regionName] 也统一走 `Tr.s`（它本来就是），避免出现「标题英文、地区名中文」的混排。
+         */
         AlertDialog(
             onDismissRequest = { closeRegionDialog() },
             title = {
                 Text(
-                    stringResource(
+                    Tr.s(
                         if (pendingFromLanguage) R.string.settings_lang_festival_title
                         else R.string.settings_source_switch_title
                     )
                 )
             },
-            text = { Text(stringResource(R.string.settings_source_switch_msg, regionName)) },
+            text = { Text(Tr.s(R.string.settings_source_switch_msg, regionName)) },
             confirmButton = {
                 TextButton(onClick = {
-                    festivalRepo.setRegion(regionToSwitch)
-                    festivalSourceLabel = festivalRepo.sourceLabel()
+                    switchRegionNow(regionToSwitch)
                     pendingRegionSwitch = null
                     pendingFromLanguage = false
+                    // 由换语言触发的这一支必须重启，否则语言不生效（两个出口行为要一致）
                     restartForLanguage()
-                }) { Text(stringResource(R.string.common_confirm)) }
+                }) { Text(Tr.s(R.string.common_confirm)) }
             },
             dismissButton = {
                 TextButton(onClick = { closeRegionDialog() }) {
-                    Text(stringResource(R.string.common_cancel))
+                    Text(Tr.s(R.string.common_cancel))
                 }
             }
         )
@@ -790,32 +822,52 @@ fun SettingsScreen(
         )
     }
 
-    // 节假日数据源选择弹窗
+    // 节假日数据源选择弹窗：四个内置区域 + 自定义 URL。
+    // 副标题显示「这个源已经缓存了哪些年份」——切换区域前就能看出哪些源是现成可用的，
+    // 而这正是分源缓存存在的意义（切回去秒开，不用重下）。
     if (showFestivalSourceDialog) {
-        val currentUrl = festivalRepo.sourceUrl()
+        val currentRegion = festivalRepo.regionOfCurrentSource()
         AlertDialog(
             onDismissRequest = { showFestivalSourceDialog = false },
             title = { Text(stringResource(R.string.settings_source_dialog_title)) },
             text = {
-                Column {
-                    WidgetEventOption(
-                        title = Tr.s(FestivalRegion.CN.labelRes),
-                        subtitle = stringResource(R.string.settings_source_holidaycn_subtitle),
-                        selected = currentUrl == FestivalRepository.SOURCE_HOLIDAY_CN
-                    ) {
-                        festivalRepo.setSourceUrl(FestivalRepository.SOURCE_HOLIDAY_CN)
-                        festivalSourceLabel = festivalRepo.sourceLabel()
-                        showFestivalSourceDialog = false
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    FestivalRegion.entries.forEach { region ->
+                        val cached = remember(showFestivalSourceDialog) {
+                            festivalRepo.cachedYearsOf(region.name)
+                        }
+                        WidgetEventOption(
+                            title = Tr.s(region.labelRes),
+                            subtitle = if (cached.isEmpty()) {
+                                stringResource(R.string.festival_status_none)
+                            } else {
+                                stringResource(
+                                    R.string.festival_status_cached,
+                                    FestivalRepository.yearsText(cached)
+                                )
+                            },
+                            selected = currentRegion == region
+                        ) {
+                            // 选中即切换 + 自动下载新源数据，不用再手动点一次「下载数据」
+                            switchRegionNow(region)
+                            showFestivalSourceDialog = false
+                        }
                     }
                     WidgetEventOption(
                         title = stringResource(R.string.settings_custom_url),
                         subtitle = stringResource(R.string.settings_source_custom_subtitle),
-                        selected = currentUrl != FestivalRepository.SOURCE_HOLIDAY_CN
+                        selected = currentRegion == null
                     ) {
                         festivalCustomUrl = festivalRepo.sourceUrl()
                         showFestivalCustomInput = true
                         showFestivalSourceDialog = false
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.settings_region_dialog_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
                 }
             },
             confirmButton = {
@@ -853,6 +905,8 @@ fun SettingsScreen(
                     if (u.startsWith("http")) {
                         festivalRepo.setSourceUrl(u)
                         festivalSourceLabel = festivalRepo.sourceLabel()
+                        // 与内置区域同一套：换源即拉数据，别让用户自己再点一次「下载数据」
+                        container.downloadFestivalData()
                         showFestivalCustomInput = false
                     } else {
                         Toast.makeText(ctx, ctx.getString(R.string.settings_url_http_hint), Toast.LENGTH_SHORT).show()

@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.data.festival.FestivalDay
+import com.ayaka7452.daymate.data.festival.HolidayNames
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
@@ -69,7 +70,9 @@ fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier) {
             Text(Tr.s(R.string.common_today), style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.width(8.dp))
             Text(
-                day.name,
+                // 走 HolidayNames 而不是 day.name：数据源给的名字是源国语言的，
+                // 中文用户切到日本节日时得看到「成人の日 → 成人节」而不是日文原名
+                HolidayNames.display(day),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
             )
@@ -133,7 +136,7 @@ fun FestivalCountdownCard(
                     )
                     val dateStr = festival.date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md)))
                     Text(
-                        "${festival.name} · $dateStr",
+                        "${HolidayNames.display(festival)} · $dateStr",
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(

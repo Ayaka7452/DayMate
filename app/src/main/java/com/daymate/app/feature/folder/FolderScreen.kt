@@ -115,7 +115,9 @@ fun FolderScreen(
     var todayFestival by remember {
         mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null)
     }
-    LaunchedEffect(Unit) {
+    // 与主页同一处理：跟着节日数据版本号重读，换源/下载完成后横幅即时跟着换
+    val festivalVersion by container.festivalRepository.version.collectAsState()
+    LaunchedEffect(festivalVersion) {
         val t = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             container.festivalRepository.todayInfo(java.time.LocalDate.now())
         }

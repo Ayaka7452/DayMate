@@ -185,7 +185,11 @@ class EventFormActivity : ComposeActivity() {
                 container = container,
                 eventId = eventId,
                 folderId = folderId,
-                prefillTitle = festivalName,
+                // 标题与锚定名刻意分开：标题是给用户看的（按当前语言译），
+                // 锚定名进 events.linkedFestival，必须保持数据源原名，否则切语言后事件会失锚
+                prefillTitle = festivalName?.let {
+                    com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(it)
+                },
                 prefillEpochDay = festivalEpochDay,
                 prefillFestival = festivalName,
                 onBack = { finish() }

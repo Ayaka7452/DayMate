@@ -137,7 +137,6 @@
     <string name="settings_auto_update_on">On launch, if the current year\'s data is missing, it downloads once automatically (at most once per day)</string>
     <string name="settings_auto_update_off">When off, connects to the network only when you tap \"Download Data\" manually</string>
     <string name="settings_about">About</string>
-    <string name="settings_source_holidaycn_subtitle">Published per State Council notices · open-source data on GitHub</string>
     <string name="settings_custom_url">Custom URL…</string>
     <string name="settings_source_custom_subtitle">Auto-detected by data structure; compatible with major holiday data sources</string>
     <string name="settings_custom_source_url">Custom Data Source URL</string>
@@ -192,6 +191,7 @@
     <string name="settings_existing_data">Existing Data (unmodified)</string>
     <string name="settings_recycle_note">The trash also contains %1$d deleted items, which are left untouched. You can handle them in the Trash.</string>
     <string name="settings_source_dialog_title">Holiday Data Source</string>
+    <string name="settings_region_dialog_hint">Pick the country or region whose holidays you want. Each source keeps its own cache, so you can switch back anytime. Events that follow a holiday keep their current target date if that holiday isn\'t found in the new source.</string>
     <string name="settings_unit_places">%1$d places</string>
     <string name="settings_unit_items">%1$d items</string>
     <string name="settings_no_repair_needed">No repair needed</string>
@@ -318,10 +318,12 @@
     <string name="cycle_add_record">Add record</string>
     <string name="cycle_delete_record">Delete record</string>
     <string name="cycle_add_note_title">Add record · %1$s</string>
+    <string name="cycle_edit_note_title">Edit record · %1$s</string>
     <string name="cycle_chip_custom">Custom</string>
     <string name="cycle_label_content">Content</string>
     <string name="cycle_placeholder_example">e.g., foot bath, brown sugar water</string>
     <string name="cycle_select_items">Select items to log (multiple allowed)</string>
+    <string name="cycle_select_one">Select one item</string>
     <string name="cycle_label_extra_note">Extra note (optional)</string>
     <string name="cycle_placeholder_extra">e.g., light flow, first day</string>
     <string name="cycle_delete_notes_title">Delete records · %1$s</string>
@@ -407,6 +409,9 @@
     <string name="note_cat_custom">Custom</string>
     <string name="note_sex_protected">Protected sex</string>
     <string name="note_sex_unprotected">Unprotected sex</string>
+    <string name="note_sex_solo">Masturbation</string>
+    <string name="note_sex_protected_hint">Withdrawal and other non-barrier methods can still lead to pregnancy — watch your body and assess your situation promptly. They also do not protect against sexually transmitted infections.</string>
+    <string name="note_sex_unprotected_hint">Emergency contraception is most effective within 72 hours after sex — the sooner, the better. For ongoing birth control, ask a doctor about short-acting oral contraceptives (taken on a regular cycle). Please protect yourself, get checked if needed, and guard against sexually transmitted infections.</string>
     <string name="note_bleed_spotting">Spotting</string>
     <string name="note_bleed_brown">Brown discharge</string>
     <string name="note_bleed_clots">Clots</string>

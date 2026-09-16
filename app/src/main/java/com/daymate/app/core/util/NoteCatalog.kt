@@ -55,11 +55,17 @@ object NoteCatalog {
      * 它会参与周期分析的前提上；DayMate 的日常记录**不参与任何推算**（见 CycleNoteEntity），
      * 记性欲就只剩留痕，而且「感受」混进「行为」栏语义不统一。保护与否才是真正有参考价值的
      * 信息（备孕 / 避孕），且它本就是性行为的一个属性。要记性欲的人可走「自定义」自由填写。
+     *
+     * 「自慰」用临床标准词（`自慰` / `Masturbation` / `자위`），与 Clue、Flo 的措辞一致——
+     * 这个词在中文里本就属医学/科普用语，不含俚俗色彩，且不像「自我满足」那样会被读成
+     * 「自满」。它**不参与互斥组**：保护与否描述的是有伴侣的性行为，而自慰与其互不替代，
+     * 同一天两者都发生是完全合理的组合。
      */
     val presets: Map<Category, List<Preset>> = mapOf(
         Category.SEX to listOf(
             Preset("sex_protected", R.string.note_sex_protected),
-            Preset("sex_unprotected", R.string.note_sex_unprotected)
+            Preset("sex_unprotected", R.string.note_sex_unprotected),
+            Preset("sex_solo", R.string.note_sex_solo)
         ),
         Category.BLEED to listOf(
             Preset("bleed_spotting", R.string.note_bleed_spotting),
@@ -100,6 +106,17 @@ object NoteCatalog {
         "sex_unprotected" to "sex_protection"
     )
 
+    /**
+     * 预置项的风险提示（preSet key → 文案资源）：勾选后在选择区下方显示一行小字。
+     *
+     * 只有真正需要提醒的项才配提示——没有条目的项不显示任何小字，避免把弹窗塞满。
+     * 文案只讲**通用的医学常识**（方式、时间窗、就医建议），不做诊断、不推荐任何品牌。
+     */
+    val presetHints: Map<String, Int> = mapOf(
+        "sex_protected" to R.string.note_sex_protected_hint,
+        "sex_unprotected" to R.string.note_sex_unprotected_hint
+    )
+
     /** 除自定义外、可在界面上选择的大类（自定义单独用一个输入框表达，不混在分段里）。 */
     val selectable: List<Category> = Category.entries.filter { it != Category.CUSTOM }
 
@@ -111,6 +128,13 @@ object NoteCatalog {
         presetKey?.let { k -> presets.values.flatten().firstOrNull { it.key == k }?.labelRes }
 
     /**
+     * 预置项 key → 所属大类；未知 key 返回 null。
+     * 修改记录时用它把预置项回填到正确的大类分段（不能拿记录里的 category 直接信，见下）。
+     */
+    fun categoryOfPreset(presetKey: String?): Category? =
+        presetKey?.let { k -> presets.entries.firstOrNull { (_, v) -> v.any { it.key == k } }?.key }
+
+    /**
      * 展示一条已落库记录的文案。
      *
      * 库里冗余存了写入当时的 `label`（保证老记录永远读得出来），但那是**写入时那种语言**的文本。
@@ -118,6 +142,17 @@ object NoteCatalog {
      */
     fun displayLabel(presetKey: String?, storedLabel: String): String =
         presetResOf(presetKey)?.let { Tr.s(it) } ?: storedLabel
+
+    /**
+     * 一组已勾选预置项要显示的风险提示（按预置项在目录中的顺序，已去重）。
+     * 供添加/修改弹窗在勾选后即时展示，勾选取消即消失。
+     */
+    fun hintsOf(selectedKeys: Collection<String>): List<Int> =
+        presets.values.asSequence().flatten().map { it.key }
+            .filter { it in selectedKeys }
+            .mapNotNull { presetHints[it] }
+            .distinct()
+            .toList()
 
     /** 自定义记录的落库大类 key。 */
     val CUSTOM_KEY: String = Category.CUSTOM.key

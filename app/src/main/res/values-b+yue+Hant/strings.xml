@@ -137,7 +137,6 @@
     <string name="settings_auto_update_on">啟動嗰陣如果當年資料唔齊，會自動下載一次（每日最多一次）</string>
     <string name="settings_auto_update_off">閂咗嗰陣只會喺手動撳「下載資料」嗰陣上網</string>
     <string name="settings_about">關於</string>
-    <string name="settings_source_holidaycn_subtitle">跟隨國務院通知發布 · GitHub 開源資料</string>
     <string name="settings_custom_url">自訂 URL…</string>
     <string name="settings_source_custom_subtitle">按資料結構自動識別，兼容主流假期資料來源</string>
     <string name="settings_custom_source_url">自訂資料來源 URL</string>
@@ -192,6 +191,7 @@
     <string name="settings_existing_data">現有資料（未修改）</string>
     <string name="settings_recycle_note">回收筒內另有 %1$d 條已刪除條目，唔做清理。可以喺「回收筒」入面處理。</string>
     <string name="settings_source_dialog_title">假期資料來源</string>
+    <string name="settings_region_dialog_hint">揀你想要邊個國家／地區嘅假期。每個資料來源都會各自留低快取，隨時可以切返轉頭。如果新來源冇咗某個節日，跟住嗰個節日嘅事件會照舊保留原本嘅目標日期。</string>
     <string name="settings_unit_places">%1$d 處</string>
     <string name="settings_unit_items">%1$d 條</string>
     <string name="settings_no_repair_needed">無需修復</string>
@@ -318,10 +318,12 @@
     <string name="cycle_add_record">添加記錄</string>
     <string name="cycle_delete_record">刪除記錄</string>
     <string name="cycle_add_note_title">添加記錄 · %1$s</string>
+    <string name="cycle_edit_note_title">修改記錄 · %1$s</string>
     <string name="cycle_chip_custom">自訂</string>
     <string name="cycle_label_content">記錄內容</string>
     <string name="cycle_placeholder_example">例如：浸腳、飲紅糖水</string>
     <string name="cycle_select_items">揀選要記錄嘅項目（可以揀多個）</string>
+    <string name="cycle_select_one">揀一個要記錄嘅項目</string>
     <string name="cycle_label_extra_note">補充說明（可選）</string>
     <string name="cycle_placeholder_extra">例如：量少、第一日</string>
     <string name="cycle_delete_notes_title">刪除記錄 · %1$s</string>
@@ -407,6 +409,9 @@
     <string name="note_cat_custom">自己寫</string>
     <string name="note_sex_protected">有保護嘅性行為</string>
     <string name="note_sex_unprotected">冇保護嘅性行為</string>
+    <string name="note_sex_solo">自慰</string>
+    <string name="note_sex_protected_hint">體外射精等唔用保險套嘅避孕方式一樣有懷孕風險，要留意自己身體、及早自我評估；呢啲方式亦都擋唔到疾病傳播。</string>
+    <string name="note_sex_unprotected_hint">緊急避孕藥要喺事後 72 個鐘內食，越快食越好。如果要長期避孕，建議問過醫生再揀短效口服避孕藥（要按週期定時食）。記得保護好自己，有需要就去睇醫生檢查，防範疾病傳播。</string>
     <string name="note_bleed_spotting">點滴出血</string>
     <string name="note_bleed_brown">褐色分泌物</string>
     <string name="note_bleed_clots">血塊</string>

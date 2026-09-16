@@ -184,7 +184,10 @@ fun HomeScreen(
     var festivalHasData by remember { mutableStateOf(false) }
     var todayFestival by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
     var nextFestival by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
-    LaunchedEffect(Unit) {
+    // 以「节日数据版本号」为 key 重读，而不是 Unit：换数据源或下载完成后数据变了，
+    // 卡片必须跟着变——早先只在首次组合时读一次，用户得重启 App 才看得到新国家的节日。
+    val festivalVersion by festivalRepo.version.collectAsState()
+    LaunchedEffect(festivalVersion) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
             Triple(festivalRepo.hasData(), festivalRepo.todayInfo(today), festivalRepo.nextOffDay(today))

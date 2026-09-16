@@ -137,7 +137,6 @@
     <string name="settings_auto_update_on">启动时若当年数据缺失，会自动下载一次（每天最多一次）</string>
     <string name="settings_auto_update_off">关闭时仅在手动点击「下载数据」时联网</string>
     <string name="settings_about">关于</string>
-    <string name="settings_source_holidaycn_subtitle">跟随国务院通知发布 · GitHub 开源数据</string>
     <string name="settings_custom_url">自定义 URL…</string>
     <string name="settings_source_custom_subtitle">按数据结构自动识别，兼容主流节假日数据源</string>
     <string name="settings_custom_source_url">自定义数据源 URL</string>
@@ -192,6 +191,7 @@
     <string name="settings_existing_data">现有数据（未修改）</string>
     <string name="settings_recycle_note">回收站内另有 %1$d 条已删除条目，不做清理。可在「回收站」中处理。</string>
     <string name="settings_source_dialog_title">节假日数据源</string>
+    <string name="settings_region_dialog_hint">选择你要的节日所属国家或地区。各数据源各自保留缓存，随时可以切回去。若新数据源里找不到某个节日，跟随该节日的事件会保持原目标日期不变。</string>
     <string name="settings_unit_places">%1$d 处</string>
     <string name="settings_unit_items">%1$d 条</string>
     <string name="settings_no_repair_needed">无需修复</string>
@@ -318,10 +318,12 @@
     <string name="cycle_add_record">添加记录</string>
     <string name="cycle_delete_record">删除记录</string>
     <string name="cycle_add_note_title">添加记录 · %1$s</string>
+    <string name="cycle_edit_note_title">修改记录 · %1$s</string>
     <string name="cycle_chip_custom">自定义</string>
     <string name="cycle_label_content">记录内容</string>
     <string name="cycle_placeholder_example">例如：泡脚、喝红糖水</string>
     <string name="cycle_select_items">选择要记录的项目（可多选）</string>
+    <string name="cycle_select_one">选择要记录的项目（单选）</string>
     <string name="cycle_label_extra_note">补充说明（可选）</string>
     <string name="cycle_placeholder_extra">例如：量少、第一天</string>
     <string name="cycle_delete_notes_title">删除记录 · %1$s</string>
@@ -407,6 +409,9 @@
     <string name="note_cat_custom">自定义</string>
     <string name="note_sex_protected">有保护性行为</string>
     <string name="note_sex_unprotected">无保护性行为</string>
+    <string name="note_sex_solo">自慰</string>
+    <string name="note_sex_protected_hint">体外射精等非屏障式避孕方式仍有怀孕风险，请留意身体状况、及时自我评估；这类方式也无法阻断疾病传播。</string>
+    <string name="note_sex_unprotected_hint">紧急避孕药需在事后 72 小时内服用，越早效果越好。若需长期避孕，建议咨询医生后选择短效口服避孕药（需按周期规律服用）。请做好自我保护，必要时就医检查，防范疾病传播。</string>
     <string name="note_bleed_spotting">点滴出血</string>
     <string name="note_bleed_brown">褐色分泌物</string>
     <string name="note_bleed_clots">血块</string>

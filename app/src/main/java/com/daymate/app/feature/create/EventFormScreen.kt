@@ -233,7 +233,12 @@ fun EventFormScreen(
             }
             Text(
                 if (linkedFestival != null) {
-                    Tr.s(R.string.event_follow_festival_hint, linkedFestival.orEmpty())
+                    // 库里存的是锚定名（跟着数据源走，可能是中文也可能是英文），
+                    // 展示要过一道 HolidayNames，否则英文界面会出现「Following 春节」
+                    Tr.s(
+                        R.string.event_follow_festival_hint,
+                        com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linkedFestival.orEmpty())
+                    )
                 } else {
                     Tr.s(R.string.event_repeat_hint)
                 },
@@ -257,7 +262,12 @@ fun EventFormScreen(
                 }) { Text(Tr.s(R.string.event_follow_festival)) }
                 if (linkedFestival != null) {
                     TextButton(onClick = { linkedFestival = null }) {
-                        Text(Tr.s(R.string.event_unfollow, linkedFestival.orEmpty()))
+                        Text(
+                            Tr.s(
+                                R.string.event_unfollow,
+                                com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linkedFestival.orEmpty())
+                            )
+                        )
                     }
                 }
             }
@@ -452,8 +462,15 @@ fun EventFormScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        // 标题为空或仍是上一个跟随节日名时自动填入，避免覆盖用户自定义标题
-                                        if (title.isBlank() || title == linkedFestival) title = f.name
+                                        // 标题填**当前语言的显示名**（用户看到什么就存什么），
+                                        // 锚定用的 linkedFestival 仍存数据源原名——两者刻意分开。
+                                        // 标题为空、或恰好还是上一个节日的显示名时自动填入，不覆盖用户自定义标题。
+                                        val shown = com.ayaka7452.daymate.data.festival.HolidayNames.display(f)
+                                        val prevShown = linkedFestival
+                                            ?.let { com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(it) }
+                                        if (title.isBlank() || (prevShown != null && title == prevShown)) {
+                                            title = shown
+                                        }
                                         linkedFestival = f.name
                                         epochDay = f.date.toEpochDay()
                                         repeatRule = null
@@ -463,7 +480,10 @@ fun EventFormScreen(
                                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(f.name, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        com.ayaka7452.daymate.data.festival.HolidayNames.display(f),
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
                                     Text(
                                         if (f.isEstimate) {
                                             Tr.s(

@@ -137,7 +137,6 @@
     <string name="settings_auto_update_on">시작 시 해당 연도 데이터가 없으면 자동으로 한 번 다운로드합니다(하루 최대 1회)</string>
     <string name="settings_auto_update_off">꺼져 있으면 \"데이터 다운로드\"를 직접 탭할 때만 네트워크에 연결</string>
     <string name="settings_about">정보</string>
-    <string name="settings_source_holidaycn_subtitle">국무원 공고에 따름 · GitHub 오픈소스 데이터</string>
     <string name="settings_custom_url">사용자 지정 URL…</string>
     <string name="settings_source_custom_subtitle">데이터 구조로 자동 인식, 주요 공휴일 데이터 소스와 호환</string>
     <string name="settings_custom_source_url">사용자 지정 데이터 소스 URL</string>
@@ -192,6 +191,7 @@
     <string name="settings_existing_data">기존 데이터 (수정 안 됨)</string>
     <string name="settings_recycle_note">휴지통에 삭제된 항목 %1$d개가 더 있으며 정리하지 않습니다. \"휴지통\"에서 처리할 수 있습니다.</string>
     <string name="settings_source_dialog_title">공휴일 데이터 소스</string>
+    <string name="settings_region_dialog_hint">원하는 국가·지역의 공휴일을 선택하세요. 데이터 소스마다 캐시를 따로 보관하므로 언제든 되돌릴 수 있습니다. 새 데이터 소스에 해당 공휴일이 없으면 그 공휴일을 따르는 일정은 기존 목표 날짜를 유지합니다.</string>
     <string name="settings_unit_places">%1$d곳</string>
     <string name="settings_unit_items">%1$d개</string>
     <string name="settings_no_repair_needed">수정 불필요</string>
@@ -318,10 +318,12 @@
     <string name="cycle_add_record">기록 추가</string>
     <string name="cycle_delete_record">기록 삭제</string>
     <string name="cycle_add_note_title">기록 추가 · %1$s</string>
+    <string name="cycle_edit_note_title">기록 수정 · %1$s</string>
     <string name="cycle_chip_custom">사용자 지정</string>
     <string name="cycle_label_content">내용</string>
     <string name="cycle_placeholder_example">예: 족욕, 흑설탕 물</string>
     <string name="cycle_select_items">기록할 항목 선택(복수 선택 가능)</string>
+    <string name="cycle_select_one">기록할 항목 선택(1개)</string>
     <string name="cycle_label_extra_note">추가 메모(선택)</string>
     <string name="cycle_placeholder_extra">예: 양 적음, 첫날</string>
     <string name="cycle_delete_notes_title">기록 삭제 · %1$s</string>
@@ -407,6 +409,9 @@
     <string name="note_cat_custom">사용자 지정</string>
     <string name="note_sex_protected">피임한 성관계</string>
     <string name="note_sex_unprotected">피임하지 않은 성관계</string>
+    <string name="note_sex_solo">자위</string>
+    <string name="note_sex_protected_hint">질외사정 등 배리어를 쓰지 않는 피임법도 임신 가능성이 있습니다. 몸 상태를 살피고 빠르게 스스로 점검하세요. 이런 방법은 성매개 감염증도 막지 못합니다.</string>
+    <string name="note_sex_unprotected_hint">응급 피임약은 관계 후 72시간 이내에 복용할 때 효과가 가장 좋으며, 빠를수록 좋습니다. 장기적인 피임이 필요하면 의사와 상담해 저용량 경구 피임약(주기에 맞춰 규칙적으로 복용)을 선택하세요. 스스로를 보호하고 필요하면 검진을 받아 성매개 감염증을 예방하세요.</string>
     <string name="note_bleed_spotting">소량 출혈</string>
     <string name="note_bleed_brown">갈색 분비물</string>
     <string name="note_bleed_clots">혈괴</string>

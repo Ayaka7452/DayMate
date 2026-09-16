@@ -177,7 +177,11 @@ private fun DetailContent(e: EventEntity, folderName: String?, modifier: Modifie
         InfoRow(
             Tr.s(R.string.repeat_label),
             when {
-                e.linkedFestival != null -> Tr.s(R.string.detail_follow_festival, e.linkedFestival.orEmpty())
+                // 存的是锚定名，展示按当前语言译一遍
+                e.linkedFestival != null -> Tr.s(
+                    R.string.detail_follow_festival,
+                    com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(e.linkedFestival.orEmpty())
+                )
                 e.repeatRule == CountdownCalculator.REPEAT_WEEKLY -> Tr.s(R.string.repeat_weekly)
                 e.repeatRule == CountdownCalculator.REPEAT_MONTHLY -> Tr.s(R.string.repeat_monthly)
                 e.repeatRule == CountdownCalculator.REPEAT_YEARLY -> Tr.s(R.string.repeat_yearly)

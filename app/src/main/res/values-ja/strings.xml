@@ -137,7 +137,6 @@
     <string name="settings_auto_update_on">起動時に当年のデータがない場合、自動で1回ダウンロードします（1日最大1回）</string>
     <string name="settings_auto_update_off">オフの場合は「データをダウンロード」を手動でタップしたときのみ通信します</string>
     <string name="settings_about">について</string>
-    <string name="settings_source_holidaycn_subtitle">国務院の発表に準拠 · GitHub のオープンデータ</string>
     <string name="settings_custom_url">カスタム URL…</string>
     <string name="settings_source_custom_subtitle">データ構造で自動判別、主要な祝日データソースに対応</string>
     <string name="settings_custom_source_url">カスタムデータソース URL</string>
@@ -192,6 +191,7 @@
     <string name="settings_existing_data">既存データ（未変更）</string>
     <string name="settings_recycle_note">ゴミ箱にはさらに %1$d 件の削除済み項目があり、清理は行われません。ゴミ箱で対応できます。</string>
     <string name="settings_source_dialog_title">祝日データソース</string>
+    <string name="settings_region_dialog_hint">祝日の対象となる国・地域を選べます。データソースごとにキャッシュを保持するので、いつでも切り戻せます。新しいデータソースに該当の祝日がない場合、その祝日を追っているイベントは元の目標日を保ちます。</string>
     <string name="settings_unit_places">%1$d 件</string>
     <string name="settings_unit_items">%1$d 件</string>
     <string name="settings_no_repair_needed">要修復なし</string>
@@ -318,10 +318,12 @@
     <string name="cycle_add_record">記録を追加</string>
     <string name="cycle_delete_record">記録を削除</string>
     <string name="cycle_add_note_title">記録を追加 · %1$s</string>
+    <string name="cycle_edit_note_title">記録を編集 · %1$s</string>
     <string name="cycle_chip_custom">カスタム</string>
     <string name="cycle_label_content">内容</string>
     <string name="cycle_placeholder_example">例：足湯、黒糖湯</string>
     <string name="cycle_select_items">記録する項目を選択（複数可）</string>
+    <string name="cycle_select_one">記録する項目を選択（1つ）</string>
     <string name="cycle_label_extra_note">補足説明（任意）</string>
     <string name="cycle_placeholder_extra">例：出血量が少ない、初日</string>
     <string name="cycle_delete_notes_title">記録を削除 · %1$s</string>
@@ -407,6 +409,9 @@
     <string name="note_cat_custom">カスタム</string>
     <string name="note_sex_protected">避妊ありの性行為</string>
     <string name="note_sex_unprotected">避妊なしの性行為</string>
+    <string name="note_sex_solo">自慰</string>
+    <string name="note_sex_protected_hint">膣外射精などバリアを使わない避妊法でも妊娠の可能性はあります。体調に気を配り、早めに自己判断してください。こうした方法では性感染症も防げません。</string>
+    <string name="note_sex_unprotected_hint">緊急避妊薬は行為後72時間以内の服用が最も効果的で、早いほど確実です。長期的な避妊を希望する場合は、医師に相談して低用量ピル（周期に沿って規則的に服用）を選びましょう。ご自身を守り、必要なら受診して性感染症の予防を。</string>
     <string name="note_bleed_spotting">不正出血（少量）</string>
     <string name="note_bleed_brown">褐色のおりもの</string>
     <string name="note_bleed_clots">血のかたまり</string>

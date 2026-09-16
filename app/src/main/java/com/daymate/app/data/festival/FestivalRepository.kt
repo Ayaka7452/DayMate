@@ -4,6 +4,9 @@ import android.content.Context
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -39,15 +42,24 @@ enum class FestivalRegion(val url: String, val labelRes: Int) {
     }
 }
 
-/** 单个节假日条目：name 节日名（调休上班日沿用所属节日名，仅 isOffDay=false 区分），
- *  isOffDay true=放假 / false=调休上班。
- *  isEstimate 仅用于表单快选的「预估日期」（缓存里没有该节日未来日期时按上次日期+1年推算，
- *  农历节日可能不准），下载到新一年数据后会自动校正，不会持久化到缓存。 */
+/**
+ * 单个节假日条目。
+ *
+ *  - [name]：**锚定名**。既是落库 `events.linkedFestival` 的比对依据，也是「跟随节日」事件
+ *    滚动时的查找键，因此解析阶段就要归一化（见 `canonicalName`），并且**绝不随界面语言变化**——
+ *    否则用户切一次语言，所有跟随节日的事件都会因名字对不上而静默停止滚动。
+ *  - [localName]：数据源提供的「节日所属国语言」名（Nager.Date 的 `localName`）。
+ *    只作展示兜底，界面语言的显示名由 [HolidayNames.resolve] 决定。
+ *  - [isOffDay]：true=放假 / false=调休上班（调休日沿用所属节日名，仅靠本字段区分）。
+ *  - [isEstimate]：仅用于表单快选的「预估日期」（缓存里没有该节日未来日期时按上次日期+1年推算，
+ *    农历节日可能不准），下载到新一年数据后会自动校正，不会持久化到缓存。
+ */
 data class FestivalDay(
     val name: String,
     val date: LocalDate,
     val isOffDay: Boolean,
-    val isEstimate: Boolean = false
+    val isEstimate: Boolean = false,
+    val localName: String? = null
 )
 
 /**
@@ -128,6 +140,9 @@ class FestivalRepository(private val appContext: Context) {
         private const val KEY_LAST_AUTO_TRY = "last_auto_try"
         private const val CACHE_DIR = "festival_cache"
 
+        /** 自定义数据源的缓存键：用户手填的 URL 不隶属任何内置区域。 */
+        private const val KEY_CUSTOM = "CUSTOM"
+
         /** 把年份列表渲染成「2025–2027 年」（连续）或「2025、2027 年」（不连续）。 */
         fun yearsText(years: List<Int>): String {
             if (years.isEmpty()) return Tr.s(R.string.festival_years_none)
@@ -143,6 +158,20 @@ class FestivalRepository(private val appContext: Context) {
     private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val cacheDir = File(appContext.filesDir, CACHE_DIR)
 
+    /**
+     * 数据变更信号（自增计数）。源切换、下载完成、缓存清理时 +1。
+     *
+     * 主页与文件夹页的节日横幅都是在 `LaunchedEffect(Unit)` 里一次性读缓存的——没有这个信号，
+     * 换完数据源就只能**重启 App** 才看得到新数据（v1.9.0 的实际表现）。
+     * 用自增计数而非布尔量：连续两次变更（切源 + 下载完成）必须各触发一次重读。
+     */
+    private val _version = MutableStateFlow(0L)
+    val version: StateFlow<Long> = _version.asStateFlow()
+
+    private fun changed() {
+        _version.value += 1
+    }
+
     init {
         // 老版本可能选过已下线的 timor.tech（现返回 403）——自动切回默认源，
         // 否则升级后下载会静默失败，而用户看不出是数据源挂了。
@@ -150,16 +179,44 @@ class FestivalRepository(private val appContext: Context) {
         if (stored != null && stored.contains("timor.tech", ignoreCase = true)) {
             prefs.edit().putString(KEY_SOURCE, DEFAULT_SOURCE).apply()
         }
+        // 必须先把老命名迁到带源前缀的新命名，再清理过期年份——否则会把刚迁过来的当年数据误删
+        migrateLegacyCache()
         // 清掉早已用不到的旧年份缓存（查询一律带 `>= 今天` 过滤，过去年份永远是死数据）
         pruneOldCache()
+    }
+
+    /**
+     * 把老命名的 `{year}.json` 迁到 `{源}_{year}.json`。
+     *
+     * 缓存从 v1.9.1 起**按数据源分文件**（切到日本节日不再覆盖中国节日的缓存，切回来是秒开，
+     * 也正是「切换数据源」弹窗里那句「已有缓存会保留」的兑现）。老格式里没有记录当时用的是哪个源，
+     * 只能归到**当前源**名下——当前源就是用户此刻正在用的那个，归到别处才是真的丢数据。
+     */
+    private fun migrateLegacyCache() {
+        runCatching {
+            val key = cacheKey()
+            cacheDir.listFiles()?.forEach { f ->
+                val year = f.nameWithoutExtension.toIntOrNull() ?: return@forEach
+                val target = File(cacheDir, "${key}_$year.json")
+                if (target.exists()) runCatching { f.delete() }
+                else runCatching { f.renameTo(target) }
+            }
+        }
     }
 
     // ---------- 数据源管理（设置页可编辑） ----------
 
     fun sourceUrl(): String = prefs.getString(KEY_SOURCE, DEFAULT_SOURCE) ?: DEFAULT_SOURCE
 
+    /**
+     * 换数据源。缓存按源分文件，所以这里**不动任何缓存文件**——切走再切回来，原数据仍在。
+     * 只不过新源的缓存大概率是空的，调用方（设置页）需要紧接着触发一次下载。
+     */
     fun setSourceUrl(url: String) {
-        prefs.edit().putString(KEY_SOURCE, url.trim()).apply()
+        val next = url.trim()
+        if (next == sourceUrl()) return
+        prefs.edit().putString(KEY_SOURCE, next).apply()
+        changed()
     }
 
     /** 内置区域的展示名；不是内置区域（用户自己填的 URL）时回落「自定义数据源」。 */
@@ -237,21 +294,35 @@ class FestivalRepository(private val appContext: Context) {
         val minYear = today.year + OFFSET_MIN
         runCatching {
             cacheDir.listFiles()?.forEach { f ->
-                val y = f.nameWithoutExtension.toIntOrNull() ?: return@forEach
+                // 两种命名都认：老的 `2026.json`、现在的 `CN_2026.json`（取最后一个下划线之后那段）
+                val y = f.nameWithoutExtension.substringAfterLast('_').toIntOrNull() ?: return@forEach
                 if (y < minYear) runCatching { f.delete() }
             }
         }
     }
 
-    private fun cacheFile(year: Int): File = cacheDir.apply { mkdirs() }.let { File(it, "$year.json") }
+    /** 当前数据源对应的缓存键：内置区域用区域名，自定义 URL 统一用 CUSTOM。 */
+    private fun cacheKey(): String = regionOfCurrentSource()?.name ?: KEY_CUSTOM
+
+    /**
+     * 某数据源某年的缓存文件。**键必须由调用方在下载开始时捕获并一路传下去**——
+     * 下载是异步的，期间用户可能又切了源，此时若在写入时才取 cacheKey()，
+     * 别的源的数据就会被写进新源的文件里（切一次源得到两份混合数据）。
+     */
+    private fun cacheFile(year: Int, key: String = cacheKey()): File =
+        cacheDir.apply { mkdirs() }.let { File(it, "${key}_$year.json") }
 
     // ---------- 缓存状态 ----------
 
-    /** 已缓存且有实际数据的年份（升序）。 */
-    fun cachedYears(): List<Int> =
+    /** 当前数据源下已缓存且有实际数据的年份（升序）。 */
+    fun cachedYears(): List<Int> = cachedYearsOf(cacheKey())
+
+    /** 指定数据源的已缓存年份。设置页只关心当前源，测试与调试需要按源取。 */
+    fun cachedYearsOf(key: String): List<Int> =
         cacheDir.listFiles()
-            ?.mapNotNull { it.nameWithoutExtension.toIntOrNull() }
-            ?.filter { loadYear(it).isNotEmpty() }
+            ?.filter { it.name.startsWith("${key}_") }
+            ?.mapNotNull { it.nameWithoutExtension.substringAfterLast('_').toIntOrNull() }
+            ?.filter { loadYearOf(key, it).isNotEmpty() }
             ?.sorted()
             ?: emptyList()
 
@@ -266,8 +337,10 @@ class FestivalRepository(private val appContext: Context) {
         else Tr.s(R.string.festival_status_cached, yearsText(years))
     }
 
-    private fun loadYear(year: Int): List<FestivalDay> {
-        val f = cacheFile(year)
+    private fun loadYear(year: Int): List<FestivalDay> = loadYearOf(cacheKey(), year)
+
+    private fun loadYearOf(key: String, year: Int): List<FestivalDay> {
+        val f = cacheFile(year, key)
         if (!f.exists()) return emptyList()
         return runCatching { parseAny(f.readText())[year] ?: emptyList() }.getOrDefault(emptyList())
     }
@@ -333,6 +406,8 @@ class FestivalRepository(private val appContext: Context) {
             val ok = mutableListOf<Int>()
             val pending = mutableListOf<Int>()
             val fail = mutableListOf<Int>()
+            // 下载开始时就把目标源的键钉死：中途用户可能又切了源，写入必须落回发起时那个源
+            val key = cacheKey()
             val url = sourceUrl()
             if (!url.contains(YEAR_PLACEHOLDER)) {
                 // 整份文件源（如 chinese-days 全量 JSON）：只下一次，按年份切分
@@ -340,13 +415,13 @@ class FestivalRepository(private val appContext: Context) {
                 if (all.isNullOrEmpty()) {
                     fail.addAll(years)
                 } else {
-                    for (y in years) commit(y, all[y].orEmpty(), ok, pending)
+                    for (y in years) commit(key, y, all[y].orEmpty(), ok, pending)
                 }
             } else {
                 for (y in years) {
                     try {
                         val days = parseAny(download(url.replace(YEAR_PLACEHOLDER, y.toString())))[y].orEmpty()
-                        commit(y, days, ok, pending)
+                        commit(key, y, days, ok, pending)
                     } catch (_: DataNotPublished) {
                         pending.add(y)
                     } catch (_: Exception) {
@@ -356,10 +431,12 @@ class FestivalRepository(private val appContext: Context) {
             }
             // 下载完顺手清一次：年份滑走后旧缓存就没用了
             pruneOldCache()
+            if (ok.isNotEmpty()) changed()
             FestivalUpdateResult(ok.sorted(), pending.sorted(), fail.sorted())
         }
 
     private fun commit(
+        key: String,
         year: Int,
         days: List<FestivalDay>,
         ok: MutableList<Int>,
@@ -368,7 +445,7 @@ class FestivalRepository(private val appContext: Context) {
         if (days.isEmpty()) {
             pending.add(year)
         } else {
-            cacheFile(year).writeText(normalize(year, days))
+            cacheFile(year, key).writeText(normalize(year, days))
             ok.add(year)
         }
     }
@@ -402,6 +479,8 @@ class FestivalRepository(private val appContext: Context) {
             o.put("name", d.name)
             o.put("date", d.date.toString())
             o.put("isOffDay", d.isOffDay)
+            // 原产国语言名要一并落缓存，否则切回该源时只能显示英文名
+            d.localName?.let { o.put("localName", it) }
             arr.put(o)
         }
         root.put("days", arr)
@@ -469,11 +548,21 @@ class FestivalRepository(private val appContext: Context) {
             ?: root.optJSONArray("data")
             ?: root.optJSONObject("data")?.let { dayArrayOf(it) }
 
-    /** 读「日条目数组」。无名字的「非放假」条目直接丢弃——它们只是普通工作日（如 apihubs 的全年流水）。 */
+    /**
+     * 读「日条目数组」。无名字的「非放假」条目直接丢弃——它们只是普通工作日（如 apihubs 的全年流水）。
+     *
+     * 两处**只在字段存在时才生效**的收敛（对 holiday-cn 这类源零影响）：
+     *  - `types`（Nager.Date）：只留含 `Public` / `Bank` 的条目。US 数据里混着
+     *    `School` / `Authorities` / `Observance` 的州级纪念日（Truman Day、Lincoln's Birthday），
+     *    它们在全国都不放假，留着只会让「下一个节日」卡片和快选列表冒出一串没人放假的节日。
+     *  - 同一天同一节日的重复条目（Columbus Day 被拆成 `Public/global=false` 与 `Bank/global=true`
+     *    两条）：去重时**优先保留标记为全国性的那条**。
+     */
     private fun readDayArray(arr: JSONArray, fallbackYear: Int?): List<FestivalDay> {
-        val out = mutableListOf<FestivalDay>()
+        val raw = mutableListOf<Pair<FestivalDay, Boolean>>()
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
+            if (!isNationwideHoliday(o)) continue
             val date = parseDate(o.opt("date")?.toString())
                 ?: parseDate(o.opt("day")?.toString())
                 ?: fallbackYear?.let { y -> monthDayOf(o)?.let { md -> md.atYear(y) } }
@@ -481,9 +570,29 @@ class FestivalRepository(private val appContext: Context) {
             val off = offDayOf(o, true)
             val name = nameOf(o)
             if (!off && name == null) continue
-            out.add(FestivalDay(name ?: Tr.s(R.string.festival_unnamed), date, off))
+            val global = asBool(o.opt("global")) != false
+            raw.add(
+                FestivalDay(
+                    name ?: Tr.s(R.string.festival_unnamed),
+                    date,
+                    off,
+                    localName = o.optString("localName", "").trim()
+                        .takeIf { it.isNotEmpty() && it != "null" }
+                ) to global
+            )
         }
-        return out
+        // sortedByDescending 是稳定排序：同一天同一节日只保留第一条，全国性的那条自然排在前面
+        return raw.sortedByDescending { it.second }.map { it.first }.distinctBy { it.date to it.name }
+    }
+
+    /** 是否全国性假日。数据源没有 `types` 字段时一律保留（不拿单一厂商的字段去卡通用解析）。 */
+    private fun isNationwideHoliday(o: JSONObject): Boolean {
+        val types = o.optJSONArray("types") ?: return true
+        for (i in 0 until types.length()) {
+            val t = types.optString(i, "")
+            if (t.equals("Public", ignoreCase = true) || t.equals("Bank", ignoreCase = true)) return true
+        }
+        return false
     }
 
     /** 读「以日期（或 MM-dd）为键」的对象；值可以是条目对象，也可以是 "英文,中文,等级" 这类字符串。 */
