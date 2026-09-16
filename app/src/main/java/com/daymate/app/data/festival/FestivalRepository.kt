@@ -79,13 +79,21 @@ class FestivalRepository(private val appContext: Context) {
         /** URL 中的年份占位符；缺省表示「整份文件源」。 */
         const val YEAR_PLACEHOLDER = "{year}"
 
-        /** 设置页可选缓存年份的前后跨度：当前年 -3 ～ +3。 */
-        private const val YEAR_SPAN_BEFORE = 3
-        private const val YEAR_SPAN_AFTER = 3
+        /** 可勾选的年份偏移范围：去年（−1）～ 三年后（+3）。过去年份无实际用途，不再提供。 */
+        private const val OFFSET_MIN = -1
+        private const val OFFSET_MAX = 3
+
+        /** 默认覆盖：去年 + 今年。次年放假安排一般当年 11 月才公布，故默认不勾明年。 */
+        private val DEFAULT_OFFSETS = listOf(-1, 0)
+
+        /** 自动补下当年数据的最小重试间隔：数据源长期不可用时不要每次冷启动都联网。 */
+        private const val AUTO_TRY_INTERVAL_MS = 24L * 60 * 60 * 1000
 
         private const val PREFS = "festival_prefs"
         private const val KEY_SOURCE = "source_url"
         private const val KEY_YEARS = "cache_years"
+        private const val KEY_AUTO_UPDATE = "auto_update_current"
+        private const val KEY_LAST_AUTO_TRY = "last_auto_try"
         private const val CACHE_DIR = "festival_cache"
 
         /** 把年份列表渲染成「2025–2027 年」（连续）或「2025、2027 年」（不连续）。 */
@@ -107,6 +115,8 @@ class FestivalRepository(private val appContext: Context) {
         if (stored != null && stored.contains("timor.tech", ignoreCase = true)) {
             prefs.edit().putString(KEY_SOURCE, DEFAULT_SOURCE).apply()
         }
+        // 清掉早已用不到的旧年份缓存（查询一律带 `>= 今天` 过滤，过去年份永远是死数据）
+        pruneOldCache()
     }
 
     // ---------- 数据源管理（设置页可编辑） ----------
@@ -120,25 +130,71 @@ class FestivalRepository(private val appContext: Context) {
     fun sourceLabel(): String =
         if (sourceUrl() == SOURCE_HOLIDAY_CN) "holiday-cn（默认）" else "自定义源"
 
-    // ---------- 缓存年份选择 ----------
+    // ---------- 缓存年份选择（存偏移，随年份自动滑动） ----------
 
-    /** 设置页可勾选的年份范围（当前年 ±3）。 */
+    /**
+     * 设置页可勾选的年份（去年 ～ 三年后）。
+     *
+     * 内部一律用「相对今年的偏移」表达，绝不存绝对年份：存绝对年份会让选择集在写入那一刻
+     * 冻结，几年后窗口已经滑走而选择集没动，结果是**当前年份反而没有数据**。
+     */
     fun selectableYears(today: LocalDate = LocalDate.now()): List<Int> =
-        ((today.year - YEAR_SPAN_BEFORE)..(today.year + YEAR_SPAN_AFTER)).toList()
+        (OFFSET_MIN..OFFSET_MAX).map { today.year + it }
 
-    /** 默认下载范围：去年、今年、明年（明年数据通常尚未发布，联网后可自动补上）。 */
-    fun defaultYears(today: LocalDate = LocalDate.now()): List<Int> =
-        listOf(today.year - 1, today.year, today.year + 1)
-
-    /** 用户勾选的缓存年份；从未设置过则为默认范围。 */
-    fun selectedYears(): List<Int> {
-        val raw = prefs.getString(KEY_YEARS, null) ?: return defaultYears()
-        val parsed = raw.split(",").mapNotNull { it.trim().toIntOrNull() }.distinct().sorted()
-        return parsed.ifEmpty { defaultYears() }
+    /** 用户勾选的年份偏移；从未设置过则为默认范围。今年（偏移 0）恒被包含。 */
+    fun selectedOffsets(): List<Int> {
+        val raw = prefs.getString(KEY_YEARS, null) ?: return DEFAULT_OFFSETS
+        val parsed = raw.split(",").mapNotNull { it.trim().toIntOrNull() }
+        // 兼容旧版存的绝对年份（如 "2025,2026,2027"）：按相对今天的偏移换算，越界丢弃
+        val thisYear = LocalDate.now().year
+        val offsets = if (parsed.any { it >= 2000 }) parsed.map { it - thisYear } else parsed
+        val kept = (offsets.filter { it in OFFSET_MIN..OFFSET_MAX } + 0).distinct().sorted()
+        return kept.ifEmpty { DEFAULT_OFFSETS }
     }
 
-    fun setSelectedYears(years: Collection<Int>) {
-        prefs.edit().putString(KEY_YEARS, years.distinct().sorted().joinToString(",")).apply()
+    /** 用户勾选的缓存年份（绝对年份，随年份自动滑动）。 */
+    fun selectedYears(today: LocalDate = LocalDate.now()): List<Int> =
+        selectedOffsets().map { today.year + it }
+
+    /** 写入勾选结果（传入偏移）。今年（0）始终保留——否则当前年份会没有数据。 */
+    fun setSelectedOffsets(offsets: Collection<Int>) {
+        val cleaned = (offsets.filter { it in OFFSET_MIN..OFFSET_MAX } + 0).distinct().sorted()
+        prefs.edit().putString(KEY_YEARS, cleaned.joinToString(",")).apply()
+    }
+
+    // ---------- 自动补下当年数据（默认关闭，用户可在设置中打开） ----------
+
+    fun autoUpdateCurrent(): Boolean = prefs.getBoolean(KEY_AUTO_UPDATE, false)
+
+    fun setAutoUpdateCurrent(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_UPDATE, enabled).apply()
+    }
+
+    /**
+     * 是否需要自动补下当年数据：开关已打开 + 当年无缓存 + 距上次尝试超过 24 小时。
+     * 当年数据缺失时小组件与「下一个节日」会取不到值，跨年后尤其明显。
+     */
+    fun shouldAutoUpdateCurrent(today: LocalDate = LocalDate.now()): Boolean =
+        autoUpdateCurrent() && !isCached(today.year) &&
+            System.currentTimeMillis() - prefs.getLong(KEY_LAST_AUTO_TRY, 0L) > AUTO_TRY_INTERVAL_MS
+
+    /** 记录一次自动尝试，无论成功与否（避免失败时每次冷启动都重试联网）。 */
+    fun markAutoTried() {
+        prefs.edit().putLong(KEY_LAST_AUTO_TRY, System.currentTimeMillis()).apply()
+    }
+
+    /**
+     * 清掉早于「去年」的缓存文件：可勾选的最小年份就是去年，更早的年份在任何查询里
+     * 都会被 `>= 今天` 过滤掉，留着只会让 [cachedYears] / [allDays] 反复解析白耗。
+     */
+    private fun pruneOldCache(today: LocalDate = LocalDate.now()) {
+        val minYear = today.year + OFFSET_MIN
+        runCatching {
+            cacheDir.listFiles()?.forEach { f ->
+                val y = f.nameWithoutExtension.toIntOrNull() ?: return@forEach
+                if (y < minYear) runCatching { f.delete() }
+            }
+        }
     }
 
     private fun cacheFile(year: Int): File = cacheDir.apply { mkdirs() }.let { File(it, "$year.json") }
@@ -251,6 +307,8 @@ class FestivalRepository(private val appContext: Context) {
                     }
                 }
             }
+            // 下载完顺手清一次：年份滑走后旧缓存就没用了
+            pruneOldCache()
             FestivalUpdateResult(ok.sorted(), pending.sorted(), fail.sorted())
         }
 

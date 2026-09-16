@@ -34,6 +34,18 @@ class DayMateApp : Application() {
         // 应用启动时滚动循环/节日跟随事件：把目标日期已过的事件锚定到下一次日期
         // （节日跟随依赖节假日缓存数据；数据未下载时不滚动，仅周期循环生效）
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            // 自动补下当年节假日数据（默认关闭，用户可在设置中打开）：必须先补数据再滚动
+            // 事件——滚动要找「该节日的下一次日期」，依赖刚下载到的当年数据。
+            runCatching {
+                val festival = container.festivalRepository
+                if (festival.shouldAutoUpdateCurrent()) {
+                    festival.markAutoTried()
+                    if (festival.updateFromNetwork().success) {
+                        container.eventRepository.reanchorFestivalEstimates(festival)
+                        com.ayaka7452.daymate.widget.WidgetRenderer.refreshAll(this@DayMateApp)
+                    }
+                }
+            }
             runCatching { container.eventRepository.rollForwardRepeating(container.festivalRepository) }
             // Vault 事件的周期循环同样锚定（日期为明文列，直接滚动，无需解密）
             runCatching { container.vaultRepository.rollForwardRepeating() }

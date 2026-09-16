@@ -100,10 +100,11 @@ fun SettingsScreen(
     var showFestivalSourceDialog by remember { mutableStateOf(false) }
     var showFestivalCustomInput by remember { mutableStateOf(false) }
     var festivalCustomUrl by remember { mutableStateOf(festivalRepo.sourceUrl()) }
-    // 可自选缓存年份（当前年 ±3），默认去年/今年/明年
+    // 可自选缓存年份（去年 ～ 三年后），默认去年/今年；存的是相对今年的偏移，随年份自动滑动
     var showFestivalYearsDialog by remember { mutableStateOf(false) }
     var festivalYears by remember { mutableStateOf(festivalRepo.selectedYears()) }
-    var festivalYearDraft by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var festivalOffsetDraft by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var autoUpdateCurrent by remember { mutableStateOf(festivalRepo.autoUpdateCurrent()) }
     var showBadgeEmojiDialog by remember { mutableStateOf(false) }
 
     // 数据备份：选择文件夹仅作 SAF 导出/导入目标，不需要任何存储权限（全屏覆盖）
@@ -464,7 +465,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        festivalYearDraft = festivalYears.toSet()
+                        festivalOffsetDraft = festivalRepo.selectedOffsets().toSet()
                         showFestivalYearsDialog = true
                     }
                     .padding(vertical = 12.dp),
@@ -475,7 +476,7 @@ fun SettingsScreen(
                 Column {
                     Text("缓存年份", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "已选 ${FestivalRepository.yearsText(festivalYears)}",
+                        "已选 ${FestivalRepository.yearsText(festivalYears)} · 随年份自动更新",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -516,6 +517,30 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("自动更新当年数据", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (autoUpdateCurrent) "启动时若当年数据缺失，会自动下载一次（每天最多一次）"
+                        else "关闭时仅在手动点击「下载数据」时联网",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = autoUpdateCurrent,
+                    onCheckedChange = {
+                        autoUpdateCurrent = it
+                        festivalRepo.setAutoUpdateCurrent(it)
+                    }
+                )
             }
 
             Spacer(Modifier.padding(vertical = 8.dp))
@@ -640,8 +665,10 @@ fun SettingsScreen(
         )
     }
 
-    // 缓存年份选择弹窗（当前年 ±3，勾选后「下载数据」按所选年份逐一拉取）
+    // 缓存年份选择弹窗（去年 ～ 三年后）。勾选存的是「相对今年的偏移」，所以年份会自动滑动：
+    // 今年选的「去年 + 今年」，到明年就变成「今年 + 明年」，永远不会出现「当年没数据」。
     if (showFestivalYearsDialog) {
+        val thisYear = java.time.LocalDate.now().year
         val years = festivalRepo.selectableYears()
         AlertDialog(
             onDismissRequest = { showFestivalYearsDialog = false },
@@ -649,34 +676,38 @@ fun SettingsScreen(
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
-                        "勾选需要缓存的年份。次年放假安排一般在当年 11 月前后公布，" +
-                            "未公布前下载会提示「尚未发布」，不会覆盖已有缓存。",
+                        "勾选需要缓存的年份，选择会随年份自动更新。次年放假安排一般在当年 11 月前后公布，" +
+                            "未公布前下载会提示「尚未发布」，不会覆盖已有缓存。\n" +
+                            "未勾选明年时，年底的跨年节日（如元旦）会取不到日期。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
                     Spacer(Modifier.height(8.dp))
                     val cached = remember(showFestivalYearsDialog) { festivalRepo.cachedYears().toSet() }
                     years.forEach { y ->
-                        val checked = y in festivalYearDraft
+                        val offset = y - thisYear
+                        val required = offset == 0
+                        val checked = required || offset in festivalOffsetDraft
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    festivalYearDraft = if (checked) {
-                                        festivalYearDraft - y
+                                .clickable(enabled = !required) {
+                                    festivalOffsetDraft = if (checked) {
+                                        festivalOffsetDraft - offset
                                     } else {
-                                        festivalYearDraft + y
+                                        festivalOffsetDraft + offset
                                     }
                                 }
                                 .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Checkbox(checked = checked, onCheckedChange = null)
+                            Checkbox(checked = checked, onCheckedChange = null, enabled = !required)
                             Spacer(Modifier.width(8.dp))
                             Text("$y 年", style = MaterialTheme.typography.bodyLarge)
                             Spacer(Modifier.weight(1f))
                             Text(
-                                if (y in cached) "已缓存" else "未缓存",
+                                (if (y in cached) "已缓存" else "未缓存") +
+                                    (if (required) " · 必选" else ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
@@ -686,13 +717,9 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val picked = festivalYearDraft.sorted()
-                    if (picked.isNotEmpty()) {
-                        festivalRepo.setSelectedYears(picked)
-                        festivalYears = picked
-                    } else {
-                        Toast.makeText(ctx, "至少选择一个年份", Toast.LENGTH_SHORT).show()
-                    }
+                    // 写入的是偏移；今年（偏移 0）由 setSelectedOffsets 强制保留
+                    festivalRepo.setSelectedOffsets(festivalOffsetDraft)
+                    festivalYears = festivalRepo.selectedYears()
                     showFestivalYearsDialog = false
                 }) { Text("确定") }
             },
