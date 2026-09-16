@@ -24,6 +24,9 @@ class CycleNoteRepository(
 
     suspend fun getByDay(day: Long): List<CycleNoteEntity> = dao.getByDay(day)
 
+    /** 全表行数，供备份的「空数据护栏」判断应用是否真的没数据用（同 [CycleRepository.countAll]）。 */
+    suspend fun countAll(): Int = dao.countAll()
+
     /** 批量新增（一次弹窗里可勾选多个预置项）。空列表直接返回，不触发备份与小组件刷新。 */
     suspend fun addAll(notes: List<CycleNoteEntity>) {
         if (notes.isEmpty()) return

@@ -21,6 +21,13 @@ class CycleRepository(
 
     suspend fun getAll(): List<CycleLogEntity> = dao.getAll()
 
+    /**
+     * 全表行数（含「特殊情况」单日标记）。
+     * 供备份的「空数据护栏」判断应用是否真的没数据用——**记得把周期管家算进去**，
+     * 否则只剩周期记录的用户会被护栏当成空库，自动备份被静默跳过。
+     */
+    suspend fun countAll(): Int = dao.countAll()
+
     suspend fun add(log: CycleLogEntity): Long =
         dao.insert(log).also { onChanged() }
 

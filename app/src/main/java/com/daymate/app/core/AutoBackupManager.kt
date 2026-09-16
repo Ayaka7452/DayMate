@@ -213,8 +213,17 @@ class AutoBackupManager(
         return remoteRows == 0
     }
 
-    /** 当前应用的数据行数（倒数日 + 文件夹 + Vault 事件）；查询失败返回 null。 */
+    /**
+     * 当前应用的数据行数（倒数日 + 文件夹 + 保险箱事件与文件夹 + 周期管家）；
+     * 查询失败返回 null，调用方按「有数据」保守处理。
+     *
+     * **表清单必须与 [StorageBackup.countDataRows] 的 DATA_TABLES 一致**：
+     * 漏掉任何一张用户数据表，都会让「只剩这类数据」（例如只记经期、不留倒数日）的用户
+     * 被误判为空库，自动备份被静默跳过——历史上周期管家就被漏掉过。
+     */
     private suspend fun appDataRows(): Int? = runCatching {
-        db.eventDao().countAll() + db.folderDao().countAll() + db.vaultEventDao().countAll()
+        db.eventDao().countAll() + db.folderDao().countAll() +
+            db.vaultEventDao().countAll() + db.vaultFolderDao().countAll() +
+            db.cycleLogDao().countAll() + db.cycleNoteDao().countAll()
     }.getOrNull()
 }

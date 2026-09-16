@@ -207,17 +207,40 @@ object StorageBackup {
     }
 
     /**
-     * 统计一个 SQLite 数据库文件中的用户数据行数（events + folders + vault_events + vault_folders）。
-     * 以只读方式打开，逐表计数（缺表按 0 计），用于判断数据库是否为空（避免用空库覆盖有数据的备份）。
-     * 返回 -1 表示「无法判定」（文件打不开 / 任一表读不出）——调用方必须按「有数据」保守处理。
+     * 参与「空数据护栏」统计的用户数据表。
+     *
+     * **新增任何用户数据表都必须同步加进来**，否则在该表有数据、其他表为空时，
+     * 护栏会把应用/备份误判成空（历史上就漏过周期管家）。
+     */
+    private val DATA_TABLES = listOf(
+        "events", "folders", "vault_events", "vault_folders",
+        "cycle_logs", "cycle_notes"
+    )
+
+    /**
+     * 统计一个 SQLite 数据库文件中的用户数据行数（见 [DATA_TABLES]，含倒数日、文件夹、保险箱、周期管家）。
+     * 以只读方式打开，逐表计数，用于判断数据库是否为空（避免用空库覆盖有数据的备份）。
+     *
+     * 返回 -1 表示「无法判定」（文件打不开 / 表清单读不出 / 现存表计数失败）——调用方必须按「有数据」保守处理。
+     * 表清单里但不存在的表按 0 计：旧版备份缺少后来新增的表（如 v1.7 备份没有 cycle_notes）属正常情况，
+     * 不能与「读库失败」混为一谈，否则老备份会被永远当成「无法判定」而拦下正常的空库初始化。
      */
     fun countDataRows(dbFile: File): Int {
         if (!dbFile.exists()) return 0
         return try {
             SQLiteDatabase.openDatabase(dbFile.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                // 先取现存表清单：读不出表清单 = 无法判定，直接 -1
+                val existing = runCatching {
+                    val names = mutableSetOf<String>()
+                    db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'", null).use { c ->
+                        while (c.moveToNext()) c.getString(0)?.let { names.add(it) }
+                    }
+                    names
+                }.getOrNull() ?: return -1
                 var total = 0
-                for (tbl in listOf("events", "folders", "vault_events", "vault_folders")) {
-                    // 任一表读不出来都视为「无法判定」：绝不能把读库失败当成 0 行，
+                for (tbl in DATA_TABLES) {
+                    if (tbl !in existing) continue   // 旧备份缺表：按 0 计，不算失败
+                    // 现存表读不出来才视为「无法判定」：绝不能把读库失败当成 0 行，
                     // 否则「空数据覆盖备份」护栏会被绕过
                     val rows = runCatching {
                         db.compileStatement("SELECT COUNT(*) FROM $tbl").simpleQueryForLong().toInt()

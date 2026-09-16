@@ -59,4 +59,10 @@ class VaultFolderRepository(
     /** 清空整个 Vault 文件夹表（重置密码时调用）。 */
     suspend fun clearAll() =
         dao.clearAll().also { onChanged(); refreshSignal.tryEmit(Unit) }
+
+    /**
+     * 全表行数，供备份的「空数据护栏」判断应用是否真的没数据用。
+     * 空文件夹也算用户数据——漏算会让「只剩保险箱文件夹」的用户被当成空库、备份被静默跳过。
+     */
+    suspend fun countAll(): Int = dao.countAll()
 }

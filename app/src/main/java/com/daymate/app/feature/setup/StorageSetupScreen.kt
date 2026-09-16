@@ -228,13 +228,20 @@ fun StorageSetupBody(
     }
 
     /**
-     * 计算「当前应用数据行数」（倒数日 + 文件夹 + Vault），用于在覆盖备份前判断应用是否为空。
-     * 通过仍在线的 Room 容器读取，结果权威。
+     * 计算「当前应用数据行数」（倒数日 + 文件夹 + 保险箱事件与文件夹 + 周期管家），
+     * 用于在覆盖备份前判断应用是否为空。通过仍在线的 Room 容器读取，结果权威。
+     *
+     * **必须与 [StorageBackup.countDataRows] 的 DATA_TABLES 保持一致**：
+     * 漏掉任何一张用户数据表，都会让「只剩这类数据」（例如只记经期、不留倒数日）的用户
+     * 被误判为空库，备份被拦下——历史上周期管家就被漏掉过。
      */
     suspend fun countAppDataRows(): Int =
         app.container.eventRepository.countAll() +
             app.container.folderRepository.countAll() +
-            app.container.vaultRepository.countAll()
+            app.container.vaultRepository.countAll() +
+            app.container.vaultFolderRepository.countAll() +
+            app.container.cycleRepository.countAll() +
+            app.container.cycleNoteRepository.countAll()
 
     /**
      * 判断是否应阻止「用当前应用数据覆盖备份」：

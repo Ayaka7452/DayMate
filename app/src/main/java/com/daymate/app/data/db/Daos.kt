@@ -181,6 +181,9 @@ interface VaultFolderDao {
 
     @Query("DELETE FROM vault_folders")
     suspend fun clearAll()
+
+    @Query("SELECT COUNT(*) FROM vault_folders")
+    suspend fun countAll(): Int
 }
 
 @Dao
@@ -203,6 +206,9 @@ interface CycleLogDao {
 
     @Delete
     suspend fun delete(log: CycleLogEntity)
+
+    @Query("SELECT COUNT(*) FROM cycle_logs")
+    suspend fun countAll(): Int
 }
 
 /**
