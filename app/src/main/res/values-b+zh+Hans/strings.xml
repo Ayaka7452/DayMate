@@ -409,7 +409,7 @@
     <string name="note_cat_custom">自定义</string>
     <string name="note_sex_protected">有保护性行为</string>
     <string name="note_sex_unprotected">无保护性行为</string>
-    <string name="note_sex_solo">自慰</string>
+    <string name="note_sex_solo">自我愉悦</string>
     <string name="note_sex_protected_hint">体外射精等非屏障式避孕方式仍有怀孕风险，请留意身体状况、及时自我评估；这类方式也无法阻断疾病传播。</string>
     <string name="note_sex_unprotected_hint">紧急避孕药需在事后 72 小时内服用，越早效果越好。若需长期避孕，建议咨询医生后选择短效口服避孕药（需按周期规律服用）。请做好自我保护，必要时就医检查，防范疾病传播。</string>
     <string name="note_bleed_spotting">点滴出血</string>

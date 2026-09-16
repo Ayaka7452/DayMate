@@ -409,7 +409,7 @@
     <string name="note_cat_custom">自訂</string>
     <string name="note_sex_protected">有保護性行為</string>
     <string name="note_sex_unprotected">無保護性行為</string>
-    <string name="note_sex_solo">自慰</string>
+    <string name="note_sex_solo">自我愉悅</string>
     <string name="note_sex_protected_hint">體外射精等非屏障式避孕方式仍有懷孕風險，請留意身體狀況、及時自我評估；這類方式亦無法阻斷疾病傳播。</string>
     <string name="note_sex_unprotected_hint">緊急避孕藥需在事後 72 小時內服用，越早效果越好。如需長期避孕，建議諮詢醫生後選擇短效口服避孕藥（需按週期規律服用）。請做好自我保護，必要時就醫檢查，防範疾病傳播。</string>
     <string name="note_bleed_spotting">點滴出血</string>

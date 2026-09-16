@@ -112,7 +112,6 @@ import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -2401,8 +2400,13 @@ private fun AddNoteDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
+                    // 性生活整类都是互斥项 → 实际只能选一个，提示要跟着改成「单选」，
+                    // 否则写「可多选」会误导（用户实测报出「自我愉悦 + 有保护措施」能同时勾上）
                     Text(
-                        stringResource(R.string.cycle_select_items),
+                        stringResource(
+                            if (NoteCatalog.isSingleChoice(category)) R.string.cycle_select_one
+                            else R.string.cycle_select_items
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
