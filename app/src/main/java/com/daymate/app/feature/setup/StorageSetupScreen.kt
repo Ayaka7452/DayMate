@@ -55,6 +55,8 @@ import com.ayaka7452.daymate.core.cloud.CloudBackup
 import com.ayaka7452.daymate.core.cloud.WebDavConfig
 import com.ayaka7452.daymate.core.cloud.WebDavStore
 import com.ayaka7452.daymate.data.repo.SettingsRepository
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -178,9 +180,9 @@ fun StorageSetupBody(
     fun setTarget(t: String) {
         scope.launch { app.container.settingsRepository.setBackupTarget(t) }
         status = when (t) {
-            SettingsRepository.BACKUP_TARGET_BOTH -> "备份位置已设为「同时在本地及云端备份」。"
-            SettingsRepository.BACKUP_TARGET_CLOUD -> "备份位置已设为「仅云端」，自动备份只写 WebDAV。"
-            else -> "备份位置已设为「仅本地」。"
+            SettingsRepository.BACKUP_TARGET_BOTH -> Tr.s(R.string.storage_target_both)
+            SettingsRepository.BACKUP_TARGET_CLOUD -> Tr.s(R.string.storage_target_cloud)
+            else -> Tr.s(R.string.storage_target_local)
         }
     }
 
@@ -192,8 +194,8 @@ fun StorageSetupBody(
         StorageConfig.setBackupFolder(ctx, uri)
         runCatching {
             withCheckpoint { StorageBackup.exportInternal(ctx, internalDb, uri) }
-        }.onSuccess { status = "已设置备份文件夹，并备份当前数据到该位置。" }
-            .onFailure { status = "导出失败：${it.message}" }
+        }.onSuccess { status = Tr.s(R.string.storage_set_folder_done) }
+            .onFailure { status = Tr.s(R.string.storage_export_failed, it.message) }
         busy = false
     }
 
@@ -202,16 +204,16 @@ fun StorageSetupBody(
         busy = true
         val failure = replaceDbFile {
             if (!StorageBackup.importExternal(ctx, internalDb, uri)) {
-                error("所选文件夹中没有可用的 daymate.db")
+                error(Tr.s(R.string.storage_no_db_short))
             }
         }
         if (failure != null) {
-            status = "恢复失败：${failure.message}"
+            status = Tr.s(R.string.storage_restore_failed, failure.message)
             busy = false
             return
         }
         StorageConfig.setBackupFolder(ctx, uri)
-        status = "已从所选备份恢复数据，并设为备份文件夹。"
+        status = Tr.s(R.string.storage_restore_done)
         busy = false
         finishAndRestartToHome()
     }
@@ -222,8 +224,8 @@ fun StorageSetupBody(
         if (alsoConfigure) StorageConfig.setBackupFolder(ctx, targetUri)
         runCatching {
             withCheckpoint { StorageBackup.exportInternal(ctx, internalDb, targetUri) }
-        }.onSuccess { status = "已备份到所选文件夹。" }
-            .onFailure { status = "备份失败：${it.message}" }
+        }.onSuccess { status = Tr.s(R.string.storage_backup_done) }
+            .onFailure { status = Tr.s(R.string.storage_backup_failed, it.message) }
         busy = false
     }
 
@@ -271,7 +273,7 @@ fun StorageSetupBody(
     }
 
     fun backupLocalNow() {
-        if (!StorageConfig.isBackupConfigured(ctx)) { status = "请先选择备份文件夹。"; return }
+        if (!StorageConfig.isBackupConfigured(ctx)) { status = Tr.s(R.string.storage_need_folder); return }
         val backupUri = StorageConfig.backupUri(ctx) ?: return
         // 该文件夹尚无任何备份：直接导出当前数据作为初始备份（无数据可丢失，无需提示）
         if (!StorageBackup.exists(ctx)) {
@@ -289,23 +291,23 @@ fun StorageSetupBody(
     }
 
     fun restoreLocal() {
-        if (!StorageConfig.isBackupConfigured(ctx)) { status = "请先选择备份文件夹。"; return }
+        if (!StorageConfig.isBackupConfigured(ctx)) { status = Tr.s(R.string.storage_need_folder); return }
         if (!StorageBackup.isBackupReadable(ctx)) {
-            status = "所选文件夹中没有可用的 DayMate 数据库（daymate.db）。"
+            status = Tr.s(R.string.storage_no_valid_db)
             return
         }
         busy = true
         val failure = replaceDbFile {
             if (!StorageBackup.importExternal(ctx, internalDb)) {
-                error("备份文件夹中没有可用的 daymate.db")
+                error(Tr.s(R.string.storage_no_db_backup))
             }
         }
         if (failure != null) {
-            status = "恢复失败：${failure.message}"
+            status = Tr.s(R.string.storage_restore_failed, failure.message)
             busy = false
             return
         }
-        status = "已从备份恢复。"
+        status = Tr.s(R.string.storage_restored)
         busy = false
         finishAndRestartToHome()
     }
@@ -317,8 +319,8 @@ fun StorageSetupBody(
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) { withCheckpoint { CloudBackup.upload(internalDb, cfg) } }
-            }.onSuccess { status = "已备份到云端。" }
-                .onFailure { status = "云端备份失败：${it.message}" }
+            }.onSuccess { status = Tr.s(R.string.storage_cloud_backup_done) }
+                .onFailure { status = Tr.s(R.string.storage_cloud_backup_failed, it.message) }
             busy = false
         }
     }
@@ -356,7 +358,7 @@ fun StorageSetupBody(
                 tmp.delete()
                 withContext(Dispatchers.IO) { CloudBackup.download(cfg, tmp) }
                 if (!StorageBackup.isSqliteFile(tmp)) {
-                    error("云端备份不是有效的数据库文件")
+                    error(Tr.s(R.string.storage_cloud_invalid_db))
                 }
                 replaceDbFile {
                     tmp.copyTo(internalDb, overwrite = true)
@@ -370,10 +372,10 @@ fun StorageSetupBody(
             tmp.delete()
             busy = false
             if (failure != null) {
-                status = "云端恢复失败：${failure.message}"
+                status = Tr.s(R.string.storage_cloud_restore_failed, failure.message)
                 return@launch
             }
-            status = "已从云端备份恢复。"
+            status = Tr.s(R.string.storage_cloud_restored)
             finishAndRestartToHome()
         }
     }
@@ -383,20 +385,20 @@ fun StorageSetupBody(
         when (backupTarget) {
             SettingsRepository.BACKUP_TARGET_CLOUD -> {
                 if (cloudCfg == null) {
-                    status = "备份位置为「仅云端」，请先配置 WebDAV。"
+                    status = Tr.s(R.string.storage_cloud_only_need_webdav)
                     return
                 }
                 startCloudBackup(cloudCfg)
             }
             SettingsRepository.BACKUP_TARGET_BOTH -> {
                 if (!StorageConfig.isBackupConfigured(ctx) && cloudCfg == null) {
-                    status = "请先选择备份文件夹或配置 WebDAV。"
+                    status = Tr.s(R.string.storage_need_folder_or_cloud)
                     return
                 }
                 if (StorageConfig.isBackupConfigured(ctx)) {
                     backupLocalNow()
                 } else {
-                    status = "本地备份未配置，本次仅备份到云端。"
+                    status = Tr.s(R.string.storage_local_missing)
                 }
                 if (cloudCfg != null) startCloudBackup(cloudCfg)
             }
@@ -408,15 +410,15 @@ fun StorageSetupBody(
         when (backupTarget) {
             SettingsRepository.BACKUP_TARGET_CLOUD -> {
                 if (WebDavStore.config(ctx) == null) {
-                    status = "备份位置为「仅云端」，请先配置 WebDAV。"
+                    status = Tr.s(R.string.storage_cloud_only_need_webdav)
                     return
                 }
                 showCloudRestoreConfirm = true
             }
             else -> {
-                if (!StorageConfig.isBackupConfigured(ctx)) { status = "请先选择备份文件夹。"; return }
+                if (!StorageConfig.isBackupConfigured(ctx)) { status = Tr.s(R.string.storage_need_folder); return }
                 if (!StorageBackup.isBackupReadable(ctx)) {
-                    status = "所选文件夹中没有可用的 DayMate 数据库（daymate.db）。"
+                    status = Tr.s(R.string.storage_no_valid_db)
                     return
                 }
                 showRestoreConfirm = true
@@ -426,7 +428,7 @@ fun StorageSetupBody(
 
     fun clear() {
         StorageConfig.clearBackupFolder(ctx)
-        status = "已清除备份文件夹设置，外部文件未删除。"
+        status = Tr.s(R.string.storage_cleared)
     }
 
     Scaffold(
@@ -436,7 +438,7 @@ fun StorageSetupBody(
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Tr.s(R.string.common_back))
                         }
                     }
                 }
@@ -452,30 +454,29 @@ fun StorageSetupBody(
             horizontalAlignment = Alignment.Start
         ) {
             Text(
-                "主数据库保存在应用内部，无需存储权限。" +
-                    "可将数据备份到本地文件夹或 WebDAV 云端，并随时从备份恢复。",
+                Tr.s(R.string.storage_intro),
                 style = MaterialTheme.typography.bodyLarge
             )
 
             Spacer(Modifier.height(20.dp))
-            SectionTitle("备份位置")
+            SectionTitle(Tr.s(R.string.storage_section_target))
             BackupTargetRow(
-                label = "仅本地",
-                desc = "仅写入所选文件夹（默认）",
+                label = Tr.s(R.string.storage_local),
+                desc = Tr.s(R.string.storage_local_desc),
                 selected = backupTarget == SettingsRepository.BACKUP_TARGET_LOCAL,
                 enabled = !busy,
                 onClick = { setTarget(SettingsRepository.BACKUP_TARGET_LOCAL) }
             )
             BackupTargetRow(
-                label = "本地与云端",
-                desc = "同时在本地文件夹及 WebDAV 各备份一份",
+                label = Tr.s(R.string.storage_both),
+                desc = Tr.s(R.string.storage_both_desc),
                 selected = backupTarget == SettingsRepository.BACKUP_TARGET_BOTH,
                 enabled = !busy,
                 onClick = { setTarget(SettingsRepository.BACKUP_TARGET_BOTH) }
             )
             BackupTargetRow(
-                label = "仅云端",
-                desc = "仅写入 WebDAV，本地不留副本",
+                label = Tr.s(R.string.storage_cloud),
+                desc = Tr.s(R.string.storage_cloud_desc),
                 selected = backupTarget == SettingsRepository.BACKUP_TARGET_CLOUD,
                 enabled = !busy,
                 onClick = { setTarget(SettingsRepository.BACKUP_TARGET_CLOUD) }
@@ -485,9 +486,9 @@ fun StorageSetupBody(
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
-            SectionTitle("本地备份文件夹")
+            SectionTitle(Tr.s(R.string.storage_section_local_folder))
             Text(
-                "当前路径：${StorageConfig.displayPath(StorageConfig.backupUri(ctx))}",
+                Tr.s(R.string.storage_current_path, StorageConfig.displayPath(StorageConfig.backupUri(ctx))),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -496,35 +497,37 @@ fun StorageSetupBody(
                 onClick = { treeLauncher.launch(null) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy
-            ) { Text("选择备份文件夹") }
+            ) { Text(Tr.s(R.string.storage_pick_folder)) }
             Spacer(Modifier.height(8.dp))
             TextButton(
                 onClick = { clear() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy
-            ) { Text("清除备份文件夹") }
+            ) { Text(Tr.s(R.string.storage_clear_folder)) }
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
-            SectionTitle("WebDAV 云端备份")
+            SectionTitle(Tr.s(R.string.storage_section_webdav))
             // 已配置但备份位置仍是「仅本地」时要说清楚——否则用户会以为配好就该自动上传
-            val cloudLocation = WebDavStore.directory(ctx).ifBlank { "（根目录）" }
+            val cloudLocation = WebDavStore.directory(ctx).ifBlank { Tr.s(R.string.storage_root_dir) }
             val cloudActive =
                 cloudConfigured && backupTarget != SettingsRepository.BACKUP_TARGET_LOCAL
             Text(
                 when {
                     !cloudConfigured ->
-                        "未配置。支持坚果云、Nextcloud、群晖、Alist 等，http 与 https 均可。"
-                    cloudActive ->
-                        "已配置：${WebDavStore.url(ctx)}\n远程目录：$cloudLocation" +
-                            "/${WebDavStore.REMOTE_DB}"
-                    else ->
-                        "已配置：${WebDavStore.url(ctx)}\n远程目录：$cloudLocation" +
-                            "/${WebDavStore.REMOTE_DB}\n" +
-                            "当前备份位置为「仅本地」，云端备份未启用。" +
-                            "在上方选择「本地与云端」或「仅云端」后才会自动上传。"
+                        Tr.s(R.string.storage_webdav_unconfigured)
+                    cloudActive -> Tr.s(
+                        R.string.storage_webdav_configured,
+                        WebDavStore.url(ctx),
+                        "$cloudLocation/${WebDavStore.REMOTE_DB}"
+                    )
+                    else -> Tr.s(
+                        R.string.storage_webdav_configured_inactive,
+                        WebDavStore.url(ctx),
+                        "$cloudLocation/${WebDavStore.REMOTE_DB}"
+                    )
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = when {
@@ -538,18 +541,18 @@ fun StorageSetupBody(
                 onClick = { ctx.startActivity(Intent(ctx, WebDavActivity::class.java)) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy
-            ) { Text(if (cloudConfigured) "修改 WebDAV 配置" else "配置 WebDAV") }
+            ) { Text(if (cloudConfigured) Tr.s(R.string.storage_webdav_edit) else Tr.s(R.string.storage_webdav_config)) }
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
-            SectionTitle("手动操作")
+            SectionTitle(Tr.s(R.string.storage_section_manual))
             Text(
                 when (backupTarget) {
-                    SettingsRepository.BACKUP_TARGET_CLOUD -> "目标：WebDAV 云端"
-                    SettingsRepository.BACKUP_TARGET_BOTH -> "目标：同时在本地及云端备份（恢复时以本地备份为准）"
-                    else -> "目标：本地备份文件夹"
+                    SettingsRepository.BACKUP_TARGET_CLOUD -> Tr.s(R.string.storage_manual_target_cloud)
+                    SettingsRepository.BACKUP_TARGET_BOTH -> Tr.s(R.string.storage_manual_target_both)
+                    else -> Tr.s(R.string.storage_manual_target_local)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
@@ -559,13 +562,13 @@ fun StorageSetupBody(
                 onClick = { backupNow() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy
-            ) { Text("立即备份") }
+            ) { Text(Tr.s(R.string.storage_backup_now)) }
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { restoreRequest() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy
-            ) { Text("从备份恢复") }
+            ) { Text(Tr.s(R.string.storage_restore_from)) }
 
             if (status != null) {
                 Spacer(Modifier.height(16.dp))
@@ -585,13 +588,13 @@ fun StorageSetupBody(
                     conflictUri?.let { StorageConfig.releaseBackupPermission(ctx, it) }
                     conflictUri = null
                 },
-                title = { Text("文件夹中已有备份数据") },
+                title = { Text(Tr.s(R.string.storage_folder_has_data)) },
                 text = {
                     Text(
                         if (canRestore)
-                            "所选文件夹中已有可用的 DayMate 备份（daymate.db）。直接写入将覆盖该备份，原有数据会丢失。"
+                            Tr.s(R.string.storage_overwrite_warn)
                         else
-                            "所选文件夹中的 daymate.db 不是有效的 DayMate 数据库。可覆盖它，或取消选择。"
+                            Tr.s(R.string.storage_invalid_db_warn)
                     )
                 },
                 confirmButton = {
@@ -601,7 +604,7 @@ fun StorageSetupBody(
                                 val u = conflictUri ?: return@TextButton
                                 conflictUri = null
                                 restoreFromSelected(u)
-                            }) { Text("以备份为准") }
+                            }) { Text(Tr.s(R.string.storage_use_backup)) }
                         }
                         TextButton(onClick = {
                             val u = conflictUri ?: return@TextButton
@@ -614,14 +617,14 @@ fun StorageSetupBody(
                                 }
                                 doExport(u, alsoConfigure = true)
                             }
-                        }) { Text(if (canRestore) "覆盖备份" else "用当前数据覆盖") }
+                        }) { Text(if (canRestore) Tr.s(R.string.storage_overwrite_backup) else Tr.s(R.string.storage_overwrite_with_current)) }
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = {
                         conflictUri?.let { StorageConfig.releaseBackupPermission(ctx, it) }
                         conflictUri = null
-                    }) { Text("取消") }
+                    }) { Text(Tr.s(R.string.common_cancel)) }
                 }
             )
         }
@@ -630,18 +633,18 @@ fun StorageSetupBody(
         if (showRestoreConfirm) {
             AlertDialog(
                 onDismissRequest = { showRestoreConfirm = false },
-                title = { Text("从备份恢复") },
+                title = { Text(Tr.s(R.string.storage_restore_title)) },
                 text = {
-                    Text("将用所选文件夹的备份替换当前应用内的全部数据。此操作不可撤销。")
+                    Text(Tr.s(R.string.storage_restore_desc))
                 },
                 confirmButton = {
                     TextButton(onClick = {
                         showRestoreConfirm = false
                         restoreLocal()
-                    }) { Text("继续") }
+                    }) { Text(Tr.s(R.string.common_continue)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showRestoreConfirm = false }) { Text("取消") }
+                    TextButton(onClick = { showRestoreConfirm = false }) { Text(Tr.s(R.string.common_cancel)) }
                 }
             )
         }
@@ -650,19 +653,19 @@ fun StorageSetupBody(
         if (overwriteTarget != null) {
             AlertDialog(
                 onDismissRequest = { overwriteTarget = null },
-                title = { Text("覆盖备份？") },
+                title = { Text(Tr.s(R.string.storage_overwrite_title)) },
                 text = {
-                    Text("将用当前应用数据覆盖所选文件夹中的备份。原有备份会被替换，此操作不可撤销。")
+                    Text(Tr.s(R.string.storage_overwrite_desc))
                 },
                 confirmButton = {
                     TextButton(onClick = {
                         val u = overwriteTarget ?: return@TextButton
                         overwriteTarget = null
                         doExport(u, alsoConfigure = false)
-                    }) { Text("继续") }
+                    }) { Text(Tr.s(R.string.common_continue)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { overwriteTarget = null }) { Text("取消") }
+                    TextButton(onClick = { overwriteTarget = null }) { Text(Tr.s(R.string.common_cancel)) }
                 }
             )
         }
@@ -671,16 +674,14 @@ fun StorageSetupBody(
         if (overwriteBlocked) {
             AlertDialog(
                 onDismissRequest = { overwriteBlocked = false },
-                title = { Text("操作已阻止") },
+                title = { Text(Tr.s(R.string.storage_blocked)) },
                 text = {
                     Text(
-                        "所选备份中含有数据，而当前应用内没有任何数据。" +
-                            "继续将用空数据覆盖备份，导致备份数据永久丢失，因此已阻止该操作。\n\n" +
-                            "如需取回备份，请使用「从备份恢复」；如确实要备份当前空数据，请先在应用中创建内容。"
+                        Tr.s(R.string.storage_blocked_local_desc)
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = { overwriteBlocked = false }) { Text("好") }
+                    TextButton(onClick = { overwriteBlocked = false }) { Text(Tr.s(R.string.common_ok)) }
                 }
             )
         }
@@ -690,18 +691,18 @@ fun StorageSetupBody(
         if (cloudTarget != null) {
             AlertDialog(
                 onDismissRequest = { cloudOverwriteTarget = null },
-                title = { Text("覆盖云端备份？") },
+                title = { Text(Tr.s(R.string.storage_cloud_overwrite_title)) },
                 text = {
-                    Text("云端（${cloudTarget.directory.ifBlank { "根目录" }}/daymate.db）已有备份，将被当前应用数据替换。")
+                    Text(Tr.s(R.string.storage_cloud_overwrite_desc, cloudTarget.directory.ifBlank { Tr.s(R.string.storage_root_dir_plain) }))
                 },
                 confirmButton = {
                     TextButton(onClick = {
                         cloudOverwriteTarget = null
                         doCloudExport(cloudTarget)
-                    }) { Text("继续") }
+                    }) { Text(Tr.s(R.string.common_continue)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { cloudOverwriteTarget = null }) { Text("取消") }
+                    TextButton(onClick = { cloudOverwriteTarget = null }) { Text(Tr.s(R.string.common_cancel)) }
                 }
             )
         }
@@ -710,15 +711,14 @@ fun StorageSetupBody(
         if (cloudBlocked) {
             AlertDialog(
                 onDismissRequest = { cloudBlocked = false },
-                title = { Text("操作已阻止") },
+                title = { Text(Tr.s(R.string.storage_blocked)) },
                 text = {
                     Text(
-                        "云端备份中含有数据，而当前应用内没有任何数据。继续将用空数据覆盖云端备份，" +
-                            "导致备份永久丢失，因此已阻止该操作。如需取回备份，请使用「从备份恢复」。"
+                        Tr.s(R.string.storage_blocked_cloud_desc)
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = { cloudBlocked = false }) { Text("好") }
+                    TextButton(onClick = { cloudBlocked = false }) { Text(Tr.s(R.string.common_ok)) }
                 }
             )
         }
@@ -727,18 +727,18 @@ fun StorageSetupBody(
         if (showCloudRestoreConfirm) {
             AlertDialog(
                 onDismissRequest = { showCloudRestoreConfirm = false },
-                title = { Text("从云端备份恢复") },
+                title = { Text(Tr.s(R.string.storage_cloud_restore_title)) },
                 text = {
-                    Text("将下载 WebDAV 上的 daymate.db 并替换当前应用内的全部数据。此操作不可撤销。")
+                    Text(Tr.s(R.string.storage_cloud_restore_desc))
                 },
                 confirmButton = {
                     TextButton(onClick = {
                         showCloudRestoreConfirm = false
                         WebDavStore.config(ctx)?.let { doCloudRestore(it) }
-                    }) { Text("继续") }
+                    }) { Text(Tr.s(R.string.common_continue)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showCloudRestoreConfirm = false }) { Text("取消") }
+                    TextButton(onClick = { showCloudRestoreConfirm = false }) { Text(Tr.s(R.string.common_cancel)) }
                 }
             )
         }

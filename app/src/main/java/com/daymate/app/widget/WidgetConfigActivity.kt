@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.ComposeActivity
 import com.ayaka7452.daymate.DayMateApp
 import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -130,10 +132,10 @@ private fun WidgetConfigScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("小组件配置") },
+                title = { Text(Tr.s(R.string.widget_config_title)) },
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Tr.s(R.string.common_back))
                     }
                 }
             )
@@ -151,7 +153,7 @@ private fun WidgetConfigScreen(
                     WidgetPrefs.setOpacityFor(ctx, appWidgetId, opacity.toInt())
                     onConfirm(appWidgetId)
                 }) {
-                    Text("完成")
+                    Text(Tr.s(R.string.common_done))
                 }
             }
         }
@@ -164,7 +166,7 @@ private fun WidgetConfigScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                "选择此小组件显示的事件：",
+                Tr.s(R.string.widget_config_pick),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -172,8 +174,8 @@ private fun WidgetConfigScreen(
             LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
                 item {
                     OptionRow(
-                        title = "自动（最近的倒数日）",
-                        subtitle = "始终显示最近的一个事件。2×2 组件显示多事件列表。",
+                        title = Tr.s(R.string.widget_config_auto),
+                        subtitle = Tr.s(R.string.widget_config_auto_desc),
                         selected = selected == 0L,
                         onClick = { selected = 0L }
                     )
@@ -190,7 +192,7 @@ private fun WidgetConfigScreen(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-            Text("卡片不透明度", style = MaterialTheme.typography.labelMedium)
+            Text(Tr.s(R.string.widget_config_opacity), style = MaterialTheme.typography.labelMedium)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -210,7 +212,7 @@ private fun WidgetConfigScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Text(
-                "以上配置仅对当前小组件生效。长按桌面上的小组件可重新打开此页（Android 12 及以上）。",
+                Tr.s(R.string.widget_config_footer),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )

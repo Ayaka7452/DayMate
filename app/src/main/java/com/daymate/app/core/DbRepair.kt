@@ -1,5 +1,7 @@
 package com.ayaka7452.daymate.core
 
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import android.content.Context
 import com.ayaka7452.daymate.data.db.DayMateDatabase
 import kotlinx.coroutines.Dispatchers
@@ -33,8 +35,8 @@ class DbRepair(
     /** 单张表的体检数据。 */
     data class TableStat(
         val table: String,
-        /** 面向用户的名称。 */
-        val label: String,
+        /** 面向用户的名称（资源 id；静态 val 里不能取字符串，否则语言会被冻结）。 */
+        val labelRes: Int,
         val rows: Long,
         /** 回收站中的条目数（仅 events / folders 支持软删除）。 */
         val inRecycleBin: Long,
@@ -45,9 +47,9 @@ class DbRepair(
     /** 某个字段的填充情况——用于回答「哪些字段实际没被用起来」。 */
     data class FieldUsage(
         val table: String,
-        val tableLabel: String,
+        val tableRes: Int,
         val column: String,
-        val fieldLabel: String,
+        val fieldRes: Int,
         /** 该列非空的行数（0 表示从未填过）。 */
         val filled: Long,
         /** 该表总行数。 */
@@ -56,7 +58,7 @@ class DbRepair(
 
     /** 一项冗余数据检查的结果。 */
     data class Redundancy(
-        val label: String,
+        val labelRes: Int,
         val count: Long
     )
 
@@ -104,22 +106,36 @@ class DbRepair(
         /** 可修复问题的中文清单（供弹框逐条展示）。 */
         val issues: List<String>
             get() = buildList {
-                if (!integrityOk) add("数据库结构完整性异常：${integrityDetail ?: "未知"}")
-                if (zombieColumns.isNotEmpty()) {
-                    add("残留字段：${zombieColumns.joinToString("、")}")
+                if (!integrityOk) {
+                    add(
+                        Tr.s(
+                            R.string.db_integrity_bad,
+                            integrityDetail ?: Tr.s(R.string.db_integrity_unknown)
+                        )
+                    )
                 }
-                if (danglingRefs > 0) add("无效的文件夹引用：$danglingRefs 处")
-                if (badTimestampRows > 0) add("时间字段为空或异常：$badTimestampRows 条")
+                if (zombieColumns.isNotEmpty()) {
+                    add(
+                        Tr.s(
+                            R.string.db_zombie_columns,
+                            zombieColumns.joinToString(Tr.s(R.string.festival_list_sep))
+                        )
+                    )
+                }
+                if (danglingRefs > 0) add(Tr.s(R.string.db_dangling_refs, danglingRefs))
+                if (badTimestampRows > 0) add(Tr.s(R.string.db_bad_timestamps, badTimestampRows))
                 if (reclaimableBytes > RECLAIM_THRESHOLD_BYTES) {
-                    add("碎片占用约 ${formatBytes(reclaimableBytes)}，可回收")
+                    add(Tr.s(R.string.db_fragmented, formatBytes(reclaimableBytes)))
                 }
             }
 
         /** 仅作提示、不会自动处理的情况。 */
         val notices: List<String>
             get() = buildList {
-                redundancies.forEach { add("${it.label}：${it.count} 处") }
-                unusedFields.forEach { add("${it.tableLabel} · ${it.fieldLabel}：未使用") }
+                redundancies.forEach { add(Tr.s(R.string.db_redundancy_item, Tr.s(it.labelRes), it.count)) }
+                unusedFields.forEach {
+                    add(Tr.s(R.string.db_unused_field_item, Tr.s(it.tableRes), Tr.s(it.fieldRes)))
+                }
             }
 
         /**
@@ -173,32 +189,32 @@ class DbRepair(
     /** 需要做填充率统计的可空字段（NOT NULL 列必然有值，没有统计意义）。 */
     private data class FieldSpec(
         val table: String,
-        val tableLabel: String,
+        val tableRes: Int,
         val column: String,
-        val fieldLabel: String
+        val fieldRes: Int
     )
 
     private val trackedFields = listOf(
-        FieldSpec("events", "倒数日", "note", "备注"),
-        FieldSpec("events", "倒数日", "refDays", "对照天数"),
-        FieldSpec("events", "倒数日", "displayUnit", "显示单位"),
-        FieldSpec("events", "倒数日", "repeatRule", "循环规则"),
-        FieldSpec("events", "倒数日", "linkedFestival", "跟随节日"),
-        FieldSpec("events", "倒数日", "specialType", "功能标记"),
-        FieldSpec("events", "倒数日", "color", "自定义颜色"),
-        FieldSpec("events", "倒数日", "folderId", "所属文件夹"),
-        FieldSpec("folders", "文件夹", "icon", "图标"),
-        FieldSpec("folders", "文件夹", "color", "自定义颜色"),
-        FieldSpec("vault_events", "保险箱条目", "note", "备注"),
-        FieldSpec("vault_events", "保险箱条目", "refDays", "对照天数"),
-        FieldSpec("vault_events", "保险箱条目", "displayUnit", "显示单位"),
-        FieldSpec("vault_events", "保险箱条目", "repeatRule", "循环规则"),
-        FieldSpec("vault_events", "保险箱条目", "linkedFestival", "跟随节日"),
-        FieldSpec("vault_folders", "保险箱文件夹", "icon", "图标"),
-        FieldSpec("vault_folders", "保险箱文件夹", "color", "自定义颜色"),
-        FieldSpec("cycle_logs", "周期记录", "note", "异常标记"),
-        FieldSpec("cycle_notes", "日常记录", "presetKey", "预置项"),
-        FieldSpec("cycle_notes", "日常记录", "note", "补充说明")
+        FieldSpec("events", R.string.db_t_events, "note", R.string.db_f_note),
+        FieldSpec("events", R.string.db_t_events, "refDays", R.string.db_f_refdays),
+        FieldSpec("events", R.string.db_t_events, "displayUnit", R.string.db_f_displayunit),
+        FieldSpec("events", R.string.db_t_events, "repeatRule", R.string.db_f_repeatrule),
+        FieldSpec("events", R.string.db_t_events, "linkedFestival", R.string.db_f_linkedfestival),
+        FieldSpec("events", R.string.db_t_events, "specialType", R.string.db_f_specialtype),
+        FieldSpec("events", R.string.db_t_events, "color", R.string.db_f_color),
+        FieldSpec("events", R.string.db_t_events, "folderId", R.string.db_f_folderid),
+        FieldSpec("folders", R.string.db_t_folders, "icon", R.string.db_f_icon),
+        FieldSpec("folders", R.string.db_t_folders, "color", R.string.db_f_color),
+        FieldSpec("vault_events", R.string.db_t_vault_events, "note", R.string.db_f_note),
+        FieldSpec("vault_events", R.string.db_t_vault_events, "refDays", R.string.db_f_refdays),
+        FieldSpec("vault_events", R.string.db_t_vault_events, "displayUnit", R.string.db_f_displayunit),
+        FieldSpec("vault_events", R.string.db_t_vault_events, "repeatRule", R.string.db_f_repeatrule),
+        FieldSpec("vault_events", R.string.db_t_vault_events, "linkedFestival", R.string.db_f_linkedfestival),
+        FieldSpec("vault_folders", R.string.db_t_vault_folders, "icon", R.string.db_f_icon),
+        FieldSpec("vault_folders", R.string.db_t_vault_folders, "color", R.string.db_f_color),
+        FieldSpec("cycle_logs", R.string.db_t_cycle_logs, "note", R.string.db_f_cycle_note_flag),
+        FieldSpec("cycle_notes", R.string.db_t_cycle_notes, "presetKey", R.string.db_f_presetkey),
+        FieldSpec("cycle_notes", R.string.db_t_cycle_notes, "note", R.string.db_f_note_extra)
     )
 
     /** 只体检、不修改任何内容。 */
@@ -304,17 +320,17 @@ class DbRepair(
                     }
                 } else {
                     integrityOk = false
-                    integrityDetail = "无法读取检查结果"
+                    integrityDetail = Tr.s(R.string.db_integrity_unreadable)
                 }
             }
         }.onFailure {
             integrityOk = false
-            integrityDetail = it.message ?: "完整性检查失败"
+            integrityDetail = it.message ?: Tr.s(R.string.db_integrity_failed)
         }
 
         val tables = listOf(
             TableStat(
-                "events", "倒数日",
+                "events", R.string.db_t_events,
                 rows = count(d, "events"),
                 inRecycleBin = count(d, "events WHERE isDeleted = 1"),
                 danglingRefs = count(
@@ -323,13 +339,13 @@ class DbRepair(
                 )
             ),
             TableStat(
-                "folders", "文件夹",
+                "folders", R.string.db_t_folders,
                 rows = count(d, "folders"),
                 inRecycleBin = count(d, "folders WHERE isDeleted = 1"),
                 danglingRefs = 0
             ),
             TableStat(
-                "vault_events", "保险箱条目",
+                "vault_events", R.string.db_t_vault_events,
                 rows = count(d, "vault_events"),
                 inRecycleBin = 0,
                 danglingRefs = count(
@@ -338,9 +354,9 @@ class DbRepair(
                         "AND folderId NOT IN (SELECT id FROM vault_folders)"
                 )
             ),
-            TableStat("vault_folders", "保险箱文件夹", count(d, "vault_folders"), 0, 0),
-            TableStat("cycle_logs", "周期记录", count(d, "cycle_logs"), 0, 0),
-            TableStat("cycle_notes", "日常记录", count(d, "cycle_notes"), 0, 0)
+            TableStat("vault_folders", R.string.db_t_vault_folders, count(d, "vault_folders"), 0, 0),
+            TableStat("cycle_logs", R.string.db_t_cycle_logs, count(d, "cycle_logs"), 0, 0),
+            TableStat("cycle_notes", R.string.db_t_cycle_notes, count(d, "cycle_notes"), 0, 0)
         )
 
         var badTs = 0L
@@ -391,9 +407,9 @@ class DbRepair(
                 out.add(
                     FieldUsage(
                         table = spec.table,
-                        tableLabel = spec.tableLabel,
+                        tableRes = spec.tableRes,
                         column = spec.column,
-                        fieldLabel = spec.fieldLabel,
+                        fieldRes = spec.fieldRes,
                         filled = filled,
                         total = total
                     )
@@ -408,55 +424,55 @@ class DbRepair(
         val out = mutableListOf<Redundancy>()
         val staleCutoff = System.currentTimeMillis() - 30L * 24 * 3600 * 1000
 
-        fun add(label: String, sql: String) {
+        fun add(labelRes: Int, sql: String) {
             val n = runCatching { d.compileStatement(sql).simpleQueryForLong() }.getOrDefault(0L)
-            if (n > 0) out.add(Redundancy(label, n))
+            if (n > 0) out.add(Redundancy(labelRes, n))
         }
 
         add(
-            "内容重复的倒数日",
+            R.string.db_red_dup_events,
             "SELECT COUNT(*) FROM (SELECT 1 FROM events WHERE isDeleted = 0 " +
                 "GROUP BY title, targetDateEpochDay, IFNULL(folderId, -1) HAVING COUNT(*) > 1)"
         )
         add(
-            "标题为空的倒数日",
+            R.string.db_red_empty_title,
             "SELECT COUNT(*) FROM events WHERE isDeleted = 0 AND TRIM(IFNULL(title, '')) = ''"
         )
         add(
-            "重名的文件夹",
+            R.string.db_red_dup_folders,
             "SELECT COUNT(*) FROM (SELECT 1 FROM folders WHERE isDeleted = 0 " +
                 "GROUP BY name HAVING COUNT(*) > 1)"
         )
         add(
-            "对照天数异常",
+            R.string.db_red_ref_days,
             "SELECT COUNT(*) FROM events WHERE refDays IS NOT NULL " +
                 "AND (refDays <= 0 OR refDays > 36500)"
         )
         add(
-            "目标日期超出范围",
+            R.string.db_red_date_range,
             "SELECT COUNT(*) FROM events WHERE targetDateEpochDay < -200000 " +
                 "OR targetDateEpochDay > 100000"
         )
         add(
-            "持续天数异常",
+            R.string.db_red_period_days,
             "SELECT COUNT(*) FROM cycle_logs WHERE periodDays < 1 OR periodDays > 15"
         )
         add(
-            "首日重复",
+            R.string.db_red_dup_start,
             "SELECT COUNT(*) FROM (SELECT 1 FROM cycle_logs " +
                 "GROUP BY startDateEpochDay HAVING COUNT(*) > 1)"
         )
         // 日常记录只报告不清理：同一天重复勾同一个小项多半是误操作，但删除与否该由用户决定
         add(
-            "名称为空的日常记录",
+            R.string.db_red_empty_note,
             "SELECT COUNT(*) FROM cycle_notes WHERE TRIM(IFNULL(label, '')) = ''"
         )
         add(
-            "日常记录日期超出范围",
+            R.string.db_red_note_range,
             "SELECT COUNT(*) FROM cycle_notes WHERE dateEpochDay < -200000 OR dateEpochDay > 100000"
         )
         add(
-            "回收站中超过 30 天的条目",
+            R.string.db_red_bin_stale,
             "SELECT (SELECT COUNT(*) FROM events WHERE isDeleted = 1 AND deletedAt > 0 " +
                 "AND deletedAt < $staleCutoff) + (SELECT COUNT(*) FROM folders " +
                 "WHERE isDeleted = 1 AND deletedAt > 0 AND deletedAt < $staleCutoff)"

@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
+import com.ayaka7452.daymate.R
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -69,8 +71,8 @@ object EmojiCatalog {
     )
 
     /** 全量，按类别分组（展开「更多」后展示）。 */
-    val categories: List<Pair<String, List<String>>> = listOf(
-        "表情与人物" to listOf(
+    val categories: List<Pair<Int, List<String>>> = listOf(
+        R.string.emoji_cat_smileys to listOf(
             "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊",
             "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😙", "😋", "😛", "😜", "🤪",
             "😝", "🤗", "🤭", "🤔", "🤐", "😐", "😑", "😶", "😏", "😒", "🙄", "😬",
@@ -82,7 +84,7 @@ object EmojiCatalog {
             "👌", "✌️", "🤞", "🤟", "🤘", "👋", "🖐️", "✋", "👊", "✊", "🧠", "👀",
             "👁️", "👅", "👄", "🦷", "👣"
         ),
-        "动物与自然" to listOf(
+        R.string.emoji_cat_animals to listOf(
             "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮",
             "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🐤", "🦆", "🦅", "🦉", "🦇", "🐺",
             "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐢", "🐍", "🦎", "🦂",
@@ -96,7 +98,7 @@ object EmojiCatalog {
             "🌪️", "🌈", "🌤️", "⛅", "🌥️", "☁️", "🌦️", "🌧️", "⛈️", "🌩️", "🌨️", "❄️",
             "☃️", "⛄", "🌬️", "💨", "💧", "💦", "☔", "☂️", "🌊"
         ),
-        "食物与饮品" to listOf(
+        R.string.emoji_cat_food to listOf(
             "🍏", "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍈", "🍒", "🍑",
             "🥭", "🍍", "🥥", "🥝", "🍅", "🥑", "🥦", "🥬", "🥒", "🌶️", "🌽", "🥕",
             "🧄", "🧅", "🥔", "🍠", "🥐", "🥯", "🍞", "🥖", "🥨", "🧀", "🥚", "🍳",
@@ -107,7 +109,7 @@ object EmojiCatalog {
             "🥜", "🍯", "🥛", "🍼", "🍵", "🧃", "🥤", "🍶", "🍺", "🍻", "🥂", "🍷",
             "🥃", "🍸", "🍹", "🧉", "🍾"
         ),
-        "活动与旅行" to listOf(
+        R.string.emoji_cat_activity to listOf(
             "⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🏓", "🏸",
             "🥅", "🏒", "🏑", "🥍", "🏏", "🥊", "🥋", "🎽", "🛹", "🛼", "🛷", "⛸️",
             "🥌", "🎿", "⛷️", "🏂", "🏋️", "🤸", "🤺", "🤾", "🏌️", "🏇", "🧘", "🏄",
@@ -126,7 +128,7 @@ object EmojiCatalog {
             "🏛️", "⛪", "🕌", "🕍", "🛕", "🕋", "⛩️", "🛤️", "🛣️", "🗾", "🎑", "🏞️",
             "🌅", "🌄", "🌠", "🎇", "🎆", "🌇", "🌆", "🏙️", "🌃", "🌌", "🌉", "🌁"
         ),
-        "物品与工具" to listOf(
+        R.string.emoji_cat_objects to listOf(
             "⌚", "📱", "💻", "⌨️", "🖥️", "🖨️", "🖱️", "🖲️", "🕹️", "🗜️", "💽", "💾",
             "💿", "📀", "📼", "📷", "📸", "📹", "🎥", "📽️", "🎞️", "📞", "☎️", "📟",
             "📠", "📺", "📻", "🎙️", "🎚️", "🎛️", "🧭", "⏱️", "⏲️", "⏰", "🕰️", "⌛",
@@ -145,7 +147,7 @@ object EmojiCatalog {
             "📌", "📍", "✂️", "🖊️", "🖋️", "✒️", "🖌️", "🖍️", "📝", "✏️", "🔍", "🔎",
             "🔏", "🔐", "🔒", "🔓"
         ),
-        "符号与标记" to listOf(
+        R.string.emoji_cat_symbols to listOf(
             "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞",
             "💓", "💗", "💖", "💘", "💝", "💟", "☮️", "✝️", "☪️", "🕉️", "☸️", "✡️",
             "🔯", "🕎", "☯️", "☦️", "🛐", "⛎", "♈", "♉", "♊", "♋", "♌", "♍",
@@ -207,7 +209,7 @@ fun EmojiPicker(
                 EmojiGridRow(row, selected, onSelect, columns)
             }
             TextButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("更多 emoji")
+                Text(stringResource(R.string.emoji_more))
             }
         } else {
             Column(
@@ -216,9 +218,9 @@ fun EmojiPicker(
                     .heightIn(max = expandedMaxHeight)
                     .verticalScroll(rememberScrollState())
             ) {
-                for ((title, list) in EmojiCatalog.categories) {
+                for ((titleRes, list) in EmojiCatalog.categories) {
                     Text(
-                        title,
+                        stringResource(titleRes),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -229,7 +231,7 @@ fun EmojiPicker(
                 }
             }
             TextButton(onClick = { expanded = false }, modifier = Modifier.fillMaxWidth()) {
-                Text("收起")
+                Text(stringResource(R.string.common_collapse))
             }
         }
     }

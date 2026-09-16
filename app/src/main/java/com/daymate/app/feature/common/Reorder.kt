@@ -3,6 +3,8 @@ package com.ayaka7452.daymate.feature.common
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 
 /** 排序模式常量（对应 SettingsRepository.defaultSort 的取值）。 */
@@ -28,19 +30,19 @@ object ReorderActions {
 @Composable
 fun ReorderMenuItems(onReorder: (String) -> Unit, dismissMenu: () -> Unit) {
     DropdownMenuItem(
-        text = { Text("上移") },
+        text = { Text(stringResource(R.string.reorder_up)) },
         onClick = { dismissMenu(); onReorder(ReorderActions.UP) }
     )
     DropdownMenuItem(
-        text = { Text("下移") },
+        text = { Text(stringResource(R.string.reorder_down)) },
         onClick = { dismissMenu(); onReorder(ReorderActions.DOWN) }
     )
     DropdownMenuItem(
-        text = { Text("移到顶部") },
+        text = { Text(stringResource(R.string.reorder_top)) },
         onClick = { dismissMenu(); onReorder(ReorderActions.TOP) }
     )
     DropdownMenuItem(
-        text = { Text("移到底部") },
+        text = { Text(stringResource(R.string.reorder_bottom)) },
         onClick = { dismissMenu(); onReorder(ReorderActions.BOTTOM) }
     )
 }

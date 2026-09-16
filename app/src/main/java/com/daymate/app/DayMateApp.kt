@@ -24,6 +24,8 @@ class DayMateApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 必须最先执行：此后任何 Tr.s(...) 取词才拿得到「按设置语言包装过」的 Context
+        com.ayaka7452.daymate.core.i18n.Tr.init(this)
         container = AppContainer(this)
         migrateLegacyVault()
         installCrashHandler()

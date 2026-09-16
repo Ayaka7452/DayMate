@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import sh.calvin.reorderable.ReorderableItem
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -189,9 +192,9 @@ private fun VaultSetupScreen(
     var enableBiometric by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    VaultScaffold(title = "设置 Vault 密码", onExit = onExit, showMenu = false) {
+    VaultScaffold(title = stringResource(R.string.vault_setup_title), onExit = onExit, showMenu = false) {
         Text(
-            "首次使用需设置密码（至少 6 位）。密码无法找回，请妥善保管。",
+            stringResource(R.string.vault_setup_hint),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
@@ -199,7 +202,7 @@ private fun VaultSetupScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("密码") },
+            label = { Text(stringResource(R.string.vault_password)) },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             singleLine = true,
@@ -209,7 +212,7 @@ private fun VaultSetupScreen(
         OutlinedTextField(
             value = confirm,
             onValueChange = { confirm = it },
-            label = { Text("确认密码") },
+            label = { Text(stringResource(R.string.vault_confirm_password)) },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             singleLine = true,
@@ -223,8 +226,8 @@ private fun VaultSetupScreen(
         Button(
             onClick = {
                 when {
-                    password.length < 6 -> error = "密码至少 6 位"
-                    password != confirm -> error = "两次输入的密码不一致"
+                    password.length < 6 -> error = context.getString(R.string.vault_password_min)
+                    password != confirm -> error = context.getString(R.string.vault_password_mismatch)
                     else -> {
                         scope.launch {
                             val salt = VaultCrypto.newSalt()
@@ -253,7 +256,7 @@ private fun VaultSetupScreen(
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("完成设置")
+            Text(stringResource(R.string.vault_complete_setup))
         }
     }
 }
@@ -299,21 +302,21 @@ private fun VaultUnlockScreen(
                         VaultSession.unlock(SecretKeySpec(raw, "AES"))
                         onUnlocked()
                     } else {
-                        error = "指纹凭据已失效，请使用密码解锁"
+                        error = context.getString(R.string.vault_fingerprint_invalid)
                     }
                 }
             }
         )
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("验证身份")
-            .setSubtitle("解锁 Vault")
-            .setNegativeButtonText("取消")
+            .setTitle(context.getString(R.string.vault_verify_identity))
+            .setSubtitle(context.getString(R.string.vault_unlock_vault))
+            .setNegativeButtonText(context.getString(R.string.common_cancel))
             .build()
         prompt.authenticate(info)
     }
 
     VaultScaffold(title = "Vault", onExit = onExit, showMenu = false) {
-        Text("输入密码解锁", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.vault_enter_password_unlock), style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(16.dp))
         OutlinedTextField(
             value = password,
@@ -321,7 +324,7 @@ private fun VaultUnlockScreen(
                 password = it
                 error = null
             },
-            label = { Text("密码") },
+            label = { Text(stringResource(R.string.vault_password)) },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             singleLine = true,
@@ -337,7 +340,7 @@ private fun VaultUnlockScreen(
                 val h = hash ?: return@Button
                 val s = salt ?: return@Button
                 if (password.isBlank()) {
-                    error = "请输入密码"
+                    error = context.getString(R.string.vault_enter_password_prompt)
                     return@Button
                 }
                 val input = password
@@ -347,7 +350,7 @@ private fun VaultUnlockScreen(
                         VaultCrypto.deriveAll(input, s)
                     }
                     if (computed != h) {
-                        error = "密码错误"
+                        error = context.getString(R.string.vault_password_wrong)
                         return@launch
                     }
                     VaultSession.unlock(key)
@@ -362,7 +365,7 @@ private fun VaultUnlockScreen(
         ) {
             Icon(Icons.Default.Lock, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("解锁")
+            Text(stringResource(R.string.vault_unlock))
         }
         if (biometricReady) {
             Spacer(Modifier.height(12.dp))
@@ -372,7 +375,7 @@ private fun VaultUnlockScreen(
             ) {
                 Icon(Icons.Default.Lock, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("使用指纹")
+                Text(stringResource(R.string.vault_use_fingerprint))
             }
         }
     }
@@ -453,7 +456,7 @@ private fun VaultListScreen(
         if (!manualSort) {
             Toast.makeText(
                 context,
-                "请先在设置中切换为手动排序",
+                context.getString(R.string.vault_switch_manual_sort),
                 Toast.LENGTH_SHORT
             ).show()
             return
@@ -468,7 +471,7 @@ private fun VaultListScreen(
         if (!manualSort) {
             Toast.makeText(
                 context,
-                "请先在设置中切换为手动排序",
+                context.getString(R.string.vault_switch_manual_sort),
                 Toast.LENGTH_SHORT
             ).show()
             return
@@ -542,11 +545,11 @@ private fun VaultListScreen(
         onDelete = { showDeleteConfirm = true },
         menuItems = {
             DropdownMenuItem(
-                text = { Text("批量管理") },
+                text = { Text(stringResource(R.string.vault_batch_manage)) },
                 onClick = { enterSelection() }
             )
             DropdownMenuItem(
-                text = { Text("重置 Vault 密码") },
+                text = { Text(stringResource(R.string.vault_reset_password)) },
                 onClick = { showResetConfirm = true }
             )
         },
@@ -554,13 +557,13 @@ private fun VaultListScreen(
             IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
                 Icon(
                     if (searchActive) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.Search,
-                    contentDescription = "搜索"
+                    contentDescription = stringResource(R.string.common_search)
                 )
             }
         },
         fab = {
             FloatingActionButton(onClick = { showAddSheet = true }) {
-                Icon(Icons.Default.Add, contentDescription = "新建")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.common_new))
             }
         }
     ) {
@@ -568,7 +571,7 @@ private fun VaultListScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("搜索 Vault 事件标题或备注") },
+                placeholder = { Text(stringResource(R.string.vault_search_placeholder)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -581,7 +584,7 @@ private fun VaultListScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "输入关键词搜索 Vault 内的事件",
+                        stringResource(R.string.vault_search_hint),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
@@ -594,7 +597,7 @@ private fun VaultListScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "未找到相关事件",
+                            stringResource(R.string.vault_search_no_result),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -629,7 +632,7 @@ private fun VaultListScreen(
                     Text("🔒", style = MaterialTheme.typography.displayMedium)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Vault 中尚无内容，点击 + 添加",
+                        stringResource(R.string.vault_empty),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -734,8 +737,8 @@ private fun VaultListScreen(
         FolderDialog(
             initialName = folderTarget?.name ?: "",
             initialIcon = folderTarget?.icon ?: "📁",
-            title = if (folderTarget == null) "新建文件夹" else "编辑文件夹",
-            confirmLabel = if (folderTarget == null) "创建" else "保存",
+            title = if (folderTarget == null) stringResource(R.string.vault_new_folder) else stringResource(R.string.vault_edit_folder),
+            confirmLabel = if (folderTarget == null) stringResource(R.string.common_create) else stringResource(R.string.common_save),
             onDismiss = {
                 showFolderDialog = false
                 pendingMoveAfterCreate = false
@@ -789,8 +792,8 @@ private fun VaultListScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("删除 $totalSelected 项？") },
-            text = { Text("此操作不可撤销。文件夹中的事件将移出到 Vault 根目录。") },
+            title = { Text(stringResource(R.string.vault_delete_n_items, totalSelected)) },
+            text = { Text(stringResource(R.string.vault_delete_confirm_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -803,10 +806,10 @@ private fun VaultListScreen(
                     }
                     showDeleteConfirm = false
                     exitSelection()
-                }) { Text("删除") }
+                }) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -814,11 +817,10 @@ private fun VaultListScreen(
     if (showResetConfirm) {
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
-            title = { Text("重置 Vault 密码？") },
+            title = { Text(stringResource(R.string.vault_reset_password_confirm)) },
             text = {
                 Text(
-                    "将清空 Vault 内的全部数据（事件与文件夹），且无法找回。" +
-                        "重置后需重新设置 Vault 密码。"
+                    stringResource(R.string.vault_reset_warning)
                 )
             },
             confirmButton = {
@@ -833,10 +835,10 @@ private fun VaultListScreen(
                         onReset()
                     }
                     showResetConfirm = false
-                }) { Text("清空并重置") }
+                }) { Text(stringResource(R.string.vault_clear_and_reset)) }
             },
             dismissButton = {
-                TextButton(onClick = { showResetConfirm = false }) { Text("取消") }
+                TextButton(onClick = { showResetConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -857,14 +859,14 @@ private fun VaultSelectionBar(
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onExit) { Text("完成") }
+            TextButton(onClick = onExit) { Text(stringResource(R.string.common_done)) }
             Spacer(Modifier.width(8.dp))
-            Text("已选 $totalSelected 项", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.vault_selected_n, totalSelected), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.weight(1f))
             if (hasEventsSelected) {
-                TextButton(onClick = onMove) { Text("移入文件夹") }
+                TextButton(onClick = onMove) { Text(stringResource(R.string.vault_move_to_folder)) }
             }
-            TextButton(onClick = onDelete, enabled = totalSelected > 0) { Text("删除") }
+            TextButton(onClick = onDelete, enabled = totalSelected > 0) { Text(stringResource(R.string.common_delete)) }
         }
     }
 }
@@ -941,7 +943,7 @@ fun VaultFolderScreen(
         if (!manualSort) {
             Toast.makeText(
                 folderContext,
-                "请先在设置中切换为手动排序",
+                folderContext.getString(R.string.vault_switch_manual_sort),
                 Toast.LENGTH_SHORT
             ).show()
             return
@@ -982,7 +984,7 @@ fun VaultFolderScreen(
     }
 
     VaultScaffold(
-        title = folder?.name ?: "文件夹",
+        title = folder?.name ?: stringResource(R.string.common_folder),
         onExit = onBack,
         selectionMode = selectionMode,
         totalSelected = totalSelected,
@@ -992,18 +994,18 @@ fun VaultFolderScreen(
         onDelete = { showDeleteConfirm = true },
         menuItems = {
             DropdownMenuItem(
-                text = { Text("批量管理") },
+                text = { Text(stringResource(R.string.vault_batch_manage)) },
                 onClick = { enterSelection() }
             )
             DropdownMenuItem(
-                text = { Text("重命名") },
+                text = { Text(stringResource(R.string.common_rename)) },
                 onClick = {
                     folderTarget = folder
                     showFolderDialog = true
                 }
             )
             DropdownMenuItem(
-                text = { Text("删除文件夹") },
+                text = { Text(stringResource(R.string.vault_delete_folder)) },
                 onClick = { showFolderDeleteConfirm = true }
             )
         },
@@ -1011,7 +1013,7 @@ fun VaultFolderScreen(
             FloatingActionButton(onClick = {
                 editingEvent = null
                 showEventDialog = true
-            }) { Icon(Icons.Default.Add, contentDescription = "新建事件") }
+            }) { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.vault_new_event)) }
         }
     ) {
         if (events.isEmpty()) {
@@ -1023,7 +1025,7 @@ fun VaultFolderScreen(
                 Text("📂", style = MaterialTheme.typography.displayMedium)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "此文件夹为空",
+                    stringResource(R.string.vault_folder_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -1078,8 +1080,8 @@ fun VaultFolderScreen(
         FolderDialog(
             initialName = folderTarget?.name ?: "",
             initialIcon = folderTarget?.icon ?: "📁",
-            title = if (folderTarget == null) "新建文件夹" else "编辑文件夹",
-            confirmLabel = if (folderTarget == null) "创建" else "保存",
+            title = if (folderTarget == null) stringResource(R.string.vault_new_folder) else stringResource(R.string.vault_edit_folder),
+            confirmLabel = if (folderTarget == null) stringResource(R.string.common_create) else stringResource(R.string.common_save),
             onDismiss = {
                 showFolderDialog = false
                 pendingMoveAfterCreate = false
@@ -1139,8 +1141,8 @@ fun VaultFolderScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("删除 $totalSelected 项？") },
-            text = { Text("此操作不可撤销。") },
+            title = { Text(stringResource(R.string.vault_delete_n_items, totalSelected)) },
+            text = { Text(stringResource(R.string.vault_delete_no_undo)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -1149,18 +1151,18 @@ fun VaultFolderScreen(
                     }
                     showDeleteConfirm = false
                     exitSelection()
-                }) { Text("删除") }
+                }) { Text(stringResource(R.string.common_delete)) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 
     if (showFolderDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showFolderDeleteConfirm = false },
-            title = { Text("删除文件夹？") },
+            title = { Text(stringResource(R.string.vault_delete_folder_confirm)) },
             text = {
-                Text("文件夹「${folder?.name ?: ""}」中的事件将移出到 Vault 根目录，仅删除文件夹本身。此操作不可撤销。")
+                Text(stringResource(R.string.vault_delete_folder_text, folder?.name ?: ""))
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -1172,10 +1174,10 @@ fun VaultFolderScreen(
                     }
                     showFolderDeleteConfirm = false
                     onBack()
-                }) { Text("删除") }
+                }) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showFolderDeleteConfirm = false }) { Text("取消") }
+                TextButton(onClick = { showFolderDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -1202,11 +1204,12 @@ private fun VaultEventDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     // 对照值的单位跟随「倒计时显示单位」：按月显示时对照值即「月数」，其余同理。
-    val refUnitLabel = when (displayUnit) {
-        CountdownCalculator.UNIT_MONTH -> "月数"
-        CountdownCalculator.UNIT_YEAR -> "年数"
-        else -> "天数"
+    val refUnitLabelRes = when (displayUnit) {
+        CountdownCalculator.UNIT_MONTH -> R.string.vault_unit_months
+        CountdownCalculator.UNIT_YEAR -> R.string.vault_unit_years
+        else -> R.string.vault_unit_days
     }
+    val refUnitLabel = stringResource(refUnitLabelRes)
     val datePickerState = rememberDatePickerState()
     LaunchedEffect(epochDay) {
         datePickerState.selectedDateMillis = LocalDate.ofEpochDay(epochDay)
@@ -1223,7 +1226,7 @@ private fun VaultEventDialog(
                     if (existing == null) {
                         container.vaultRepository.add(
                             VaultEventEntity(
-                                title = title.ifBlank { "未命名" },
+                                title = title.ifBlank { stringResource(R.string.common_unnamed) },
                                 targetDateEpochDay = epochDay,
                                 refDays = refValue,
                                 displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
@@ -1235,7 +1238,7 @@ private fun VaultEventDialog(
                     } else {
                         container.vaultRepository.update(
                             existing.copy(
-                                title = title.ifBlank { "未命名" },
+                                title = title.ifBlank { stringResource(R.string.common_unnamed) },
                                 targetDateEpochDay = epochDay,
                                 refDays = refValue,
                                 displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
@@ -1246,16 +1249,16 @@ private fun VaultEventDialog(
                     }
                 }
                 onDismiss()
-            }) { Text("保存") }
+            }) { Text(stringResource(R.string.common_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-        title = { Text(if (existing == null) "新建 Vault 事件" else "编辑 Vault 事件") },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
+        title = { Text(if (existing == null) stringResource(R.string.vault_new_vault_event) else stringResource(R.string.vault_edit_vault_event)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("标题") },
+                    label = { Text(stringResource(R.string.common_title)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1263,8 +1266,8 @@ private fun VaultEventDialog(
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
-                    label = { Text("简述（可选）") },
-                    placeholder = { Text("补充说明，例如地点、注意事项") },
+                    label = { Text(stringResource(R.string.vault_note_label)) },
+                    placeholder = { Text(stringResource(R.string.vault_note_placeholder)) },
                     minLines = 2,
                     maxLines = 5,
                     modifier = Modifier.fillMaxWidth()
@@ -1277,67 +1280,68 @@ private fun VaultEventDialog(
                 ) {
                     TextButton(onClick = { showDatePicker = true }) {
                         Text(
-                            "目标日期：${
+                            stringResource(
+                                R.string.vault_target_date,
                                 LocalDate.ofEpochDay(epochDay)
-                                    .format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
-                            }",
+                                    .format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd)))
+                            ),
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
                     TextButton(onClick = { showResetConfirm = true }) {
-                        Text("重置为今天")
+                        Text(stringResource(R.string.vault_reset_to_today))
                     }
                 }
                 Spacer(Modifier.height(12.dp))
 
-                Text("倒计时显示单位", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.vault_countdown_unit_label), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = displayUnit == CountdownCalculator.UNIT_DAY,
                         onClick = { displayUnit = CountdownCalculator.UNIT_DAY },
-                        label = { Text("天数") }
+                        label = { Text(stringResource(R.string.vault_unit_days)) }
                     )
                     FilterChip(
                         selected = displayUnit == CountdownCalculator.UNIT_MONTH,
                         onClick = { displayUnit = CountdownCalculator.UNIT_MONTH },
-                        label = { Text("月数") }
+                        label = { Text(stringResource(R.string.vault_unit_months)) }
                     )
                     FilterChip(
                         selected = displayUnit == CountdownCalculator.UNIT_YEAR,
                         onClick = { displayUnit = CountdownCalculator.UNIT_YEAR },
-                        label = { Text("年数") }
+                        label = { Text(stringResource(R.string.vault_unit_years)) }
                     )
                 }
                 Text(
-                    "随时可更改。按月或按年不足一个完整单位时，自动改用更小的单位显示。",
+                    stringResource(R.string.vault_unit_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
                 Spacer(Modifier.height(12.dp))
 
-                Text("循环", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.vault_repeat_label), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = repeatRule == null,
                         onClick = { repeatRule = null },
-                        label = { Text("不循环") }
+                        label = { Text(stringResource(R.string.vault_repeat_none)) }
                     )
                     FilterChip(
                         selected = repeatRule == CountdownCalculator.REPEAT_WEEKLY,
                         onClick = { repeatRule = CountdownCalculator.REPEAT_WEEKLY },
-                        label = { Text("每周") }
+                        label = { Text(stringResource(R.string.vault_repeat_weekly)) }
                     )
                     FilterChip(
                         selected = repeatRule == CountdownCalculator.REPEAT_MONTHLY,
                         onClick = { repeatRule = CountdownCalculator.REPEAT_MONTHLY },
-                        label = { Text("每月") }
+                        label = { Text(stringResource(R.string.vault_repeat_monthly)) }
                     )
                     FilterChip(
                         selected = repeatRule == CountdownCalculator.REPEAT_YEARLY,
                         onClick = { repeatRule = CountdownCalculator.REPEAT_YEARLY },
-                        label = { Text("每年") }
+                        label = { Text(stringResource(R.string.vault_repeat_yearly)) }
                     )
                 }
                 Spacer(Modifier.height(12.dp))
@@ -1345,9 +1349,9 @@ private fun VaultEventDialog(
                 OutlinedTextField(
                     value = refDaysText,
                     onValueChange = { refDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
-                    label = { Text("对照${refUnitLabel}（可选）") },
-                    placeholder = { Text("例如：8") },
-                    supportingText = { Text("目标日期已过去时显示为「已过 X/N $refUnitLabel」，如 2/8。切换显示单位后需按新单位填写。") },
+                    label = { Text(stringResource(R.string.vault_ref_label, refUnitLabel)) },
+                    placeholder = { Text(stringResource(R.string.vault_ref_placeholder)) },
+                    supportingText = { Text(stringResource(R.string.vault_ref_support, refUnitLabel)) },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                     ),
@@ -1368,22 +1372,23 @@ private fun VaultEventDialog(
                             .atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
                     }
                     showDatePicker = false
-                }) { Text("确定") }
+                }) { Text(stringResource(R.string.common_confirm)) }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.common_cancel)) } }
         ) { DatePicker(state = datePickerState) }
     }
 
     if (showResetConfirm) {
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
-            title = { Text("重置目标日期") },
+            title = { Text(stringResource(R.string.vault_reset_target_date)) },
             text = {
                 Text(
-                    "将目标日期重置为今天？\n当前：${
+                    stringResource(
+                        R.string.vault_reset_date_confirm,
                         LocalDate.ofEpochDay(epochDay)
-                            .format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
-                    }"
+                            .format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd)))
+                    )
                 )
             },
             confirmButton = {
@@ -1399,10 +1404,10 @@ private fun VaultEventDialog(
                         }
                     }
                     showResetConfirm = false
-                }) { Text("重置") }
+                }) { Text(stringResource(R.string.common_reset)) }
             },
             dismissButton = {
-                TextButton(onClick = { showResetConfirm = false }) { Text("取消") }
+                TextButton(onClick = { showResetConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -1459,7 +1464,7 @@ private fun VaultEventRow(
         if (noteHit) {
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "命中备注",
+                text = stringResource(R.string.vault_note_hit),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1495,7 +1500,7 @@ private fun VaultEventRow(
         if (!selectionMode && onMoveToMain != null) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                 }
                 DropdownMenu(
                     expanded = menuExpanded,
@@ -1505,7 +1510,7 @@ private fun VaultEventRow(
                         ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     DropdownMenuItem(
-                        text = { Text("移出到主空间") },
+                        text = { Text(stringResource(R.string.vault_move_out_main)) },
                         onClick = {
                             menuExpanded = false
                             onMoveToMain()
@@ -1552,7 +1557,7 @@ private fun VaultFolderRow(
             var menuExpanded by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                 }
                 DropdownMenu(
                     expanded = menuExpanded,
@@ -1613,21 +1618,21 @@ private fun VaultScaffold(
         topBar = {
             if (selectionMode) {
                 TopAppBar(
-                    title = { Text("已选 $totalSelected 项") },
+                    title = { Text(stringResource(R.string.vault_selected_n, totalSelected)) },
                     navigationIcon = {
                         IconButton(onClick = { onExitSelection?.invoke() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "完成")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_done))
                         }
                     },
                     actions = {
                         if (hasEventsSelected && onMove != null) {
-                            TextButton(onClick = onMove) { Text("移入文件夹") }
+                            TextButton(onClick = onMove) { Text(stringResource(R.string.vault_move_to_folder)) }
                         }
                         if (onDelete != null) {
-                            TextButton(
-                                onClick = onDelete,
-                                enabled = totalSelected > 0
-                            ) { Text("删除") }
+                                TextButton(
+                                    onClick = onDelete,
+                                    enabled = totalSelected > 0
+                                ) { Text(stringResource(R.string.common_delete)) }
                         }
                     }
                 )
@@ -1636,7 +1641,7 @@ private fun VaultScaffold(
                     title = { Text(title) },
                     navigationIcon = {
                         IconButton(onClick = onExit) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出 Vault")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.vault_exit_vault))
                         }
                     },
                     actions = {
@@ -1645,7 +1650,7 @@ private fun VaultScaffold(
                             var menuExpanded by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { menuExpanded = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "菜单")
+                                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.vault_menu))
                                 }
                                 DropdownMenu(
                                     expanded = menuExpanded,
@@ -1653,7 +1658,7 @@ private fun VaultScaffold(
                                 ) { menuItems() }
                             }
                         }
-                        TextButton(onClick = onExit) { Text("退出") }
+                        TextButton(onClick = onExit) { Text(stringResource(R.string.vault_exit)) }
                     }
                 )
             }

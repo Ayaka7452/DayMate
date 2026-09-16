@@ -1,6 +1,8 @@
 package com.ayaka7452.daymate.data.festival
 
 import android.content.Context
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -9,6 +11,33 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDate
+
+/**
+ * 内置节日数据源区域。
+ *
+ * [url] 里的 `{year}` 由下载器替换；[labelRes] 为设置页展示名。
+ * 中国走 holiday-cn（跟随国务院通知），其余走 Nager.Date 的公共假日接口（免费、无需 key，
+ * 返回顶层数组，正好落在 [FestivalRepository.parseAny] 已支持的「形态 7」上，无需新增解析分支）。
+ */
+enum class FestivalRegion(val url: String, val labelRes: Int) {
+    CN(FestivalRepository.SOURCE_HOLIDAY_CN, R.string.settings_source_region_cn),
+    US("https://date.nager.at/api/v3/PublicHolidays/{year}/US", R.string.settings_source_region_us),
+    JP("https://date.nager.at/api/v3/PublicHolidays/{year}/JP", R.string.settings_source_region_jp),
+    KR("https://date.nager.at/api/v3/PublicHolidays/{year}/KR", R.string.settings_source_region_kr);
+
+    companion object {
+        /**
+         * 语言 → 建议区域。判断只看 `language`：zh / yue 都归中国（繁体、粤语用户同样过中国节日），
+         * 其余未支持的语言回落美国（与「未支持语言显示英文」的兜底口径一致）。
+         */
+        fun forLanguage(language: String): FestivalRegion = when (language.lowercase()) {
+            "ja" -> JP
+            "ko" -> KR
+            "zh", "yue" -> CN
+            else -> US
+        }
+    }
+}
 
 /** 单个节假日条目：name 节日名（调休上班日沿用所属节日名，仅 isOffDay=false 区分），
  *  isOffDay true=放假 / false=调休上班。
@@ -35,16 +64,19 @@ data class FestivalUpdateResult(
     val success: Boolean get() = okYears.isNotEmpty()
 
     fun summaryText(): String {
+        val sep = Tr.s(R.string.festival_list_sep)
         val parts = buildList {
-            if (okYears.isNotEmpty()) add("已更新 ${okYears.joinToString("、")} 年")
-            if (notPublishedYears.isNotEmpty()) add("${notPublishedYears.joinToString("、")} 年放假安排尚未发布")
-            if (failedYears.isNotEmpty()) add("${failedYears.joinToString("、")} 年下载失败")
+            if (okYears.isNotEmpty()) add(Tr.s(R.string.festival_summary_updated, okYears.joinToString(sep)))
+            if (notPublishedYears.isNotEmpty())
+                add(Tr.s(R.string.festival_summary_pending, notPublishedYears.joinToString(sep)))
+            if (failedYears.isNotEmpty())
+                add(Tr.s(R.string.festival_summary_failed, failedYears.joinToString(sep)))
         }
         return when {
-            parts.isEmpty() -> "没有可下载的年份"
+            parts.isEmpty() -> Tr.s(R.string.festival_summary_no_years)
             // 全部都是「还没发布」：不报失败，明确告诉用户数据源还没出
-            okYears.isEmpty() && failedYears.isEmpty() -> "所选的年份放假安排尚未发布"
-            else -> parts.joinToString("；")
+            okYears.isEmpty() && failedYears.isEmpty() -> Tr.s(R.string.festival_summary_all_pending)
+            else -> parts.joinToString(Tr.s(R.string.festival_sentence_sep))
         }
     }
 }
@@ -98,10 +130,13 @@ class FestivalRepository(private val appContext: Context) {
 
         /** 把年份列表渲染成「2025–2027 年」（连续）或「2025、2027 年」（不连续）。 */
         fun yearsText(years: List<Int>): String {
-            if (years.isEmpty()) return "无"
+            if (years.isEmpty()) return Tr.s(R.string.festival_years_none)
             val s = years.sorted()
-            return if (s.last() - s.first() == s.size - 1) "${s.first()}–${s.last()} 年"
-            else s.joinToString("、") + " 年"
+            return if (s.last() - s.first() == s.size - 1) {
+                Tr.s(R.string.festival_years_range, s.first().toString(), s.last().toString())
+            } else {
+                Tr.s(R.string.festival_years_list, s.joinToString(Tr.s(R.string.festival_list_sep)))
+            }
         }
     }
 
@@ -127,8 +162,19 @@ class FestivalRepository(private val appContext: Context) {
         prefs.edit().putString(KEY_SOURCE, url.trim()).apply()
     }
 
-    fun sourceLabel(): String =
-        if (sourceUrl() == SOURCE_HOLIDAY_CN) "holiday-cn（默认）" else "自定义源"
+    /** 内置区域的展示名；不是内置区域（用户自己填的 URL）时回落「自定义数据源」。 */
+    fun sourceLabel(): String {
+        val url = sourceUrl()
+        val region = FestivalRegion.entries.firstOrNull { it.url == url }
+        return if (region != null) Tr.s(region.labelRes) else Tr.s(R.string.settings_source_region_custom)
+    }
+
+    /** 当前源对应的内置区域；自定义 URL 返回 null。 */
+    fun regionOfCurrentSource(): FestivalRegion? =
+        FestivalRegion.entries.firstOrNull { it.url == sourceUrl() }
+
+    /** 切换到某个内置区域的数据源。 */
+    fun setRegion(region: FestivalRegion) = setSourceUrl(region.url)
 
     // ---------- 缓存年份选择（存偏移，随年份自动滑动） ----------
 
@@ -216,7 +262,8 @@ class FestivalRepository(private val appContext: Context) {
 
     fun dataStatusText(): String {
         val years = cachedYears()
-        return if (years.isEmpty()) "未下载" else "已缓存 ${yearsText(years)}"
+        return if (years.isEmpty()) Tr.s(R.string.festival_status_none)
+        else Tr.s(R.string.festival_status_cached, yearsText(years))
     }
 
     private fun loadYear(year: Int): List<FestivalDay> {
@@ -434,7 +481,7 @@ class FestivalRepository(private val appContext: Context) {
             val off = offDayOf(o, true)
             val name = nameOf(o)
             if (!off && name == null) continue
-            out.add(FestivalDay(name ?: "节假日", date, off))
+            out.add(FestivalDay(name ?: Tr.s(R.string.festival_unnamed), date, off))
         }
         return out
     }
@@ -458,7 +505,7 @@ class FestivalRepository(private val appContext: Context) {
                     val off = offDayOf(v, offDefault)
                     val name = nameOf(v)
                     if (!off && name == null) continue
-                    out.add(FestivalDay(name ?: "节假日", date, off))
+                    out.add(FestivalDay(name ?: Tr.s(R.string.festival_unnamed), date, off))
                 }
                 // chinese-days："New Year's Day,元旦,1" → 取中文名（值也可能是纯中文名）
                 is String -> {
@@ -466,7 +513,7 @@ class FestivalRepository(private val appContext: Context) {
                     val parts = v.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                     val name = (parts.getOrNull(1) ?: parts.firstOrNull())?.let { canonicalName(it) }
                     if (!offDefault && name == null) continue
-                    out.add(FestivalDay(name ?: "节假日", date, offDefault))
+                    out.add(FestivalDay(name ?: Tr.s(R.string.festival_unnamed), date, offDefault))
                 }
                 else -> Unit
             }

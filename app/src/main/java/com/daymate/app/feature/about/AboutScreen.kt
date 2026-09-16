@@ -21,9 +21,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.BuildConfig
+import com.ayaka7452.daymate.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,10 +33,13 @@ fun AboutScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("关于") },
+                title = { Text(stringResource(R.string.about_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.common_back)
+                        )
                     }
                 }
             )
@@ -55,18 +60,22 @@ fun AboutScreen(onBack: () -> Unit) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                stringResource(
+                    R.string.about_version,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "一款轻量的倒数日应用，记录你的期待与坚持。",
+                stringResource(R.string.about_tagline),
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(Modifier.height(24.dp))
             Text(
-                "由 Ayaka7452 开发",
+                stringResource(R.string.about_developer),
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(Modifier.height(8.dp))

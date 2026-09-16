@@ -5,6 +5,8 @@ import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.repo.CycleRepository
 import com.ayaka7452.daymate.data.repo.EventRepository
 import com.ayaka7452.daymate.data.repo.SettingsRepository
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.flow.first
 
 /**
@@ -57,7 +59,7 @@ class CycleEventBridge(
             return -1L
         }
         val nextStart = nextPredictedStart() ?: return -1L
-        val title = settingsRepository.cycleEventTitle.first().ifBlank { "周期管家" }
+        val title = settingsRepository.cycleEventTitle.first().ifBlank { Tr.s(R.string.cycle_default_event_title) }
         val existing = linkedId.takeIf { it > 0 }?.let { eventRepository.getById(it) }
         if (existing != null && existing.isDeleted) {
             // 用户手动把快捷事件删进了回收站 → 尊重意图，自动关闭开关，不再重建

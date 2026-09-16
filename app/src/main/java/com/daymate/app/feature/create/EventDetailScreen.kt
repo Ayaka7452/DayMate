@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
 import java.time.Period
 import java.time.format.DateTimeFormatter
@@ -73,15 +75,15 @@ fun EventDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("事件详情") },
+                title = { Text(Tr.s(R.string.detail_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Tr.s(R.string.common_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "编辑")
+                        Icon(Icons.Default.Edit, contentDescription = Tr.s(R.string.common_edit))
                     }
                 }
             )
@@ -100,7 +102,7 @@ fun EventDetailScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    "事件不存在或已移入回收站",
+                    Tr.s(R.string.detail_not_found),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
@@ -168,25 +170,25 @@ private fun DetailContent(e: EventEntity, folderName: String?, modifier: Modifie
         // ===== 信息行 =====
         val date = LocalDate.ofEpochDay(e.targetDateEpochDay)
         InfoRow(
-            "目标日期",
-            date.format(DateTimeFormatter.ofPattern("yyyy年M月d日")) +
-                " · " + date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
+            Tr.s(R.string.detail_target_date),
+            date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd))) +
+                " · " + date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.forLanguageTag(Tr.s(R.string.locale_tag)))
         )
         InfoRow(
-            "循环",
+            Tr.s(R.string.repeat_label),
             when {
-                e.linkedFestival != null -> "跟随节日「${e.linkedFestival}」"
-                e.repeatRule == CountdownCalculator.REPEAT_WEEKLY -> "每周"
-                e.repeatRule == CountdownCalculator.REPEAT_MONTHLY -> "每月"
-                e.repeatRule == CountdownCalculator.REPEAT_YEARLY -> "每年"
-                else -> "不循环"
+                e.linkedFestival != null -> Tr.s(R.string.detail_follow_festival, e.linkedFestival.orEmpty())
+                e.repeatRule == CountdownCalculator.REPEAT_WEEKLY -> Tr.s(R.string.repeat_weekly)
+                e.repeatRule == CountdownCalculator.REPEAT_MONTHLY -> Tr.s(R.string.repeat_monthly)
+                e.repeatRule == CountdownCalculator.REPEAT_YEARLY -> Tr.s(R.string.repeat_yearly)
+                else -> Tr.s(R.string.repeat_none)
             }
         )
         if (e.refDays != null && e.refDays > 0) {
-            InfoRow("对照值", "${e.refDays} ${refUnitLabel(e.displayUnit)}")
+            InfoRow(Tr.s(R.string.detail_ref_value), "${e.refDays} ${refUnitLabel(e.displayUnit)}")
         }
-        if (folderName != null) InfoRow("所在文件夹", "📂 $folderName")
-        if (e.isPinned) InfoRow("置顶", "已置顶")
+        if (folderName != null) InfoRow(Tr.s(R.string.detail_folder), "📂 $folderName")
+        if (e.isPinned) InfoRow(Tr.s(R.string.detail_pinned), Tr.s(R.string.detail_pinned_yes))
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -215,9 +217,9 @@ private fun InfoRow(label: String, value: String) {
 }
 
 private fun refUnitLabel(unit: String?): String = when (unit) {
-    CountdownCalculator.UNIT_MONTH -> "个月"
-    CountdownCalculator.UNIT_YEAR -> "年"
-    else -> "天"
+    CountdownCalculator.UNIT_MONTH -> Tr.s(R.string.unit_months)
+    CountdownCalculator.UNIT_YEAR -> Tr.s(R.string.unit_years)
+    else -> Tr.s(R.string.unit_days)
 }
 
 /** 详情页大数字：按显示单位取整数，不足一个单位时逐级退回（与 formatCountdown 规则一致）。 */
@@ -239,20 +241,20 @@ private fun countdownDisplay(e: EventEntity): CountdownDisplay {
     // 统一显示正数：天按绝对值，月/年因 Period 已按过去方向计算本就为正；
     // 是否已过由下方 caption（距离目标日期 / 目标日期已过去）明确提示
     var n = if (isFuture) diffDays else -diffDays
-    var u = "天"
+    var u = Tr.s(R.string.unit_days)
     when (e.displayUnit) {
         CountdownCalculator.UNIT_YEAR -> when {
-            period.years > 0 -> { n = period.years.toLong(); u = "年" }
-            totalMonths > 0 -> { n = totalMonths; u = "个月" }
+            period.years > 0 -> { n = period.years.toLong(); u = Tr.s(R.string.unit_years) }
+            totalMonths > 0 -> { n = totalMonths; u = Tr.s(R.string.unit_months) }
         }
-        CountdownCalculator.UNIT_MONTH -> if (totalMonths > 0) { n = totalMonths; u = "个月" }
+        CountdownCalculator.UNIT_MONTH -> if (totalMonths > 0) { n = totalMonths; u = Tr.s(R.string.unit_months) }
     }
     // 已过且有对照值时数字区显示 X/N（对照值单位跟随显示单位）
     val number = if (!isFuture && hasRef) "$n / ${e.refDays}" else "$n"
     val caption = when {
-        diffDays == 0L -> "就是今天"
-        isFuture -> "距离目标日期"
-        else -> "目标日期已过去"
+        diffDays == 0L -> Tr.s(R.string.detail_today)
+        isFuture -> Tr.s(R.string.detail_until)
+        else -> Tr.s(R.string.detail_past)
     }
     return CountdownDisplay(number = number, unit = u, caption = caption)
 }

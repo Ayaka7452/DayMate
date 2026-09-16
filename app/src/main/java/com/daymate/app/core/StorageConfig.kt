@@ -1,6 +1,8 @@
 package com.ayaka7452.daymate.core
 
 import android.content.Context
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import android.content.Intent
 import android.net.Uri
 
@@ -63,7 +65,7 @@ object StorageConfig {
      * 例如 content://.../tree/primary:DayMate -> /storage/emulated/0/DayMate
      */
     fun displayPath(uri: Uri?): String {
-        if (uri == null) return "未设置"
+        if (uri == null) return Tr.s(R.string.storage_state_unset)
         val seg = uri.lastPathSegment ?: return uri.toString()
         return if (seg.startsWith("primary:")) {
             "/storage/emulated/0/" + seg.substring("primary:".length).replace(':', '/')

@@ -87,6 +87,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -94,7 +95,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.core.i18n.LocaleWrap
+import com.ayaka7452.daymate.core.i18n.Tr
 import com.ayaka7452.daymate.core.security.VaultCrypto
 import com.ayaka7452.daymate.core.util.CycleCalculator
 import com.ayaka7452.daymate.core.util.NoteCatalog
@@ -109,8 +113,6 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
-
-private val DateFmt = DateTimeFormatter.ofPattern("M月d日")
 
 /**
  * 周期管家：
@@ -221,7 +223,7 @@ private fun CycleOverviewScreen(
     //  ① 与已有记录重叠：同一时段重复登记经期通常不合理
     //  ② 与任一真实经期首日间隔不足 MIN_PERIOD_INTERVAL_DAYS 天（不重叠）：两次独立经期不可能这么近
     //  ③ 比预测下次经期提前超过 EARLY_PERIOD_THRESHOLD_DAYS 天（FIGO：相邻周期波动 ≤7~9 天属正常）
-    fun unreasonableLogReason(day: Long, days: Int): String? {
+    fun unreasonableLogReason(day: Long, days: Int): String? { // TODO(i18n): 见 skipped
         val last = logs.firstOrNull()?.startDateEpochDay
             ?: return null
         if (logs.any {
@@ -229,7 +231,7 @@ private fun CycleOverviewScreen(
                     day + days - 1 >= it.startDateEpochDay
             }
         ) {
-            return "与已有经期记录日期重叠"
+            return Tr.s(R.string.cycle_warn_overlap)
         }
         // 与任一真实经期记录首日间隔不足 15 天（不重叠）：两次「经期」间隔过短，
         // 基本不可能是两次独立经期，多为经间期出血。特殊情况记录（带备注的单日标记）不参与判断
@@ -239,15 +241,21 @@ private fun CycleOverviewScreen(
         }
         if (tooClose != null) {
             val gap = kotlin.math.abs(tooClose.startDateEpochDay - day)
-            return "与已有经期记录（" + formatDate(tooClose.startDateEpochDay) + "）仅相差 " + gap +
-                " 天。间隔不足 " + CycleCalculator.MIN_PERIOD_INTERVAL_DAYS +
-                " 天的两次出血通常不是两次独立经期，可能是非经期出血。建议咨询医生。"
+            return Tr.s(
+                R.string.cycle_warn_too_close,
+                formatDate(tooClose.startDateEpochDay),
+                gap,
+                CycleCalculator.MIN_PERIOD_INTERVAL_DAYS
+            )
         }
         val next = CycleCalculator.nextStartAfter(last, cycleDays)
         if (day > last && day < next - CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS) {
-            return "比预测下次经期（" + formatDate(next) + "）提前 " + (next - day) +
-                " 天。提前超过 " + CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS +
-                " 天属异常出血范围，建议咨询医生。"
+            return Tr.s(
+                R.string.cycle_warn_too_early,
+                formatDate(next),
+                next - day,
+                CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS
+            )
         }
         return null
     }
@@ -292,15 +300,15 @@ private fun CycleOverviewScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("周期管家") },
+                title = { Text(stringResource(R.string.cycle_title)) },
                 navigationIcon = {
                     IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "设置")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.common_settings))
                     }
                 }
             )
@@ -332,19 +340,19 @@ private fun CycleOverviewScreen(
                         horizontalAlignment = Alignment.Start
                     ) {
                         Text(
-                            "已到预测经期日（" + formatDate(predicted) + "）",
+                            stringResource(R.string.cycle_predicted_period_day, formatDate(predicted)),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "登记实际开始日期可提高推算准确度",
+                            stringResource(R.string.cycle_register_improve_accuracy),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                         Spacer(Modifier.height(10.dp))
-                        Button(onClick = { showRegister = true }) { Text("登记本次经期") }
+                        Button(onClick = { showRegister = true }) { Text(stringResource(R.string.cycle_register_this_period)) }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -407,8 +415,8 @@ private fun CycleOverviewScreen(
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    ViewToggle("圆环", selected = !showCalendar) { manualCalendar = false }
-                    ViewToggle("日历", selected = showCalendar) { manualCalendar = true }
+                    ViewToggle(stringResource(R.string.cycle_view_ring), selected = !showCalendar) { manualCalendar = false }
+                    ViewToggle(stringResource(R.string.cycle_view_calendar), selected = showCalendar) { manualCalendar = true }
                 }
             }
 
@@ -462,9 +470,9 @@ private fun CycleOverviewScreen(
                         ) {
                             Text(
                                 when {
-                                    pastEnd -> "本次经期已结束"
-                                    alreadyToday -> "已记录到今天"
-                                    else -> "结束本次经期"
+                                    pastEnd -> stringResource(R.string.cycle_period_ended)
+                                    alreadyToday -> stringResource(R.string.cycle_recorded_today)
+                                    else -> stringResource(R.string.cycle_end_period)
                                 },
                                 maxLines = 1
                             )
@@ -475,7 +483,7 @@ private fun CycleOverviewScreen(
                         enabled = !ongoing,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (ongoing) "经期中" else "开始新经期", maxLines = 1)
+                        Text(if (ongoing) stringResource(R.string.cycle_in_period) else stringResource(R.string.cycle_start_new_period), maxLines = 1)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -486,11 +494,11 @@ private fun CycleOverviewScreen(
                     OutlinedButton(
                         onClick = { editingLog = lastLog },
                         modifier = Modifier.weight(1f)
-                    ) { Text("修订上次经期", maxLines = 1) }
+                    ) { Text(stringResource(R.string.cycle_edit_last_period), maxLines = 1) }
                     OutlinedButton(
                         onClick = { showBackfill = true },
                         modifier = Modifier.weight(1f)
-                    ) { Text("补记历史经期", maxLines = 1) }
+                    ) { Text(stringResource(R.string.cycle_backfill_history_period), maxLines = 1) }
                 }
             } else {
                 // 无任何记录时的空状态操作行
@@ -501,11 +509,11 @@ private fun CycleOverviewScreen(
                     Button(
                         onClick = { showRegister = true },
                         modifier = Modifier.weight(1f)
-                    ) { Text("开始新经期") }
+                    ) { Text(stringResource(R.string.cycle_start_new_period)) }
                     OutlinedButton(
                         onClick = { showBackfill = true },
                         modifier = Modifier.weight(1f)
-                    ) { Text("补记历史经期") }
+                    ) { Text(stringResource(R.string.cycle_backfill_history_period)) }
                 }
             }
 
@@ -521,10 +529,10 @@ private fun CycleOverviewScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
             ) {
-                LegendDot(legendPeriod, "月经期")
-                LegendDot(legendFollicular, "卵泡期")
-                LegendDot(legendOvulation, "排卵期")
-                LegendDot(legendLuteal, "黄体期")
+                LegendDot(legendPeriod, stringResource(R.string.cycle_phase_period))
+                LegendDot(legendFollicular, stringResource(R.string.cycle_phase_follicular))
+                LegendDot(legendOvulation, stringResource(R.string.cycle_phase_ovulation))
+                LegendDot(legendLuteal, stringResource(R.string.cycle_phase_luteal))
             }
 
             Spacer(Modifier.height(20.dp))
@@ -536,37 +544,38 @@ private fun CycleOverviewScreen(
                 val ovuRange = CycleCalculator.ovulationWindow(lastLog.startDateEpochDay, periodDays, nextStart)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     InfoCard(
-                        "上次经期",
+                        stringResource(R.string.cycle_last_period),
                         formatRange(lastLog.startDateEpochDay, lastLog.periodDays),
-                        "共 " + lastLog.periodDays + " 天",
+                        stringResource(R.string.cycle_total_days_n, lastLog.periodDays),
                         Modifier.weight(1f)
                     )
                     InfoCard(
                         // 明确限定为「今天」：选中其它日期时详情区会显示那天的阶段，两者不能都叫「当前阶段」而打架
-                        "今日阶段",
-                        if (todayIsPeriodEnd) "今日结束" else phase.label,
-                        "周期第 " + (today - lastLog.startDateEpochDay + 1) + " 天",
+                        stringResource(R.string.cycle_today_phase),
+                        if (todayIsPeriodEnd) stringResource(R.string.cycle_today_end)
+                        else stringResource(phase.labelRes),
+                        stringResource(R.string.cycle_day_n, (today - lastLog.startDateEpochDay + 1)),
                         Modifier.weight(1f)
                     )
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     InfoCard(
-                        "下次经期",
+                        stringResource(R.string.cycle_next_period),
                         formatDate(nextStart),
-                        if (overdue) "已到预测日期，请登记" else "还有 " + (nextStart - today) + " 天",
+                        if (overdue) stringResource(R.string.cycle_overdue_register) else stringResource(R.string.cycle_days_left_n, (nextStart - today)),
                         Modifier.weight(1f)
                     )
                     InfoCard(
-                        "排卵日",
+                        stringResource(R.string.cycle_ovulation_day),
                         formatDate(CycleCalculator.effectiveOvulationDay(lastLog.startDateEpochDay, periodDays, nextStart)),
-                        "窗口 " + formatDate(ovuRange.first) + " ~ " + formatDate(ovuRange.last),
+                        stringResource(R.string.cycle_window_range, formatDate(ovuRange.first), formatDate(ovuRange.last)),
                         Modifier.weight(1f)
                     )
                 }
             } else {
                 Text(
-                    "尚无记录。登记最近一次经期首日后，此处将显示完整推算。",
+                    stringResource(R.string.cycle_no_record_overview),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -574,14 +583,14 @@ private fun CycleOverviewScreen(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "温馨提示",
+                stringResource(R.string.cycle_tips_title),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable { showTips = true }
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "日历法推算仅供参考，不能作为避孕或医学诊断依据。",
+                stringResource(R.string.cycle_disclaimer_calendar),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
@@ -614,9 +623,9 @@ private fun CycleOverviewScreen(
                         }
                     }
                     showRegister = false
-                }) { Text("保存") }
+                }) { Text(stringResource(R.string.common_save)) }
             },
-            dismissButton = { TextButton(onClick = { showRegister = false }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { showRegister = false }) { Text(stringResource(R.string.common_cancel)) } }
         ) { DatePicker(state = registerState) }
     }
 
@@ -650,9 +659,9 @@ private fun CycleOverviewScreen(
                         }
                         showBackfill = false
                     }
-                ) { Text("保存") }
+                ) { Text(stringResource(R.string.common_save)) }
             },
-            dismissButton = { TextButton(onClick = { showBackfill = false }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { showBackfill = false }) { Text(stringResource(R.string.common_cancel)) } }
         ) {
             Column(
                 modifier = Modifier
@@ -660,18 +669,18 @@ private fun CycleOverviewScreen(
                     .padding(top = 12.dp)
             ) {
                 Text(
-                    "补记历史经期",
+                    stringResource(R.string.cycle_backfill_history_period),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
                 Text(
                     when {
-                        startDay == null || selEnd == null -> "选择这次经期的开始与结束日期"
-                        !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
+                        startDay == null || selEnd == null -> stringResource(R.string.cycle_select_period_range)
+                        !valid -> stringResource(R.string.cycle_period_days_range, CycleCalculator.MIN_PERIOD_DAYS, CycleCalculator.MAX_PERIOD_DAYS)
                         startDay != null && unreasonableLogReason(startDay, days) != null ->
-                            "日期与已有记录重叠或提前过多，保存时需确认是否作为特殊情况记录"
-                        else -> "将记录 " + formatRange(startDay, days) + "，共 " + days + " 天"
+                            stringResource(R.string.cycle_overlap_early_note)
+                        else -> stringResource(R.string.cycle_will_record_n, formatRange(startDay, days), days)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -688,20 +697,20 @@ private fun CycleOverviewScreen(
 
     // 重叠二次确认弹窗：登记/补记区间与已有记录重叠时出现，可选填备注作为特殊情况保存
     pendingSpecial?.let { pending ->
-        var noteText by remember(pending) { mutableStateOf("可能为非经期出血") }
+        var noteText by remember(pending) { mutableStateOf(stringResource(R.string.cycle_default_special_note)) }
         AlertDialog(
             onDismissRequest = { pendingSpecial = null },
-            title = { Text("确认作为特殊情况记录？") },
+            title = { Text(stringResource(R.string.cycle_confirm_special)) },
             text = {
                 Column {
                     // 三种 reason 文案结尾并不统一（「日期重叠」无句号，另两种自带句号），
                     // 直接拼接会产出「。。」——统一去掉结尾句号后由此处补一个
-                    Text(pending.reason.trimEnd('。') + "。\n特殊情况仅标记当天，不按经期天数向后延伸。可附备注说明。")
+                    Text(pending.reason.trimEnd('。') + stringResource(R.string.cycle_special_note_suffix))
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = noteText,
                         onValueChange = { noteText = it.take(50) },
-                        label = { Text("备注（可选）") },
+                        label = { Text(stringResource(R.string.cycle_note_optional_label)) },
                         singleLine = true
                     )
                 }
@@ -721,9 +730,9 @@ private fun CycleOverviewScreen(
                         runCatching { container.cycleEventBridge.syncEvent() }
                     }
                     pendingSpecial = null
-                }) { Text("作为特殊情况记录") }
+                }) { Text(stringResource(R.string.cycle_save_as_special)) }
             },
-            dismissButton = { TextButton(onClick = { pendingSpecial = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { pendingSpecial = null }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 
@@ -734,11 +743,10 @@ private fun CycleOverviewScreen(
             val diff = (today - log.startDateEpochDay + 1).toInt()
             AlertDialog(
                 onDismissRequest = { showEndConfirm = false },
-                title = { Text("结束本次经期？") },
+                title = { Text(stringResource(R.string.cycle_end_period_confirm_title)) },
                 text = {
                     Text(
-                        "将把本次经期记录为 " + formatRange(log.startDateEpochDay, diff) + "，共 " + diff +
-                            " 天。今天（" + formatDate(today) + "）计为最后一天。如有错误，可进行补记或修订。"
+                        stringResource(R.string.cycle_end_period_confirm_text, formatRange(log.startDateEpochDay, diff), diff, formatDate(today))
                     )
                 },
                 confirmButton = {
@@ -748,9 +756,9 @@ private fun CycleOverviewScreen(
                             scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
                         }
                         showEndConfirm = false
-                    }) { Text("确认结束") }
+                    }) { Text(stringResource(R.string.cycle_confirm_end)) }
                 },
-                dismissButton = { TextButton(onClick = { showEndConfirm = false }) { Text("取消") } }
+                dismissButton = { TextButton(onClick = { showEndConfirm = false }) { Text(stringResource(R.string.common_cancel)) } }
             )
         } else {
             showEndConfirm = false
@@ -781,52 +789,52 @@ private fun CycleOverviewScreen(
         AlertDialog(
             onDismissRequest = { showTips = false },
             confirmButton = {
-                TextButton(onClick = { showTips = false }) { Text("好") }
+                TextButton(onClick = { showTips = false }) { Text(stringResource(R.string.common_ok)) }
             },
-            title = { Text("温馨提示") },
+            title = { Text(stringResource(R.string.cycle_tips_title)) },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "功能说明",
+                        stringResource(R.string.cycle_tips_function),
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "周期管家记录每次经期首日，以日历法推算月经周期，预测下次经期、排卵日与排卵期，并将下次经期同步为首页倒数事件。所有数据仅保存在本机。",
+                        stringResource(R.string.cycle_tips_function_body),
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        "日常记录",
+                        stringResource(R.string.cycle_tips_daily_log),
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "在日历上点选任意日期，即可为那天添加日常记录（性生活、出血与分泌物、身体症状、情绪，或自己填写）。日常记录只作留痕，不参与周期与排卵推算，也不会点亮经期圆点，随手记一条症状不会影响预测结果。",
+                        stringResource(R.string.cycle_tips_daily_log_body),
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        "周期四个阶段",
+                        stringResource(R.string.cycle_tips_phases),
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "· 月经期：经期出血的第 1 天到结束，通常 3～7 天，对应圆环的深色段。\n· 卵泡期：月经结束后到排卵前，卵泡逐渐发育成熟，是子宫内膜重新增厚的阶段。\n· 排卵期：排卵日一般在下次经期前 14 天左右，其前后各约 2 天是受孕概率最高的窗口。\n· 黄体期：排卵后到下次经期来临前，身体分泌孕激素维持内膜；未受孕则内膜脱落，进入下一个月经期。",
+                        stringResource(R.string.cycle_tips_phases_body),
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        "日历标记",
+                        stringResource(R.string.cycle_tips_calendar_marks),
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "· 日期底色代表当天所处阶段。\n· 实心圆点：已登记的经期日。\n· 空心圆点：预测的经期日，到来后变为实心。\n· 右上角小圆点：当天有日常记录，点选该日可查看。\n· 细蓝框：今天；粗蓝框：当前选中的日期，收起详情后粗框消失。",
+                        stringResource(R.string.cycle_tips_calendar_marks_body),
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        "关于准确性",
+                        stringResource(R.string.cycle_tips_accuracy),
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "周期长度与经期天数因人而异，情绪、压力、作息、出行、疾病等均可能导致周期提前或延后。日历法按平均值推算，与实际排卵时间可能存在数天误差。推算结果仅供参考，不可作为避孕或医学诊断依据；如周期长期紊乱或伴有不适，请咨询医生。",
+                        stringResource(R.string.cycle_tips_accuracy_body),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -933,7 +941,7 @@ private fun CycleRing(
         // 环中心文字
         if (lastStart == null) {
             Text(
-                "暂无记录",
+                stringResource(R.string.cycle_no_record),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
@@ -943,7 +951,8 @@ private fun CycleRing(
             val phase = CycleCalculator.phaseOf(today, lastStart, periodDays, cycleDays)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    if (todayIsPeriodEnd) "今日结束" else phase.label,
+                    if (todayIsPeriodEnd) stringResource(R.string.cycle_today_end)
+                        else stringResource(phase.labelRes),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = when {
@@ -956,18 +965,18 @@ private fun CycleRing(
                 Spacer(Modifier.height(4.dp))
                 if (overdue) {
                     Text(
-                        "请登记本次经期",
+                        stringResource(R.string.cycle_register_prompt),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error
                     )
                 } else {
                     Text(
-                        "周期第 " + (today - lastStart + 1) + " 天",
+                        stringResource(R.string.cycle_day_n, (today - lastStart + 1)),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                     Text(
-                        "距下次经期 " + (nextStart - today) + " 天",
+                        stringResource(R.string.cycle_days_to_next_period_n, (nextStart - today)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -1014,7 +1023,7 @@ private fun CycleSettingsScreen(
     val passwordEnabled by container.settingsRepository.cyclePasswordEnabled.collectAsState(initial = false)
     val eventEnabled by container.settingsRepository.cycleEventEnabled.collectAsState(initial = false)
     val entryEnabled by container.settingsRepository.cycleEntryEnabled.collectAsState(initial = false)
-    val eventTitle by container.settingsRepository.cycleEventTitle.collectAsState(initial = "周期管家")
+    val eventTitle by container.settingsRepository.cycleEventTitle.collectAsState(initial = stringResource(R.string.cycle_title))
     val vaultSet by container.settingsRepository.vaultPasswordSet.collectAsState(initial = false)
 
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
@@ -1055,10 +1064,10 @@ private fun CycleSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("周期管家设置") },
+                title = { Text(stringResource(R.string.cycle_settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -1072,14 +1081,14 @@ private fun CycleSettingsScreen(
                 .padding(16.dp)
         ) {
             // ===== 周期参数（自动测算 ⇄ 手动设置开关） =====
-            Text("周期参数", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.cycle_params_title), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
             ToggleRow(
-                title = "自动测算周期天数",
+                title = stringResource(R.string.cycle_auto_cycle_days),
                 subtitle = when {
-                    cycleAuto && avg != null -> "周期天数自动测算：近 ${CycleCalculator.AVG_WINDOW} 次均值 $avg 天"
-                    cycleAuto -> "当前数据未满足测算要求，仍以手动设置为准"
-                    else -> "已关闭，使用下方手动设置的值"
+                    cycleAuto && avg != null -> stringResource(R.string.cycle_auto_cycle_sub_calc, CycleCalculator.AVG_WINDOW, avg)
+                    cycleAuto -> stringResource(R.string.cycle_auto_insufficient)
+                    else -> stringResource(R.string.cycle_auto_off_manual)
                 },
                 checked = cycleAuto,
                 enabled = true
@@ -1090,7 +1099,7 @@ private fun CycleSettingsScreen(
                 }
             }
             SettingStepper(
-                label = "周期天数",
+                label = stringResource(R.string.cycle_label_cycle_days),
                 value = cycleDays,
                 range = CycleCalculator.MIN_CYCLE_DAYS..CycleCalculator.MAX_CYCLE_DAYS,
                 // 数据不满足测算要求时生效值就是手动值，± 应保持可用
@@ -1103,11 +1112,11 @@ private fun CycleSettingsScreen(
             }
             Spacer(Modifier.height(10.dp))
             ToggleRow(
-                title = "自动测算经期持续天数",
+                title = stringResource(R.string.cycle_auto_period_days),
                 subtitle = when {
-                    periodAuto && periodAvg != null -> "经期持续天数自动测算：近 ${CycleCalculator.AVG_WINDOW} 次均值 $periodAvg 天"
-                    periodAuto -> "当前数据未满足测算要求，仍以手动设置为准"
-                    else -> "已关闭，使用下方手动设置的值"
+                    periodAuto && periodAvg != null -> stringResource(R.string.cycle_auto_period_sub_calc, CycleCalculator.AVG_WINDOW, periodAvg)
+                    periodAuto -> stringResource(R.string.cycle_auto_period_insufficient)
+                    else -> stringResource(R.string.cycle_auto_off_manual)
                 },
                 checked = periodAuto,
                 enabled = true
@@ -1118,7 +1127,7 @@ private fun CycleSettingsScreen(
                 }
             }
             SettingStepper(
-                label = "经期持续天数",
+                label = stringResource(R.string.cycle_label_period_days),
                 value = periodDays,
                 range = CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS,
                 // 数据不满足测算要求时生效值就是手动值，± 应保持可用
@@ -1135,7 +1144,7 @@ private fun CycleSettingsScreen(
             // ===== 默认视图 =====
             val defaultCalendar by container.settingsRepository.cycleDefaultCalendar
                 .collectAsState(initial = false)
-            Text("默认视图", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.cycle_default_view), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             Row {
                 Row(
@@ -1147,17 +1156,17 @@ private fun CycleSettingsScreen(
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    ViewToggle("圆环", selected = !defaultCalendar) {
+                    ViewToggle(stringResource(R.string.cycle_view_ring), selected = !defaultCalendar) {
                         scope.launch { container.settingsRepository.setCycleDefaultCalendar(false) }
                     }
-                    ViewToggle("日历", selected = defaultCalendar) {
+                    ViewToggle(stringResource(R.string.cycle_view_calendar), selected = defaultCalendar) {
                         scope.launch { container.settingsRepository.setCycleDefaultCalendar(true) }
                     }
                 }
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "进入周期管家时默认显示的视图。主视图中的手动切换不会改变此设置。",
+                stringResource(R.string.cycle_default_view_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
             )
@@ -1166,7 +1175,7 @@ private fun CycleSettingsScreen(
 
             if (logs.isEmpty()) {
                 Text(
-                    "尚无记录。登记最近一次经期首日后，主视图将显示四个阶段的推算。",
+                    stringResource(R.string.cycle_no_record_settings),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -1180,13 +1189,13 @@ private fun CycleSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "历史记录管理（${logs.size}）",
+                        stringResource(R.string.cycle_history_manage_n, logs.size),
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.weight(1f)
                     )
                     Icon(
                         Icons.Default.KeyboardArrowRight,
-                        contentDescription = "进入",
+                        contentDescription = stringResource(R.string.cycle_enter),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
@@ -1195,11 +1204,11 @@ private fun CycleSettingsScreen(
             Spacer(Modifier.height(20.dp))
 
             // ===== 隐私与快捷事件 =====
-            Text("隐私与快捷事件", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.cycle_privacy_quick), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
             ToggleRow(
-                title = "密码保护",
-                subtitle = if (vaultSet) "进入本功能需验证 Vault 密码或指纹" else "需要先在 Vault 中设置密码",
+                title = stringResource(R.string.cycle_title_password_protect),
+                subtitle = if (vaultSet) stringResource(R.string.cycle_sub_password_set) else stringResource(R.string.cycle_sub_password_need),
                 checked = passwordEnabled,
                 enabled = vaultSet
             ) { want ->
@@ -1210,8 +1219,8 @@ private fun CycleSettingsScreen(
                 }
             }
             ToggleRow(
-                title = "在主页显示快捷事件",
-                subtitle = "以普通事件的形式存在，可移动、放入文件夹、置顶。点击直达本功能，日期随预测自动更新。",
+                title = stringResource(R.string.cycle_title_show_event),
+                stringResource(R.string.cycle_sub_show_event),
                 checked = eventEnabled,
                 enabled = true
             ) { want ->
@@ -1227,12 +1236,12 @@ private fun CycleSettingsScreen(
             }
             if (eventEnabled) {
                 TextButton(onClick = { showEventNameDialog = true }) {
-                    Text("自定义事件名称：$eventTitle")
+                    Text(stringResource(R.string.cycle_event_name_custom, eventTitle))
                 }
             }
             ToggleRow(
-                title = "在主页显示入口按钮",
-                subtitle = "开启后，长按主页右下角的加号，即可在加号上方展开周期管家入口。",
+                title = stringResource(R.string.cycle_title_show_entry),
+                stringResource(R.string.cycle_sub_show_entry),
                 checked = entryEnabled,
                 enabled = true
             ) { want ->
@@ -1241,10 +1250,7 @@ private fun CycleSettingsScreen(
 
             Spacer(Modifier.height(24.dp))
             Text(
-                "本功能采用日历法推算：排卵日约为预测下次经期首日减 14 天。" +
-                    "经期较长时排卵日与阶段划分自动微调，卵泡期不短于 2 天、黄体期不短于 11 天，均在医学共识波动区间内。" +
-                    "周期受压力、作息、疾病等影响存在波动，结果仅供参考，不可作为避孕或医学诊断依据；" +
-                    "如有月经异常或健康疑问，请咨询医生。",
+                stringResource(R.string.cycle_method_note),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
@@ -1276,8 +1282,8 @@ private fun CycleSettingsScreen(
         val log = deletingLog!!
         AlertDialog(
             onDismissRequest = { deletingLog = null },
-            title = { Text("删除这条记录？") },
-            text = { Text(formatRange(log.startDateEpochDay, log.periodDays) + " 的经期记录将被删除，推算将基于剩余记录进行。") },
+            title = { Text(stringResource(R.string.cycle_delete_record_title)) },
+            text = { Text(stringResource(R.string.cycle_delete_record_text, formatRange(log.startDateEpochDay, log.periodDays))) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -1285,9 +1291,9 @@ private fun CycleSettingsScreen(
                         deletingLog = null
                         syncEvent()
                     }
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { deletingLog = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { deletingLog = null }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 
@@ -1295,35 +1301,35 @@ private fun CycleSettingsScreen(
         var name by remember { mutableStateOf(eventTitle) }
         AlertDialog(
             onDismissRequest = { showEventNameDialog = false },
-            title = { Text("快捷事件名称") },
+            title = { Text(stringResource(R.string.cycle_event_name_title)) },
             text = {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it.take(20) },
-                    label = { Text("名称（默认「周期管家」）") },
+                    label = { Text(stringResource(R.string.cycle_event_name_label)) },
                     singleLine = true
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
-                        container.settingsRepository.setCycleEventTitle(name.ifBlank { "周期管家" })
+                        container.settingsRepository.setCycleEventTitle(name.ifBlank { cycleTitleDef })
                         syncEvent()
                         showEventNameDialog = false
                     }
-                }) { Text("保存") }
+                }) { Text(stringResource(R.string.common_save)) }
             },
-            dismissButton = { TextButton(onClick = { showEventNameDialog = false }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { showEventNameDialog = false }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 
     if (showPasswordNeedVault) {
         AlertDialog(
             onDismissRequest = { showPasswordNeedVault = false },
-            title = { Text("需要先设置 Vault 密码") },
-            text = { Text("周期管家的密码保护复用 Vault 密码。请先进入 Vault 设置密码，再返回此处开启。") },
+            title = { Text(stringResource(R.string.cycle_need_vault_title)) },
+            text = { Text(stringResource(R.string.cycle_need_vault_text)) },
             confirmButton = {
-                TextButton(onClick = { showPasswordNeedVault = false }) { Text("好") }
+                TextButton(onClick = { showPasswordNeedVault = false }) { Text(stringResource(R.string.common_ok)) }
             }
         )
     }
@@ -1331,10 +1337,10 @@ private fun CycleSettingsScreen(
     if (showNeedLog) {
         AlertDialog(
             onDismissRequest = { showNeedLog = false },
-            title = { Text("请先登记一次经期") },
-            text = { Text("快捷事件的日期来自周期推算，需要至少一次经期登记。请先返回主视图点「开始新经期」登记，之后快捷事件会自动创建并显示在主页。") },
+            title = { Text(stringResource(R.string.cycle_register_first_title)) },
+            text = { Text(stringResource(R.string.cycle_register_first_text)) },
             confirmButton = {
-                TextButton(onClick = { showNeedLog = false }) { Text("好") }
+                TextButton(onClick = { showNeedLog = false }) { Text(stringResource(R.string.common_ok)) }
             }
         )
     }
@@ -1381,9 +1387,9 @@ private fun CycleLogEditDialog(
                         onSave(startDay, days, noteText.trim().ifEmpty { null })
                     }
                 }
-            ) { Text("保存") }
+            ) { Text(stringResource(R.string.common_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     ) {
         Column(
             modifier = Modifier
@@ -1391,17 +1397,17 @@ private fun CycleLogEditDialog(
                 .padding(top = 12.dp)
         ) {
             Text(
-                "修订这条记录",
+                stringResource(R.string.cycle_edit_record_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
             Text(
                 when {
-                    startDay == null || selEnd == null -> "重新选择这次经期的开始与结束日期"
-                    overlap -> "与另一条记录的日期重叠，请调整"
-                    !valid -> "持续天数需在 ${CycleCalculator.MIN_PERIOD_DAYS}~${CycleCalculator.MAX_PERIOD_DAYS} 天之间"
-                    else -> "将改为 " + formatRange(startDay, days) + "，共 " + days + " 天"
+                    startDay == null || selEnd == null -> stringResource(R.string.cycle_reselect_range)
+                    overlap -> stringResource(R.string.cycle_overlap_adjust)
+                    !valid -> stringResource(R.string.cycle_period_days_range, CycleCalculator.MIN_PERIOD_DAYS, CycleCalculator.MAX_PERIOD_DAYS)
+                    else -> stringResource(R.string.cycle_will_change_n, formatRange(startDay, days), days)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -1415,7 +1421,7 @@ private fun CycleLogEditDialog(
             OutlinedTextField(
                 value = noteText,
                 onValueChange = { noteText = it.take(50) },
-                label = { Text("备注（特殊情况说明，可选）") },
+                label = { Text(stringResource(R.string.cycle_note_special_optional)) },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1445,7 +1451,7 @@ private fun SettingStepper(
             enabled = enabled
         ) { Text("−", style = MaterialTheme.typography.titleMedium) }
         Text(
-            "$value 天",
+            stringResource(R.string.cycle_value_days_n, value),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 12.dp)
@@ -1499,6 +1505,8 @@ private fun CycleUnlockGate(
     val activity = context as? androidx.fragment.app.FragmentActivity
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    val cycleErrEmpty = stringResource(R.string.cycle_error_empty_password)
+    val cycleErrWrong = stringResource(R.string.cycle_error_wrong_password)
     val hash by container.settingsRepository.vaultPasswordHash.collectAsState(initial = null)
     val salt by container.settingsRepository.vaultSalt.collectAsState(initial = null)
     val biometricEnabled by container.settingsRepository.vaultBiometricEnabled
@@ -1524,9 +1532,9 @@ private fun CycleUnlockGate(
             }
         )
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("验证身份")
-            .setSubtitle("解锁周期管家")
-            .setNegativeButtonText("取消")
+            .setTitle(act.getString(R.string.cycle_biometric_title))
+            .setSubtitle(act.getString(R.string.cycle_biometric_subtitle))
+            .setNegativeButtonText(act.getString(R.string.common_cancel))
             .build()
         prompt.authenticate(info)
     }
@@ -1534,10 +1542,10 @@ private fun CycleUnlockGate(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("周期管家") },
+                title = { Text(stringResource(R.string.cycle_title)) },
                 navigationIcon = {
                     IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -1549,7 +1557,7 @@ private fun CycleUnlockGate(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            Text("输入密码解锁", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.cycle_input_password), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
                 value = password,
@@ -1557,7 +1565,7 @@ private fun CycleUnlockGate(
                     password = it
                     error = null
                 },
-                label = { Text("密码（与 Vault 一致）") },
+                label = { Text(stringResource(R.string.cycle_password_label)) },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
@@ -1573,7 +1581,7 @@ private fun CycleUnlockGate(
                     val h = hash ?: return@Button
                     val s = salt ?: return@Button
                     if (password.isBlank()) {
-                        error = "请输入密码"
+                        error = cycleErrEmpty
                         return@Button
                     }
                     val ok = try {
@@ -1581,20 +1589,20 @@ private fun CycleUnlockGate(
                     } catch (e: Exception) {
                         false
                     }
-                    if (ok) onUnlocked() else error = "密码错误"
+                    if (ok) onUnlocked() else error = cycleErrWrong
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Lock, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("解锁")
+                Text(stringResource(R.string.cycle_unlock))
             }
             if (biometricAvailable && biometricEnabled) {
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = { authenticateWithBiometric() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Lock, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("使用指纹")
+                    Text(stringResource(R.string.cycle_use_fingerprint))
                 }
             }
         }
@@ -1602,7 +1610,7 @@ private fun CycleUnlockGate(
 }
 
 private fun formatDate(epochDay: Long): String =
-    LocalDate.ofEpochDay(epochDay).format(DateFmt)
+    LocalDate.ofEpochDay(epochDay).format(LocaleWrap.dateFormatter(R.string.date_pattern_md))
 
 /** 「几号到几号」区间格式：X月X日 ~ X月X日 */
 private fun formatRange(startEpochDay: Long, days: Int): String =
@@ -1630,10 +1638,10 @@ private fun CycleHistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("历史记录管理") },
+                title = { Text(stringResource(R.string.cycle_history_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -1659,8 +1667,8 @@ private fun CycleHistoryScreen(
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    ViewToggle("经期记录", selected = tab == 0) { tab = 0 }
-                    ViewToggle("日常记录", selected = tab == 1) { tab = 1 }
+                    ViewToggle(stringResource(R.string.cycle_tab_period), selected = tab == 0) { tab = 0 }
+                    ViewToggle(stringResource(R.string.cycle_tab_daily), selected = tab == 1) { tab = 1 }
                 }
             }
 
@@ -1671,7 +1679,7 @@ private fun CycleHistoryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        if (tab == 0) "尚无经期记录" else "尚无日常记录\n在日历上点选日期即可添加",
+                        if (tab == 0) stringResource(R.string.cycle_no_period_records) else stringResource(R.string.cycle_no_daily_records),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         textAlign = TextAlign.Center
@@ -1691,11 +1699,11 @@ private fun CycleHistoryScreen(
                         ) {
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    formatRange(log.startDateEpochDay, log.periodDays) + " · " + log.periodDays + "天",
+                                    stringResource(R.string.cycle_log_range_days, formatRange(log.startDateEpochDay, log.periodDays), log.periodDays),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 val dow = LocalDate.ofEpochDay(log.startDateEpochDay)
-                                    .dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
+                                    .dayOfWeek.getDisplayName(TextStyle.FULL, LocaleWrap.locale())
                                 Text(
                                     dow,
                                     style = MaterialTheme.typography.bodySmall,
@@ -1703,16 +1711,16 @@ private fun CycleHistoryScreen(
                                 )
                                 log.note?.let { note ->
                                     Text(
-                                        "备注：" + note,
+                                        stringResource(R.string.cycle_note_prefix, note),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.tertiary
                                     )
                                 }
                             }
-                            TextButton(onClick = { onEdit(log) }) { Text("调整") }
+                            TextButton(onClick = { onEdit(log) }) { Text(stringResource(R.string.cycle_adjust)) }
                             IconButton(onClick = { onDelete(log) }) {
                                 Icon(
-                                    Icons.Default.Delete, contentDescription = "删除",
+                                    Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete),
                                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                 )
                             }
@@ -1746,7 +1754,7 @@ private fun CycleHistoryScreen(
                                 IconButton(onClick = { deletingNotesDay = day }) {
                                     Icon(
                                         Icons.Default.Delete,
-                                        contentDescription = "删除该日记录",
+                                        contentDescription = stringResource(R.string.cycle_delete_day_records),
                                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                     )
                                 }
@@ -1891,23 +1899,26 @@ private fun CycleCalendarMonth(
         // 月份导航
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = { monthOffset -= 1 }) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "上个月")
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.cycle_prev_month))
             }
             Text(
-                month.year.toString() + "年" + month.monthValue + "月",
+                month.format(LocaleWrap.dateFormatter(R.string.date_pattern_ym)),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = { monthOffset += 1 }) {
-                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "下个月")
+                Icon(Icons.Default.KeyboardArrowRight, contentDescription = stringResource(R.string.cycle_next_month))
             }
         }
         Spacer(Modifier.height(4.dp))
         // 星期表头（周一开始）
         Row(Modifier.fillMaxWidth()) {
-            listOf("一", "二", "三", "四", "五", "六", "日").forEach { d ->
+            val weekLocale = LocaleWrap.locale()
+            (1..7).map {
+                java.time.DayOfWeek.of(it).getDisplayName(TextStyle.NARROW, weekLocale)
+            }.forEach { d ->
                 Text(
                     d,
                     style = MaterialTheme.typography.labelSmall,
@@ -2052,12 +2063,17 @@ private fun describeDay(
     logs: List<CycleLogEntity>,
     cycleDays: Int,
     today: Long
-): Pair<String, String> {
-    if (logs.isEmpty()) return "尚无记录" to "登记一次经期后即可推算阶段"
+): Pair<String, String> { // TODO(i18n): 见 skipped
+    if (logs.isEmpty()) {
+        return Tr.s(R.string.cycle_no_records) to Tr.s(R.string.cycle_no_records_hint)
+    }
 
     // 落在任一已登记经期区间内 → 月经期（按该记录自身的持续天数）
     logs.firstOrNull { day in CycleCalculator.periodRange(it.startDateEpochDay, it.periodDays) }
-        ?.let { return "月经期" to ("经期第 " + (day - it.startDateEpochDay + 1) + " 天") }
+        ?.let {
+            return Tr.s(R.string.cycle_phase_period) to
+                Tr.s(R.string.cycle_day_n, day - it.startDateEpochDay + 1)
+        }
 
     val entries = logs.map { it.startDateEpochDay to it.periodDays }
     val phase = CycleCalculator.phaseOfAnyDay(day, entries, cycleDays)
@@ -2080,27 +2096,40 @@ private fun describeDay(
 
     return when {
         phase == CycleCalculator.Phase.PERIOD ->
-            "预测经期" to ("系统预测，尚未登记 · " +
-                if (day > today) "还有 " + (day - today) + " 天" else "已过 " + (today - day) + " 天")
+            Tr.s(R.string.cycle_predict_period) to Tr.s(
+                R.string.cycle_predict_not_logged,
+                if (day > today) Tr.s(R.string.unit_days_future, day - today)
+                else Tr.s(R.string.unit_days_past, today - day)
+            )
         day == ovu ->
-            "排卵日" to ("受孕概率最高 · 排卵期 " + formatDate(window.first) + " ~ " + formatDate(window.last))
+            Tr.s(R.string.cycle_ovulation_day) to Tr.s(
+                R.string.cycle_ovu_best_sub, formatDate(window.first), formatDate(window.last)
+            )
         phase == CycleCalculator.Phase.OVULATION ->
-            "排卵期" to ("排卵日 " + formatDate(ovu) + " · 窗口 " + formatDate(window.first) + " ~ " + formatDate(window.last))
+            Tr.s(R.string.cycle_phase_ovulation) to Tr.s(
+                R.string.cycle_ovu_phase_sub,
+                formatDate(ovu), formatDate(window.first), formatDate(window.last)
+            )
         phase == CycleCalculator.Phase.LUTEAL ->
-            "黄体期" to ("距下次经期 " + (nextStart - day) + " 天")
+            Tr.s(R.string.cycle_phase_luteal) to Tr.s(R.string.cycle_luteal_sub_n, nextStart - day)
         else ->
-            "卵泡期" to ("距排卵日 " + (ovu - day) + " 天")
+            Tr.s(R.string.cycle_phase_follicular) to Tr.s(R.string.cycle_follicular_sub_n, ovu - day)
     }
 }
 
 /** 阶段标签的配色（与圆环/日历同一套色板，保证三处说法一致）。 */
 @Composable
 private fun phaseChipColors(label: String): Pair<Color, Color> = when (label) {
-    "月经期" -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
-    "预测经期" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.onSurface
-    "排卵日", "排卵期" -> MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
-    "卵泡期" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
-    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f) to MaterialTheme.colorScheme.onSurface
+    stringResource(R.string.cycle_phase_period) ->
+        MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+    stringResource(R.string.cycle_predict_period) ->
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.onSurface
+    stringResource(R.string.cycle_ovulation_day), stringResource(R.string.cycle_phase_ovulation) ->
+        MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
+    stringResource(R.string.cycle_phase_follicular) ->
+        MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+    else ->
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f) to MaterialTheme.colorScheme.onSurface
 }
 
 /** 记录大类的色条颜色：用于详情区列表与历史页，让「症状/情绪/性生活」一眼可分。 */
@@ -2129,7 +2158,7 @@ private fun NoteRow(note: CycleNoteEntity) {
                 .background(noteCategoryColor(note.category), RoundedCornerShape(2.dp))
         )
         Spacer(Modifier.width(10.dp))
-        Text(note.label, style = MaterialTheme.typography.bodyMedium)
+        Text(NoteCatalog.displayLabel(note.presetKey, note.label), style = MaterialTheme.typography.bodyMedium)
         note.note?.let { extra ->
             Spacer(Modifier.width(8.dp))
             Text(
@@ -2165,8 +2194,8 @@ private fun CycleDayDetail(
     val (phaseLabel, sub) = describeDay(day, logs, cycleDays, today)
     val (chipBg, chipFg) = phaseChipColors(phaseLabel)
     val date = LocalDate.ofEpochDay(day)
-    val dateText = date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)) + " " +
-        date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
+    val dateText = date.format(LocaleWrap.dateFormatter(R.string.date_pattern_md)) + " " +
+        date.dayOfWeek.getDisplayName(TextStyle.FULL, LocaleWrap.locale())
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -2182,7 +2211,7 @@ private fun CycleDayDetail(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (day == today) "今天 · " + dateText else dateText,
+                        if (day == today) stringResource(R.string.cycle_today_prefix, dateText) else dateText,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -2208,14 +2237,14 @@ private fun CycleDayDetail(
             Spacer(Modifier.height(10.dp))
 
             Text(
-                "当日记录",
+                stringResource(R.string.cycle_day_records),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Spacer(Modifier.height(4.dp))
             if (dayNotes.isEmpty()) {
                 Text(
-                    "暂无记录",
+                    stringResource(R.string.cycle_no_record),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                 )
@@ -2227,19 +2256,19 @@ private fun CycleDayDetail(
             // 层级约定：实心 = 会动数据的执行动作；空心 = 次级/破坏性动作
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
-                    Text("添加记录", maxLines = 1)
+                    Text(stringResource(R.string.cycle_add_record), maxLines = 1)
                 }
                 OutlinedButton(
                     onClick = onDelete,
                     enabled = dayNotes.isNotEmpty(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("删除记录", maxLines = 1)
+                    Text(stringResource(R.string.cycle_delete_record), maxLines = 1)
                 }
             }
             // 始终显示：点「今天」也会展开详情，此时同样需要一条收起的出口（原先只在非今天时显示，是个死路）
             TextButton(onClick = onCollapse, modifier = Modifier.align(Alignment.End)) {
-                Text("收起")
+                Text(stringResource(R.string.common_collapse))
             }
         }
     }
@@ -2295,7 +2324,7 @@ private fun AddNoteDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加记录 · " + formatDate(day)) },
+        title = { Text(stringResource(R.string.cycle_add_note_title, formatDate(day))) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -2306,9 +2335,9 @@ private fun AddNoteDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     NoteCatalog.selectable.forEach { c ->
-                        NoteChip(c.label, selected = category == c) { switchTo(c) }
+                        NoteChip(stringResource(c.labelRes), selected = category == c) { switchTo(c) }
                     }
-                    NoteChip("自定义", selected = isCustom) { switchTo(NoteCatalog.Category.CUSTOM) }
+                    NoteChip(stringResource(R.string.cycle_chip_custom), selected = isCustom) { switchTo(NoteCatalog.Category.CUSTOM) }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
@@ -2317,14 +2346,14 @@ private fun AddNoteDialog(
                     OutlinedTextField(
                         value = customText,
                         onValueChange = { customText = it.take(NoteCatalog.MAX_LABEL_LENGTH) },
-                        label = { Text("记录内容") },
-                        placeholder = { Text("例如：泡脚、喝红糖水") },
+                        label = { Text(stringResource(R.string.cycle_label_content)) },
+                        placeholder = { Text(stringResource(R.string.cycle_placeholder_example)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
                     Text(
-                        "选择要记录的项目（可多选）",
+                        stringResource(R.string.cycle_select_items),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -2333,7 +2362,7 @@ private fun AddNoteDialog(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         NoteCatalog.presets[category].orEmpty().forEach { p ->
-                            NoteChip(p.label, selected = p.key in selectedKeys) {
+                            NoteChip(stringResource(p.labelRes), selected = p.key in selectedKeys) {
                                 selectedKeys = if (p.key in selectedKeys) {
                                     selectedKeys - p.key
                                 } else {
@@ -2353,8 +2382,8 @@ private fun AddNoteDialog(
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it.take(NoteCatalog.MAX_NOTE_LENGTH) },
-                    label = { Text("补充说明（可选）") },
-                    placeholder = { Text("例如：量少、第一天") },
+                    label = { Text(stringResource(R.string.cycle_label_extra_note)) },
+                    placeholder = { Text(stringResource(R.string.cycle_placeholder_extra)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -2385,7 +2414,7 @@ private fun AddNoteDialog(
                                     dateEpochDay = day,
                                     category = category.key,
                                     presetKey = it.key,
-                                    label = it.label,
+                                    label = Tr.s(it.labelRes),
                                     note = extra,
                                     createdAt = now
                                 )
@@ -2393,9 +2422,9 @@ private fun AddNoteDialog(
                     }
                     onConfirm(items)
                 }
-            ) { Text("添加") }
+            ) { Text(stringResource(R.string.common_add)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }
 
@@ -2416,14 +2445,14 @@ private fun DeleteNotesDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("删除记录 · " + formatDate(day)) },
+        title = { Text(stringResource(R.string.cycle_delete_notes_title, formatDate(day))) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    "勾选要删除的记录，删除后不可恢复。",
+                    stringResource(R.string.cycle_delete_notes_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -2445,7 +2474,7 @@ private fun DeleteNotesDialog(
                             }
                         )
                         Column(Modifier.weight(1f)) {
-                            Text(n.label, style = MaterialTheme.typography.bodyMedium)
+                            Text(NoteCatalog.displayLabel(n.presetKey, n.label), style = MaterialTheme.typography.bodyMedium)
                             val meta = listOfNotNull(NoteCatalog.labelOf(n.category), n.note)
                                 .joinToString(" · ")
                             if (meta.isNotEmpty()) {
@@ -2467,8 +2496,8 @@ private fun DeleteNotesDialog(
                     contentColor = MaterialTheme.colorScheme.error
                 ),
                 onClick = { onConfirm(checkedIds.toList()) }
-            ) { Text("删除选中（" + checkedIds.size + "）") }
+            ) { Text(stringResource(R.string.cycle_delete_selected_n, checkedIds.size)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }

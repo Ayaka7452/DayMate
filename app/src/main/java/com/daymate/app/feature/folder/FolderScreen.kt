@@ -58,6 +58,8 @@ import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import com.ayaka7452.daymate.feature.home.EventRow
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
@@ -171,7 +173,7 @@ fun FolderScreen(
         if (!manualSort) {
             Toast.makeText(
                 context,
-                "请先在设置中切换为手动排序",
+                Tr.s(R.string.folder_sort_hint),
                 Toast.LENGTH_SHORT
             ).show()
             return
@@ -201,35 +203,35 @@ fun FolderScreen(
         topBar = {
             if (selectionMode) {
                 TopAppBar(
-                    title = { Text("已选 $totalSelected 项") },
+                    title = { Text(Tr.s(R.string.folder_selected_n, totalSelected)) },
                     navigationIcon = {
                         IconButton(onClick = { exitSelection() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "完成")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Tr.s(R.string.common_done))
                         }
                     },
                     actions = {
                         TextButton(onClick = {
                             events.forEach { if (it.id !in selectedEventIds) selectedEventIds.add(it.id) }
-                        }) { Text("全选") }
+                        }) { Text(Tr.s(R.string.common_select_all)) }
                         if (selectedEventIds.isNotEmpty()) {
-                            TextButton(onClick = { showMoveDialog = true }) { Text("移入文件夹") }
+                            TextButton(onClick = { showMoveDialog = true }) { Text(Tr.s(R.string.folder_move_in)) }
                         }
                         TextButton(
                             onClick = { if (vaultSet) vaultConfirmBatch = true else vaultNeedSetup = true },
                             enabled = selectedEventIds.isNotEmpty()
-                        ) { Text("移入 Vault") }
+                        ) { Text(Tr.s(R.string.folder_move_vault)) }
                         TextButton(
                             onClick = { showDeleteConfirm = true },
                             enabled = totalSelected > 0
-                        ) { Text("移入回收站") }
+                        ) { Text(Tr.s(R.string.folder_move_bin)) }
                     }
                 )
             } else {
                 TopAppBar(
-                    title = { Text(folder?.name ?: "文件夹") },
+                    title = { Text(folder?.name ?: Tr.s(R.string.common_folder)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Tr.s(R.string.common_back))
                         }
                     },
                     actions = {
@@ -237,27 +239,27 @@ fun FolderScreen(
                             searchActive = !searchActive
                             if (!searchActive) searchQuery = ""
                         }) {
-                            Icon(Icons.Default.Search, contentDescription = "搜索")
+                            Icon(Icons.Default.Search, contentDescription = Tr.s(R.string.common_search))
                         }
                         var menuExpanded by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "菜单")
+                                Icon(Icons.Default.MoreVert, contentDescription = Tr.s(R.string.folder_menu))
                             }
                             DropdownMenu(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("批量管理") },
+                                    text = { Text(Tr.s(R.string.folder_batch)) },
                                     onClick = { menuExpanded = false; enterSelection() }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("重命名") },
+                                    text = { Text(Tr.s(R.string.common_rename)) },
                                     onClick = { menuExpanded = false; showFolderDialog = true }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("移入回收站") },
+                                    text = { Text(Tr.s(R.string.folder_move_bin)) },
                                     onClick = {
                                         menuExpanded = false
                                         showFolderDeleteConfirm = true
@@ -272,7 +274,7 @@ fun FolderScreen(
         floatingActionButton = {
             if (!selectionMode) {
                 FloatingActionButton(onClick = { onNavigate("event_form?folderId=$folderId") }) {
-                    Icon(Icons.Default.Add, contentDescription = "新建事件")
+                    Icon(Icons.Default.Add, contentDescription = Tr.s(R.string.folder_new_event))
                 }
             }
         }
@@ -282,7 +284,7 @@ fun FolderScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("搜索标题或备注") },
+                    placeholder = { Text(Tr.s(R.string.folder_search_hint)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -299,7 +301,7 @@ fun FolderScreen(
                     Text("📂", style = MaterialTheme.typography.displayMedium)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "此文件夹为空",
+                        Tr.s(R.string.folder_empty),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -312,7 +314,7 @@ fun FolderScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "未找到相关事件",
+                        Tr.s(R.string.folder_not_found),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
@@ -389,8 +391,8 @@ fun FolderScreen(
         FolderDialog(
             initialName = folder?.name ?: "",
             initialIcon = folder?.icon ?: "📁",
-            title = "编辑文件夹",
-            confirmLabel = "保存",
+            title = Tr.s(R.string.folder_edit_title),
+            confirmLabel = Tr.s(R.string.common_save),
             onDismiss = {
                 showFolderDialog = false
                 pendingMoveAfterCreate = false
@@ -435,7 +437,7 @@ fun FolderScreen(
 
     if (singleMoveEventId != null) {
         PickFolderDialog(
-            title = "移动到",
+            title = Tr.s(R.string.common_move_to),
             folders = allFolders
                 .filter { it.id != folderId }
                 .map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
@@ -456,8 +458,8 @@ fun FolderScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("移入回收站？") },
-            text = { Text("将把选中的 $totalSelected 项移入回收站。可在「回收站」中恢复或彻底删除。") },
+            title = { Text(Tr.s(R.string.folder_move_bin_title)) },
+            text = { Text(Tr.s(R.string.folder_move_bin_desc, totalSelected)) },
             confirmButton = {
                 TextButton(onClick = {
                     val ids = selectedEventIds.toList()
@@ -470,10 +472,10 @@ fun FolderScreen(
                         showDeleteConfirm = false
                         exitSelection()
                     }
-                }) { Text("移入回收站") }
+                }) { Text(Tr.s(R.string.folder_move_bin)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(Tr.s(R.string.common_cancel)) }
             }
         )
     }
@@ -481,9 +483,9 @@ fun FolderScreen(
     if (showFolderDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showFolderDeleteConfirm = false },
-            title = { Text("移入回收站？") },
+            title = { Text(Tr.s(R.string.folder_move_bin_title)) },
             text = {
-                Text("文件夹「${folder?.name ?: ""}」中的事件将移回主空间，仅文件夹本身进入回收站。")
+                Text(Tr.s(R.string.folder_delete_desc, folder?.name ?: ""))
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -498,10 +500,10 @@ fun FolderScreen(
                     }
                     showFolderDeleteConfirm = false
                     onBack()
-                }) { Text("移入回收站") }
+                }) { Text(Tr.s(R.string.folder_move_bin)) }
             },
             dismissButton = {
-                TextButton(onClick = { showFolderDeleteConfirm = false }) { Text("取消") }
+                TextButton(onClick = { showFolderDeleteConfirm = false }) { Text(Tr.s(R.string.common_cancel)) }
             }
         )
     }
@@ -509,13 +511,13 @@ fun FolderScreen(
     if (vaultNeedSetup) {
         AlertDialog(
             onDismissRequest = { vaultNeedSetup = false },
-            title = { Text("Vault 尚未设置") },
-            text = { Text("需先进入 Vault 设置密码，之后才能移入内容。") },
+            title = { Text(Tr.s(R.string.folder_vault_not_setup)) },
+            text = { Text(Tr.s(R.string.folder_vault_not_setup_desc)) },
             confirmButton = {
-                TextButton(onClick = { vaultNeedSetup = false; onNavigate(Routes.VAULT) }) { Text("去设置") }
+                TextButton(onClick = { vaultNeedSetup = false; onNavigate(Routes.VAULT) }) { Text(Tr.s(R.string.folder_go_setup)) }
             },
             dismissButton = {
-                TextButton(onClick = { vaultNeedSetup = false }) { Text("取消") }
+                TextButton(onClick = { vaultNeedSetup = false }) { Text(Tr.s(R.string.common_cancel)) }
             }
         )
     }
@@ -523,8 +525,8 @@ fun FolderScreen(
     if (vaultConfirmBatch) {
         AlertDialog(
             onDismissRequest = { vaultConfirmBatch = false },
-            title = { Text("移入 Vault？") },
-            text = { Text("将把选中的 ${selectedEventIds.size} 个事件移入 Vault。") },
+            title = { Text(Tr.s(R.string.folder_vault_confirm_title)) },
+            text = { Text(Tr.s(R.string.folder_vault_confirm_desc, selectedEventIds.size)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -532,10 +534,10 @@ fun FolderScreen(
                     }
                     vaultConfirmBatch = false
                     exitSelection()
-                }) { Text("移入") }
+                }) { Text(Tr.s(R.string.folder_move_in_short)) }
             },
             dismissButton = {
-                TextButton(onClick = { vaultConfirmBatch = false }) { Text("取消") }
+                TextButton(onClick = { vaultConfirmBatch = false }) { Text(Tr.s(R.string.common_cancel)) }
             }
         )
     }

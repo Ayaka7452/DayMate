@@ -21,6 +21,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 /**
@@ -35,7 +38,7 @@ fun FolderDialog(
     initialName: String = "",
     initialIcon: String = "📁",
     title: String,
-    confirmLabel: String = "保存",
+    confirmLabel: String = Tr.s(R.string.common_save),
     onDismiss: () -> Unit,
     onSave: (name: String, icon: String) -> Unit,
     onDelete: (() -> Unit)? = null
@@ -54,9 +57,9 @@ fun FolderDialog(
         dismissButton = {
             Row {
                 if (onDelete != null) {
-                    TextButton(onClick = onDelete) { Text("删除") }
+                    TextButton(onClick = onDelete) { Text(stringResource(R.string.common_delete)) }
                 }
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
             }
         },
         title = { Text(title) },
@@ -65,12 +68,12 @@ fun FolderDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("名称") },
+                    label = { Text(stringResource(R.string.dlg_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(12.dp))
-                Text("图标", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.dlg_icon), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(8.dp))
                 EmojiPicker(
                     selected = icon,
@@ -93,7 +96,7 @@ fun FolderDialog(
 fun PickFolderDialog(
     folders: List<Pair<Long, String>>,
     showRoot: Boolean = true,
-    title: String = "移动到",
+    title: String = Tr.s(R.string.common_move_to),
     onDismiss: () -> Unit,
     onPick: (folderId: Long?) -> Unit,
     onCreateNew: (() -> Unit)? = null
@@ -112,7 +115,7 @@ fun PickFolderDialog(
                                 .clickable { onPick(null) }
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
-                        ) { Text("📂  根目录（移出文件夹）") }
+                        ) { Text(stringResource(R.string.dlg_root_folder)) }
                     }
                 }
                 items(folders) { (id, label) ->
@@ -126,7 +129,7 @@ fun PickFolderDialog(
                 }
                 if (onCreateNew != null) {
                     item {
-                        TextButton(onClick = onCreateNew) { Text("+ 新建文件夹并移入") }
+                        TextButton(onClick = onCreateNew) { Text(stringResource(R.string.dlg_new_folder_and_move)) }
                     }
                 }
             }

@@ -13,6 +13,7 @@ import com.ayaka7452.daymate.MainActivity
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.data.db.EventEntity
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -204,24 +205,24 @@ object WidgetRenderer {
 
         // 数字与单位：跟随事件的显示单位（月/年不足 1 时自动退回更小单位）
         var number = abs(diff).toString()
-        var unit = "天"
+        var unit = Tr.s(R.string.unit_days)
         if (!isFuture || diff > 0) {
             val period = if (isFuture) Period.between(today, LocalDate.ofEpochDay(picked.targetDateEpochDay))
             else Period.between(LocalDate.ofEpochDay(picked.targetDateEpochDay), today)
             val totalMonths = period.years * 12L + period.months
             when (picked.displayUnit) {
                 "MONTH" -> if (totalMonths > 0) {
-                    number = totalMonths.toString(); unit = "个月"
+                    number = totalMonths.toString(); unit = Tr.s(R.string.unit_months)
                 }
                 "YEAR" -> when {
-                    period.years > 0 -> { number = period.years.toString(); unit = "年" }
-                    totalMonths > 0 -> { number = totalMonths.toString(); unit = "个月" }
+                    period.years > 0 -> { number = period.years.toString(); unit = Tr.s(R.string.unit_years) }
+                    totalMonths > 0 -> { number = totalMonths.toString(); unit = Tr.s(R.string.unit_months) }
                 }
             }
         }
         return WidgetModel(
             title = picked.title,
-            subtitle = "$dateStr · ${if (isFuture) "还有" else "已过"}",
+            subtitle = "$dateStr · ${if (isFuture) Tr.s(R.string.widget_remaining) else Tr.s(R.string.widget_passed)}",
             number = number,
             unit = unit
         )
@@ -276,7 +277,10 @@ object WidgetRenderer {
             return
         }
         views.setViewVisibility(R.id.widget_festival_badge, android.view.View.VISIBLE)
-        views.setTextViewText(R.id.widget_festival_badge, if (festival.isOffDay) "休" else "班")
+        views.setTextViewText(
+            R.id.widget_festival_badge,
+            if (festival.isOffDay) Tr.s(R.string.festival_badge_off) else Tr.s(R.string.festival_badge_work)
+        )
         views.setInt(
             R.id.widget_festival_badge, "setBackgroundResource",
             if (festival.isOffDay) R.drawable.widget_badge_off else R.drawable.widget_badge_work
@@ -315,7 +319,7 @@ object WidgetRenderer {
 
         if (model == null) {
             views.setTextViewText(R.id.widget_title, "DayMate")
-            views.setTextViewText(R.id.widget_subtitle, "暂无倒数日")
+            views.setTextViewText(R.id.widget_subtitle, Tr.s(R.string.widget_no_events))
             views.setTextViewText(R.id.widget_days_number, "")
             views.setTextViewText(R.id.widget_days_unit, "")
         } else {

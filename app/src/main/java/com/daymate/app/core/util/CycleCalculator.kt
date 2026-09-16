@@ -1,5 +1,7 @@
 package com.ayaka7452.daymate.core.util
 
+import com.ayaka7452.daymate.R
+
 /**
  * 周期管家：经期/排卵期/黄体期推算。
  *
@@ -201,10 +203,10 @@ object CycleCalculator {
         return listOf(period, follicular, ovulation, luteal)
     }
 
-    enum class Phase(val label: String) {
-        PERIOD("月经期"),
-        FOLLICULAR("卵泡期"),
-        OVULATION("排卵期"),
-        LUTEAL("黄体期")
+    enum class Phase(val labelRes: Int) {
+        PERIOD(R.string.cycle_phase_period),
+        FOLLICULAR(R.string.cycle_phase_follicular),
+        OVULATION(R.string.cycle_phase_ovulation),
+        LUTEAL(R.string.cycle_phase_luteal)
     }
 }

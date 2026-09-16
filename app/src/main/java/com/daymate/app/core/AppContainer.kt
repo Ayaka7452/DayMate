@@ -19,6 +19,10 @@ class AppContainer(context: Context) {
     private val mainDb = DayMateDatabase.build(appContext)
 
     val settingsRepository = SettingsRepository(appContext.settingsDataStore)
+
+    /** 界面语言（SharedPreferences 存储，供 attachBaseContext 同步读取）。 */
+    val localeStore = com.ayaka7452.daymate.core.i18n.LocaleStore(appContext)
+
     val autoBackup = AutoBackupManager(appContext, mainDb, settingsRepository)
 
     /** 数据库诊断与维护（设置 → 数据维护）：体检、无损修复、回收碎片并同步各备份点。 */

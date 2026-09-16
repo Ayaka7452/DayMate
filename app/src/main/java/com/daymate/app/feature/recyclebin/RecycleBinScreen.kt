@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.feature.common.matchesQuery
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.launch
 
 private data class BinTarget(val id: Long, val type: String) // type: "event" | "folder"
@@ -78,10 +80,10 @@ fun RecycleBinScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("回收站") },
+                title = { Text(Tr.s(R.string.bin_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Tr.s(R.string.common_back))
                     }
                 },
                 actions = {
@@ -90,9 +92,9 @@ fun RecycleBinScreen(
                             searchActive = !searchActive
                             if (!searchActive) searchQuery = ""
                         }) {
-                            Icon(Icons.Default.Search, contentDescription = "搜索")
+                            Icon(Icons.Default.Search, contentDescription = Tr.s(R.string.common_search))
                         }
-                        TextButton(onClick = { clearConfirm = true }) { Text("清空回收站") }
+                        TextButton(onClick = { clearConfirm = true }) { Text(Tr.s(R.string.bin_clear)) }
                     }
                 }
             )
@@ -110,7 +112,7 @@ fun RecycleBinScreen(
                 Text("🗑️", style = MaterialTheme.typography.displayMedium)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "回收站为空",
+                    Tr.s(R.string.bin_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -125,7 +127,7 @@ fun RecycleBinScreen(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("搜索标题、备注或文件夹名") },
+                        placeholder = { Text(Tr.s(R.string.bin_search_hint)) },
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -142,7 +144,7 @@ fun RecycleBinScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "未找到相关内容",
+                            Tr.s(R.string.bin_not_found),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -154,7 +156,7 @@ fun RecycleBinScreen(
                         items(shownFolders, key = { "f${it.id}" }) { folder ->
                             BinRow(
                                 title = "${folder.icon ?: "📁"}  ${folder.name}",
-                                subtitle = "文件夹",
+                                subtitle = Tr.s(R.string.common_folder),
                                 onRestore = {
                                     scope.launch {
                                         container.eventRepository.restoreByFolders(listOf(folder.id))
@@ -185,8 +187,8 @@ fun RecycleBinScreen(
     if (clearConfirm) {
         AlertDialog(
             onDismissRequest = { clearConfirm = false },
-            title = { Text("清空回收站？") },
-            text = { Text("将永久删除全部 ${binEvents.size + binFolders.size} 项。此操作不可恢复。") },
+            title = { Text(Tr.s(R.string.bin_clear_confirm_title)) },
+            text = { Text(Tr.s(R.string.bin_clear_confirm_desc, binEvents.size + binFolders.size)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -197,19 +199,19 @@ fun RecycleBinScreen(
                         }
                     }
                     clearConfirm = false
-                }) { Text("清空") }
+                }) { Text(Tr.s(R.string.common_clear)) }
             },
-            dismissButton = { TextButton(onClick = { clearConfirm = false }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { clearConfirm = false }) { Text(Tr.s(R.string.common_cancel)) } }
         )
     }
 
     if (confirmTarget != null) {
         val target = confirmTarget!!
-        val name = if (target.type == "folder") "文件夹" else "事件"
+        val name = if (target.type == "folder") Tr.s(R.string.common_folder) else Tr.s(R.string.common_event)
         AlertDialog(
             onDismissRequest = { confirmTarget = null },
-            title = { Text("彻底删除？") },
-            text = { Text("将永久删除该$name。此操作不可恢复。") },
+            title = { Text(Tr.s(R.string.bin_purge_title)) },
+            text = { Text(Tr.s(R.string.bin_purge_desc, name)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -221,9 +223,9 @@ fun RecycleBinScreen(
                         }
                     }
                     confirmTarget = null
-                }) { Text("彻底删除") }
+                }) { Text(Tr.s(R.string.bin_purge)) }
             },
-            dismissButton = { TextButton(onClick = { confirmTarget = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { confirmTarget = null }) { Text(Tr.s(R.string.common_cancel)) } }
         )
     }
 }
@@ -252,7 +254,7 @@ private fun BinRow(
                 )
             }
         }
-        TextButton(onClick = onRestore) { Text("恢复") }
-        TextButton(onClick = onDelete) { Text("彻底删除") }
+        TextButton(onClick = onRestore) { Text(Tr.s(R.string.common_restore)) }
+        TextButton(onClick = onDelete) { Text(Tr.s(R.string.bin_purge)) }
     }
 }

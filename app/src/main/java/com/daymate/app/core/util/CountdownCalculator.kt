@@ -1,5 +1,7 @@
 package com.ayaka7452.daymate.core.util
 
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
 import java.time.Period
 
@@ -69,20 +71,20 @@ object CountdownCalculator {
         val hasRef = refDays != null && refDays > 0
         return when (unit) {
             UNIT_MONTH -> when {
-                isFuture -> if (totalMonths > 0) "还有 $totalMonths 个月" else dayText(diffDays, null, true)
-                hasRef && totalMonths > 0 -> "已过 $totalMonths/$refDays 个月"
-                totalMonths > 0 -> "已过 $totalMonths 个月"
+                isFuture -> if (totalMonths > 0) Tr.s(R.string.unit_months_future, totalMonths) else dayText(diffDays, null, true)
+                hasRef && totalMonths > 0 -> Tr.s(R.string.unit_months_past_ref, totalMonths, refDays)
+                totalMonths > 0 -> Tr.s(R.string.unit_months_past, totalMonths)
                 else -> dayText(diffDays, null, false)
             }
             UNIT_YEAR -> when {
                 isFuture -> when {
-                    period.years > 0 -> "还有 ${period.years} 年"
-                    totalMonths > 0 -> "还有 $totalMonths 个月"
+                    period.years > 0 -> Tr.s(R.string.unit_years_future, period.years)
+                    totalMonths > 0 -> Tr.s(R.string.unit_months_future, totalMonths)
                     else -> dayText(diffDays, null, true)
                 }
-                hasRef && period.years > 0 -> "已过 ${period.years}/$refDays 年"
-                period.years > 0 -> "已过 ${period.years} 年"
-                totalMonths > 0 -> "已过 $totalMonths 个月"
+                hasRef && period.years > 0 -> Tr.s(R.string.unit_years_past_ref, period.years, refDays)
+                period.years > 0 -> Tr.s(R.string.unit_years_past, period.years)
+                totalMonths > 0 -> Tr.s(R.string.unit_months_past, totalMonths)
                 else -> dayText(diffDays, null, false)
             }
             else -> dayText(diffDays, refDays, isFuture)
@@ -90,8 +92,8 @@ object CountdownCalculator {
     }
 
     private fun dayText(diffDays: Long, refDays: Int?, isFuture: Boolean): String = when {
-        isFuture -> "还有 $diffDays 天"
-        refDays != null && refDays > 0 -> "已过 ${-diffDays}/$refDays 天"
-        else -> "已过 ${-diffDays} 天"
+        isFuture -> Tr.s(R.string.unit_days_future, diffDays)
+        refDays != null && refDays > 0 -> Tr.s(R.string.unit_days_past_ref, -diffDays, refDays)
+        else -> Tr.s(R.string.unit_days_past, -diffDays)
     }
 }

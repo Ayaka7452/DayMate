@@ -78,6 +78,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -99,6 +100,8 @@ import com.ayaka7452.daymate.feature.common.noteHitOnly
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import com.ayaka7452.daymate.feature.home.SelectionDot
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
@@ -273,7 +276,7 @@ fun HomeScreen(
     fun requireManualThen(action: () -> Unit) {
         if (manualSort) action() else Toast.makeText(
             context,
-            "请先在设置中切换为手动排序",
+            context.getString(R.string.home_manual_sort_toast),
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -327,12 +330,12 @@ fun HomeScreen(
         topBar = {
             if (selectionMode) {
                 TopAppBar(
-                    title = { Text("已选 $totalSelected 项") },
+                    title = { Text(stringResource(R.string.home_selected_n, totalSelected)) },
                     navigationIcon = {
                         IconButton(onClick = { exitSelection() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "完成"
+                                contentDescription = stringResource(R.string.common_done)
                             )
                         }
                     },
@@ -340,18 +343,18 @@ fun HomeScreen(
                         TextButton(onClick = {
                             events.forEach { if (it.id !in selectedEventIds) selectedEventIds.add(it.id) }
                             folders.forEach { if (it.id !in selectedFolderIds) selectedFolderIds.add(it.id) }
-                        }) { Text("全选") }
+                        }) { Text(stringResource(R.string.common_select_all)) }
                         if (selectedEventIds.isNotEmpty()) {
-                            TextButton(onClick = { showMoveDialog = true }) { Text("移入文件夹") }
+                            TextButton(onClick = { showMoveDialog = true }) { Text(stringResource(R.string.home_move_into_folder)) }
                         }
                         TextButton(
                             onClick = { if (vaultSet) vaultConfirmBatch = true else vaultNeedSetup = true },
                             enabled = totalSelected > 0
-                        ) { Text("移入 Vault") }
+                        ) { Text(stringResource(R.string.home_move_to_vault)) }
                         TextButton(
                             onClick = { showDeleteConfirm = true },
                             enabled = totalSelected > 0
-                        ) { Text("移入回收站") }
+                        ) { Text(stringResource(R.string.home_move_to_trash)) }
                     }
                 )
             } else if (searchActive) {
@@ -360,7 +363,7 @@ fun HomeScreen(
                         TextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("搜索事件标题或备注") },
+                            placeholder = { Text(stringResource(R.string.home_search_placeholder)) },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -377,13 +380,13 @@ fun HomeScreen(
                         IconButton(onClick = { closeSearch() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "退出搜索"
+                                contentDescription = stringResource(R.string.home_exit_search)
                             )
                         }
                     },
                     actions = {
                         if (searchQuery.isNotBlank()) {
-                            TextButton(onClick = { searchQuery = "" }) { Text("清空") }
+                            TextButton(onClick = { searchQuery = "" }) { Text(stringResource(R.string.common_clear)) }
                         }
                     }
                 )
@@ -392,7 +395,7 @@ fun HomeScreen(
                     title = { Text("DayMate", fontFamily = FontFamily.Cursive) },
                     actions = {
                         IconButton(onClick = { searchActive = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "搜索")
+                            Icon(Icons.Default.Search, contentDescription = stringResource(R.string.common_search))
                         }
                         // 云备份指示器：仅在 WebDAV 已配置且备份位置含云端时出现，点击查看详情/手动备份
                         if (cloudEnabled) {
@@ -403,46 +406,46 @@ fun HomeScreen(
                         var menuExpanded by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "菜单")
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.home_menu))
                             }
                             DropdownMenu(
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("批量管理") },
+                                    text = { Text(stringResource(R.string.home_batch_manage)) },
                                     onClick = { menuExpanded = false; enterSelection() }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("周期管家") },
+                                    text = { Text(stringResource(R.string.home_cycle_tracker)) },
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.CYCLE)
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Vault") },
+                                    text = { Text(stringResource(R.string.home_vault)) },
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.VAULT)
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("设置") },
+                                    text = { Text(stringResource(R.string.common_settings)) },
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.SETTINGS)
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("关于") },
+                                    text = { Text(stringResource(R.string.home_about)) },
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.ABOUT)
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("回收站") },
+                                    text = { Text(stringResource(R.string.home_trash)) },
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.RECYCLE_BIN)
@@ -484,7 +487,7 @@ fun HomeScreen(
                             containerColor = MaterialTheme.colorScheme.surface,
                             contentColor = MaterialTheme.colorScheme.primary
                         ) {
-                            Icon(Icons.Filled.Nightlight, contentDescription = "周期管家")
+                            Icon(Icons.Filled.Nightlight, contentDescription = stringResource(R.string.home_cycle_tracker))
                         }
                     }
                     // 加号：单击直接新建事件，长按展开（再长按收起）周期管家入口。
@@ -493,7 +496,7 @@ fun HomeScreen(
                     // 万一遮挡失效，FAB 的 onClick 是空实现，最坏只是「点了没反应」，不会误触发别的动作。
                     Box {
                         FloatingActionButton(onClick = {}) {
-                            Icon(Icons.Default.Add, contentDescription = "新建")
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.common_new))
                         }
                         Box(
                             modifier = Modifier
@@ -526,7 +529,7 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "未找到相关事件",
+                            stringResource(R.string.home_no_results),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -640,7 +643,7 @@ fun HomeScreen(
                         if (show != null) {
                             item(key = "event_card") {
                                 val dateStr = java.time.LocalDate.ofEpochDay(show.targetDateEpochDay)
-                                    .format(java.time.format.DateTimeFormatter.ofPattern("M月d日"))
+                                    .format(java.time.format.DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md)))
                                 com.ayaka7452.daymate.feature.common.EventCountdownCard(
                                     title = show.title,
                                     dateStr = dateStr,
@@ -777,8 +780,8 @@ fun HomeScreen(
         FolderDialog(
             initialName = folderDialogTarget?.name ?: "",
             initialIcon = folderDialogTarget?.icon ?: "📁",
-            title = if (folderDialogTarget == null) "新建文件夹" else "编辑文件夹",
-            confirmLabel = if (folderDialogTarget == null) "创建" else "保存",
+            title = if (folderDialogTarget == null) stringResource(R.string.home_new_folder) else stringResource(R.string.home_edit_folder),
+            confirmLabel = if (folderDialogTarget == null) stringResource(R.string.common_create) else stringResource(R.string.common_save),
             onDismiss = {
                 showFolderDialog = false
                 pendingMoveAfterCreate = false
@@ -839,7 +842,7 @@ fun HomeScreen(
 
     if (singleMoveEventId != null) {
         PickFolderDialog(
-            title = "移动到",
+            title = stringResource(R.string.common_move_to),
             folders = folders.map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
             // 主页的事件都在根目录，这里只提供文件夹目标
             showRoot = false,
@@ -858,14 +861,14 @@ fun HomeScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("移入回收站？") },
+            title = { Text(stringResource(R.string.home_move_to_trash_title)) },
             text = {
                 Column {
-                    Text("将把 $totalSelected 项移入回收站。可在「回收站」中恢复或彻底删除，清空后不可恢复。")
+                    Text(stringResource(R.string.home_delete_confirm_desc, totalSelected))
                     if (selectedFolderIds.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "被删除文件夹中的事件将移回主空间，仅文件夹本身进入回收站。",
+                            stringResource(R.string.home_folder_delete_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -887,10 +890,10 @@ fun HomeScreen(
                         showDeleteConfirm = false
                         exitSelection()
                     }
-                }) { Text("移入回收站") }
+                }) { Text(stringResource(R.string.home_move_to_trash)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -898,9 +901,9 @@ fun HomeScreen(
     if (showFolderDeleteConfirm && folderToDelete != null) {
         AlertDialog(
             onDismissRequest = { showFolderDeleteConfirm = false; folderToDelete = null },
-            title = { Text("移入回收站？") },
+            title = { Text(stringResource(R.string.home_move_to_trash_title)) },
             text = {
-                Text("文件夹「${folderToDelete!!.name}」中的事件将移回主空间，仅文件夹本身进入回收站。")
+                Text(stringResource(R.string.home_folder_delete_confirm_desc, folderToDelete!!.name))
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -914,13 +917,13 @@ fun HomeScreen(
                     }
                     showFolderDeleteConfirm = false
                     folderToDelete = null
-                }) { Text("移入回收站") }
+                }) { Text(stringResource(R.string.home_move_to_trash)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     showFolderDeleteConfirm = false
                     folderToDelete = null
-                }) { Text("取消") }
+                }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -928,13 +931,13 @@ fun HomeScreen(
     if (vaultNeedSetup) {
         AlertDialog(
             onDismissRequest = { vaultNeedSetup = false },
-            title = { Text("Vault 尚未设置") },
-            text = { Text("需先进入 Vault 设置密码，之后才能移入内容。") },
+            title = { Text(stringResource(R.string.home_vault_not_setup)) },
+            text = { Text(stringResource(R.string.home_vault_setup_hint)) },
             confirmButton = {
-                TextButton(onClick = { vaultNeedSetup = false; onNavigate(Routes.VAULT) }) { Text("去设置") }
+                TextButton(onClick = { vaultNeedSetup = false; onNavigate(Routes.VAULT) }) { Text(stringResource(R.string.home_go_settings)) }
             },
             dismissButton = {
-                TextButton(onClick = { vaultNeedSetup = false }) { Text("取消") }
+                TextButton(onClick = { vaultNeedSetup = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -942,16 +945,16 @@ fun HomeScreen(
     if (vaultConfirmEventId != null) {
         AlertDialog(
             onDismissRequest = { vaultConfirmEventId = null },
-            title = { Text("移入 Vault？") },
-            text = { Text("该事件将移入 Vault，之后需输入密码才能查看。") },
+            title = { Text(stringResource(R.string.home_move_to_vault_title)) },
+            text = { Text(stringResource(R.string.home_move_to_vault_desc)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { vaultConfirmEventId?.let { container.vaultBridge.moveEventToVault(it) } }
                     vaultConfirmEventId = null
-                }) { Text("移入") }
+                }) { Text(stringResource(R.string.home_move_in)) }
             },
             dismissButton = {
-                TextButton(onClick = { vaultConfirmEventId = null }) { Text("取消") }
+                TextButton(onClick = { vaultConfirmEventId = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -959,8 +962,8 @@ fun HomeScreen(
     if (vaultConfirmBatch) {
         AlertDialog(
             onDismissRequest = { vaultConfirmBatch = false },
-            title = { Text("移入 Vault？") },
-            text = { Text("将把选中的 ${selectedEventIds.size} 个事件移入 Vault。文件夹暂不支持移入 Vault。") },
+            title = { Text(stringResource(R.string.home_move_to_vault_title)) },
+            text = { Text(stringResource(R.string.home_batch_vault_desc, selectedEventIds.size)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -968,10 +971,10 @@ fun HomeScreen(
                     }
                     vaultConfirmBatch = false
                     exitSelection()
-                }) { Text("移入") }
+                }) { Text(stringResource(R.string.home_move_in)) }
             },
             dismissButton = {
-                TextButton(onClick = { vaultConfirmBatch = false }) { Text("取消") }
+                TextButton(onClick = { vaultConfirmBatch = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -1040,7 +1043,7 @@ fun EventRow(
         }
         if (noteHit) {
             Text(
-                text = "命中备注",
+                text = stringResource(R.string.home_note_hit),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1077,7 +1080,7 @@ fun EventRow(
         if (!selectionMode && onMoveToVault != null) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                 }
                 DropdownMenu(
                     expanded = menuExpanded,
@@ -1088,7 +1091,7 @@ fun EventRow(
                     }
                     if (onMoveToFolder != null) {
                         DropdownMenuItem(
-                            text = { Text("移动到文件夹…") },
+                            text = { Text(stringResource(R.string.home_move_to_folder_ellipsis)) },
                             onClick = {
                                 menuExpanded = false
                                 onMoveToFolder.invoke()
@@ -1096,14 +1099,14 @@ fun EventRow(
                         )
                     }
                     DropdownMenuItem(
-                        text = { Text("移入 Vault") },
+                        text = { Text(stringResource(R.string.home_move_to_vault)) },
                         onClick = {
                             menuExpanded = false
                             onMoveToVault?.invoke()
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("移入回收站") },
+                        text = { Text(stringResource(R.string.home_move_to_trash)) },
                         onClick = {
                             menuExpanded = false
                             onMoveToRecycleBin?.invoke()
@@ -1163,7 +1166,7 @@ fun FolderRow(
         if (!selectionMode) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                 }
                 DropdownMenu(
                     expanded = menuExpanded,
@@ -1173,7 +1176,7 @@ fun FolderRow(
                         ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     DropdownMenuItem(
-                        text = { Text("移入回收站") },
+                        text = { Text(stringResource(R.string.home_move_to_trash)) },
                         onClick = {
                             menuExpanded = false
                             onMoveToRecycleBin?.invoke()
@@ -1234,17 +1237,17 @@ fun AddSheet(
                 .padding(bottom = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("新建", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.common_new), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 SheetAction(
                     emoji = "📅",
-                    label = "事件",
+                    label = stringResource(R.string.common_event),
                     onClick = onCreateEvent
                 )
                 SheetAction(
                     emoji = "📁",
-                    label = "文件夹",
+                    label = stringResource(R.string.common_folder),
                     onClick = onCreateFolder
                 )
             }
@@ -1278,7 +1281,7 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         Text("📝", style = MaterialTheme.typography.displayMedium)
         Spacer(Modifier.height(12.dp))
         Text(
-            "轻点 + 创建第一个倒数日",
+            stringResource(R.string.home_empty_hint),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
@@ -1308,7 +1311,7 @@ private fun CloudBackupIndicator(state: CloudBackupState, modifier: Modifier = M
             )
             Icon(
                 imageVector = Icons.Default.Sync,
-                contentDescription = "云备份中",
+                contentDescription = stringResource(R.string.home_cloud_backing_up),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .size(20.dp)
@@ -1317,7 +1320,7 @@ private fun CloudBackupIndicator(state: CloudBackupState, modifier: Modifier = M
         } else {
             Icon(
                 imageVector = Icons.Default.Cloud,
-                contentDescription = "云备份",
+                contentDescription = stringResource(R.string.home_cloud_backup),
                 tint = neutral,
                 modifier = Modifier.size(22.dp)
             )
@@ -1364,22 +1367,22 @@ private fun CloudBackupSheet(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp)
         ) {
-            Text("云备份", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.home_cloud_backup), style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(4.dp))
             Text(
-                "数据修改后自动上传到 WebDAV，覆盖云端上一份备份。",
+                stringResource(R.string.home_cloud_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Spacer(Modifier.height(16.dp))
 
             val (statusText, statusColor) = when (state) {
-                is CloudBackupState.Idle -> "已就绪" to MaterialTheme.colorScheme.onSurface
-                is CloudBackupState.Syncing -> "正在备份…" to MaterialTheme.colorScheme.primary
+                is CloudBackupState.Idle -> stringResource(R.string.home_cloud_idle) to MaterialTheme.colorScheme.onSurface
+                is CloudBackupState.Syncing -> stringResource(R.string.home_cloud_syncing) to MaterialTheme.colorScheme.primary
                 is CloudBackupState.Success ->
-                    "备份成功 · ${fmt.format(Date(state.at))}" to Color(0xFF1D9E75)
+                    stringResource(R.string.home_cloud_success, fmt.format(Date(state.at))) to Color(0xFF1D9E75)
                 is CloudBackupState.Failure ->
-                    "备份失败 · ${fmt.format(Date(state.at))}" to MaterialTheme.colorScheme.error
+                    stringResource(R.string.home_cloud_failure, fmt.format(Date(state.at))) to MaterialTheme.colorScheme.error
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CloudBackupIndicator(state = state)
@@ -1402,7 +1405,7 @@ private fun CloudBackupSheet(
                 enabled = state !is CloudBackupState.Syncing,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("立即备份")
+                Text(stringResource(R.string.home_backup_now))
             }
         }
     }

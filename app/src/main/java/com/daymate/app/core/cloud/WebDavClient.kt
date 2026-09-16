@@ -1,6 +1,8 @@
 package com.ayaka7452.daymate.core.cloud
 
 import android.util.Xml
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -100,7 +102,7 @@ class WebDavClient(private val config: WebDavConfig) {
             bodyFactory = { PROPFIND_BODY.toRequestBody(XML_TYPE.toMediaType()) }
         ) { it.code }
         if (code != 207 && code != 200) {
-            throw WebDavException(code, "服务器未按 WebDAV 协议响应（$code），请确认地址与路径")
+            throw WebDavException(code, Tr.s(R.string.webdav_e_protocol, code))
         }
     }
 
@@ -175,7 +177,7 @@ class WebDavClient(private val config: WebDavConfig) {
         tmp.delete()
         try {
             perform(method = "GET", url = fullUrl(path, isCollection = false)) { resp ->
-                val body = resp.body ?: throw WebDavException(0, "服务器未返回内容")
+                val body = resp.body ?: throw WebDavException(0, Tr.s(R.string.webdav_e_empty))
                 body.byteStream().use { input ->
                     tmp.outputStream().use { output -> input.copyTo(output) }
                 }
@@ -245,25 +247,25 @@ class WebDavClient(private val config: WebDavConfig) {
         // 此处显式放行以免误判。
         if (resp.isSuccessful || resp.code == 207) return
         val msg = when (resp.code) {
-            401 -> "认证失败：用户名或密码不正确"
-            403 -> "没有权限访问该路径（403）"
-            404 -> "远程路径不存在（404）"
-            405 -> "服务器不允许该操作（405）"
-            409 -> "远程父目录不存在（409）"
-            423 -> "远程资源被锁定（423）"
-            507 -> "云端空间不足（507）"
-            else -> "服务器返回 ${resp.code} ${resp.message}"
+            401 -> Tr.s(R.string.webdav_e_401)
+            403 -> Tr.s(R.string.webdav_e_403)
+            404 -> Tr.s(R.string.webdav_e_404)
+            405 -> Tr.s(R.string.webdav_e_405)
+            409 -> Tr.s(R.string.webdav_e_409)
+            423 -> Tr.s(R.string.webdav_e_423)
+            507 -> Tr.s(R.string.webdav_e_507)
+            else -> Tr.s(R.string.webdav_e_http, resp.code, resp.message)
         }
         throw WebDavException(resp.code, msg)
     }
 
     private fun describeNetworkError(e: Throwable): String = when (e) {
         is SSLHandshakeException ->
-            "TLS 握手失败：服务器证书不受信任。自建服务器可开启「允许自签名证书」。"
-        is UnknownHostException -> "无法解析服务器地址，请检查域名是否正确"
-        is ConnectException -> "无法连接服务器，请检查地址与端口"
-        is SocketTimeoutException -> "连接超时，请检查网络或服务器状态"
-        else -> "网络错误：${e.message ?: e.javaClass.simpleName}"
+            Tr.s(R.string.webdav_e_tls)
+        is UnknownHostException -> Tr.s(R.string.webdav_e_unknown_host)
+        is ConnectException -> Tr.s(R.string.webdav_e_connect)
+        is SocketTimeoutException -> Tr.s(R.string.webdav_e_timeout)
+        else -> Tr.s(R.string.webdav_e_network, e.message ?: e.javaClass.simpleName)
     }
 
     /** 拼接完整 URL。目录请求保留尾随 `/`（部分服务器据此区分集合），文件请求不带。 */

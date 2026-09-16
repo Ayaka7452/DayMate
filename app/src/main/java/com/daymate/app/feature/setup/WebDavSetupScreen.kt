@@ -53,6 +53,8 @@ import com.ayaka7452.daymate.core.cloud.WebDavEntry
 import com.ayaka7452.daymate.core.cloud.WebDavException
 import com.ayaka7452.daymate.core.cloud.WebDavStore
 import com.ayaka7452.daymate.data.repo.SettingsRepository
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -118,9 +120,9 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 withContext(Dispatchers.IO) { block() }
                 onDone()
             } catch (e: WebDavException) {
-                report("$label 失败：${e.message}", error = true)
+                report(Tr.s(R.string.webdav_failed, label, e.message.orEmpty()), error = true)
             } catch (e: Throwable) {
-                report("$label 失败：${e.message ?: e.javaClass.simpleName}", error = true)
+                report(Tr.s(R.string.webdav_failed, label, e.message ?: e.javaClass.simpleName), error = true)
             } finally {
                 busy = false
             }
@@ -128,9 +130,9 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
     }
 
     fun loadEntries(path: String) {
-        runRemote("读取目录", { entries = CloudBackup.list(configFor(path), path) }) {
+        runRemote(Tr.s(R.string.webdav_read_dir), { entries = CloudBackup.list(configFor(path), path) }) {
             browsePath = path
-            report("已读取远程目录：/${path}")
+            report(Tr.s(R.string.webdav_read_done, path))
         }
     }
 
@@ -146,46 +148,41 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 repo.setBackupTarget(SettingsRepository.BACKUP_TARGET_BOTH)
                 val localReady = StorageConfig.isBackupConfigured(ctx)
                 report(
-                    prefix + "，并已启用云端自动备份（同时在本地及云端备份）。" +
-                        if (localReady) "数据修改后会自动上传。"
-                        else "未选择本地备份文件夹，仅上传云端。需要本地副本可返回上一页选择。"
+                    if (localReady) Tr.s(R.string.webdav_saved_both_upload, prefix)
+                    else Tr.s(R.string.webdav_saved_cloud_only, prefix)
                 )
             } else {
-                report(prefix + "，云端自动备份已启用。")
+                report(Tr.s(R.string.webdav_saved_cloud_on, prefix))
             }
         }
     }
 
     fun save() {
         if (url.isBlank()) {
-            report("请先填写服务器地址", error = true)
+            report(Tr.s(R.string.webdav_need_url), error = true)
             return
         }
         val saved = WebDavStore.save(ctx, configFor(directory), directoryPicked)
         if (!saved) {
-            report("保存失败：系统密钥库不可用，密码未能安全存储", error = true)
+            report(Tr.s(R.string.webdav_save_failed_keystore), error = true)
             return
         }
         // 没选定远程目录时配置不算完整，云端备份不会启用——必须说清楚，
         // 否则用户看到「已保存」会以为大功告成，实际主页永远不出现云图标。
         if (!directoryPicked) {
-            report(
-                "已保存地址与凭据，但尚未选定远程目录，云端备份不会启用。" +
-                    "请使用下方「浏览并选择远程目录」选定存放位置，可选根目录。",
-                error = true
-            )
+            report(Tr.s(R.string.webdav_saved_no_dir), error = true)
             return
         }
-        afterSaved("已保存 WebDAV 配置")
+        afterSaved(Tr.s(R.string.webdav_saved_title))
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (browsing) "选择远程目录" else "WebDAV 云端备份") },
+                title = { Text(if (browsing) Tr.s(R.string.webdav_pick_dir) else Tr.s(R.string.webdav_title)) },
                 navigationIcon = {
                     IconButton(onClick = { if (browsing) browsing = false else onBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Tr.s(R.string.common_back))
                     }
                 }
             )
@@ -211,9 +208,9 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                             WebDavStore.save(ctx, configFor(browsePath), directoryPicked = true)
                         browsing = false
                         if (saved) {
-                            afterSaved("已选择远程目录：/${browsePath}")
+                            afterSaved(Tr.s(R.string.webdav_dir_selected_prefix, browsePath))
                         } else {
-                            report("目录已选择，但密码未能安全存储（系统密钥库不可用）", error = true)
+                            report(Tr.s(R.string.webdav_dir_selected_no_keystore), error = true)
                         }
                     },
                     onNewFolder = {
@@ -223,8 +220,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 )
             } else {
                 Text(
-                    "将备份同时上传到 WebDAV 服务器（坚果云、Nextcloud、群晖、Alist 等）。" +
-                        "填写 WebDAV 根地址，应用会在其下创建并写入 daymate.db。",
+                    Tr.s(R.string.webdav_intro),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(16.dp))
@@ -232,7 +228,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("服务器地址") },
+                    label = { Text(Tr.s(R.string.webdav_server_url)) },
                     placeholder = { Text("https://dav.jianguoyun.com/dav/") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -241,7 +237,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("用户名") },
+                    label = { Text(Tr.s(R.string.webdav_username)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -249,7 +245,7 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("密码 / 应用密码") },
+                    label = { Text(Tr.s(R.string.webdav_password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
@@ -262,9 +258,9 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("允许自签名证书", style = MaterialTheme.typography.bodyLarge)
+                        Text(Tr.s(R.string.webdav_allow_self_signed), style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "仅自建 NAS 使用自签名 https 证书时开启",
+                            Tr.s(R.string.webdav_allow_self_signed_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -276,29 +272,29 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = {
-                            runRemote("测试连接", { CloudBackup.testConnection(configFor(directory)) }) {
-                                report("连接成功，凭据可用。需点「保存」后生效。")
+                            runRemote(Tr.s(R.string.webdav_test_conn), { CloudBackup.testConnection(configFor(directory)) }) {
+                                report(Tr.s(R.string.webdav_test_ok))
                             }
                         },
                         modifier = Modifier.weight(1f),
                         enabled = !busy
-                    ) { Text("测试连接") }
+                    ) { Text(Tr.s(R.string.webdav_test_conn)) }
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = { save() },
                         modifier = Modifier.weight(1f),
                         enabled = !busy
-                    ) { Text("保存") }
+                    ) { Text(Tr.s(R.string.common_save)) }
                 }
 
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = {
                         // 先验证再浏览：目录浏览本身也要用同一套凭据
-                        runRemote("读取目录", { entries = CloudBackup.list(configFor(""), "") }) {
+                        runRemote(Tr.s(R.string.webdav_read_dir), { entries = CloudBackup.list(configFor(""), "") }) {
                             browsePath = ""
                             browsing = true
-                            report("已读取远程目录：/")
+                            report(Tr.s(R.string.webdav_read_root))
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -306,22 +302,29 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                 ) {
                     Icon(Icons.Filled.FolderOpen, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("浏览并选择远程目录")
+                    Text(Tr.s(R.string.webdav_browse))
                 }
 
                 Spacer(Modifier.height(16.dp))
                 Text(
                     if (directoryPicked)
-                        "当前远程目录：${if (directory.isBlank()) "（根目录）" else "/$directory"}"
+                        Tr.s(
+                            R.string.webdav_current_dir,
+                            if (directory.isBlank()) Tr.s(R.string.webdav_root_dir) else "/$directory"
+                        )
                     else
-                        "尚未选定远程目录，云端备份不会启用。请使用上方「浏览并选择远程目录」。",
+                        Tr.s(R.string.webdav_no_dir_yet),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (directoryPicked) MaterialTheme.colorScheme.outline
                     else MaterialTheme.colorScheme.error
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "备份文件：${if (directory.isBlank()) "/" else "/$directory/"}${WebDavStore.REMOTE_DB}",
+                    Tr.s(
+                        R.string.webdav_backup_file,
+                        if (directory.isBlank()) "/" else "/$directory/",
+                        WebDavStore.REMOTE_DB
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -338,19 +341,19 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
             }
             if (busy) {
                 Spacer(Modifier.height(8.dp))
-                Text("处理中…", style = MaterialTheme.typography.bodySmall)
+                Text(Tr.s(R.string.webdav_processing), style = MaterialTheme.typography.bodySmall)
             }
         }
 
         if (showNewFolderDialog) {
             AlertDialog(
                 onDismissRequest = { showNewFolderDialog = false },
-                title = { Text("新建远程文件夹") },
+                title = { Text(Tr.s(R.string.webdav_new_folder)) },
                 text = {
                     OutlinedTextField(
                         value = newFolderName,
                         onValueChange = { newFolderName = it },
-                        label = { Text("文件夹名") },
+                        label = { Text(Tr.s(R.string.webdav_folder_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -361,13 +364,13 @@ fun WebDavSetupScreen(onBack: () -> Unit) {
                         showNewFolderDialog = false
                         if (name.isEmpty()) return@TextButton
                         val target = if (browsePath.isBlank()) name else "$browsePath/$name"
-                        runRemote("新建文件夹", { CloudBackup.ensureDirectory(configFor(browsePath), target) }) {
+                        runRemote(Tr.s(R.string.webdav_create_folder), { CloudBackup.ensureDirectory(configFor(browsePath), target) }) {
                             loadEntries(browsePath)
                         }
-                    }) { Text("创建") }
+                    }) { Text(Tr.s(R.string.common_create)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showNewFolderDialog = false }) { Text("取消") }
+                    TextButton(onClick = { showNewFolderDialog = false }) { Text(Tr.s(R.string.common_cancel)) }
                 }
             )
         }
@@ -385,12 +388,12 @@ private fun BrowseSection(
     onNewFolder: () -> Unit
 ) {
     Text(
-        "当前路径：/${path}",
+        Tr.s(R.string.webdav_current_path, path),
         style = MaterialTheme.typography.bodyLarge
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        "选中后，备份将写入该目录下的 ${WebDavStore.REMOTE_DB}。",
+        Tr.s(R.string.webdav_select_hint, WebDavStore.REMOTE_DB),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline
     )
@@ -400,7 +403,7 @@ private fun BrowseSection(
         onClick = { onSelectCurrent() },
         modifier = Modifier.fillMaxWidth(),
         enabled = !busy
-    ) { Text("选择当前目录") }
+    ) { Text(Tr.s(R.string.webdav_select_current)) }
 
     Spacer(Modifier.height(8.dp))
     OutlinedButton(
@@ -410,7 +413,7 @@ private fun BrowseSection(
     ) {
         Icon(Icons.Filled.CreateNewFolder, contentDescription = null)
         Spacer(Modifier.width(8.dp))
-        Text("在此新建文件夹")
+        Text(Tr.s(R.string.webdav_new_folder_here))
     }
 
     if (path.isNotBlank()) {
@@ -419,7 +422,7 @@ private fun BrowseSection(
             onClick = { onEnter(path.substringBeforeLast('/', "")) },
             modifier = Modifier.fillMaxWidth(),
             enabled = !busy
-        ) { Text("返回上一级") }
+        ) { Text(Tr.s(R.string.webdav_go_up)) }
     }
 
     Spacer(Modifier.height(8.dp))
@@ -431,7 +434,7 @@ private fun BrowseSection(
     if (dirs.isEmpty() && files.isEmpty()) {
         Spacer(Modifier.height(12.dp))
         Text(
-            "该目录为空。",
+            Tr.s(R.string.webdav_dir_empty),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline
         )

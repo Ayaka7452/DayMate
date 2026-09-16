@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -164,7 +166,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val cycleEventEnabled: Flow<Boolean> = dataStore.data.map { it[CYCLE_EVENT_ENABLED] ?: false }
     /** 主页右下角、新建按钮上方的常驻入口按钮（默认关，需在周期管家设置里开启）。 */
     val cycleEntryEnabled: Flow<Boolean> = dataStore.data.map { it[CYCLE_ENTRY_ENABLED] ?: false }
-    val cycleEventTitle: Flow<String> = dataStore.data.map { it[CYCLE_EVENT_TITLE] ?: "周期管家" }
+    val cycleEventTitle: Flow<String> = dataStore.data.map { it[CYCLE_EVENT_TITLE] ?: Tr.s(R.string.cycle_default_event_title) }
     val cycleEventId: Flow<Long> = dataStore.data.map { it[CYCLE_EVENT_ID] ?: -1L }
     val cycleDefaultCalendar: Flow<Boolean> = dataStore.data.map { it[CYCLE_DEFAULT_CALENDAR] ?: false }
     val cycleCycleAuto: Flow<Boolean> = dataStore.data.map { it[CYCLE_CYCLE_AUTO] ?: true }

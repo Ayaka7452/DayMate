@@ -6,6 +6,7 @@ import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import com.ayaka7452.daymate.DayMateApp
 import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.time.LocalDate
@@ -49,7 +50,8 @@ class CountdownWidgetListService : RemoteViewsService() {
                     rows.add(
                         Row(
                             title = e.title,
-                            daysText = if (diff >= 0) "还有 $diff 天" else "已过 ${-diff} 天",
+                            daysText = if (diff >= 0) Tr.s(R.string.unit_days_future, diff)
+                            else Tr.s(R.string.unit_days_past, -diff),
                             isPast = diff < 0,
                             eventId = e.id
                         )

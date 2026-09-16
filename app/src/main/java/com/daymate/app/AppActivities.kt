@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 import com.ayaka7452.daymate.core.AppContainer
+import com.ayaka7452.daymate.core.i18n.LocaleWrap
 import com.ayaka7452.daymate.core.ui.theme.DayMateTheme
 import com.ayaka7452.daymate.feature.about.AboutScreen
 import com.ayaka7452.daymate.feature.create.EventDetailScreen
@@ -37,6 +38,14 @@ import com.ayaka7452.daymate.feature.vault.VaultScreen
 abstract class ComposeActivity : FragmentActivity() {
     val container: AppContainer
         get() = (application as DayMateApp).container
+
+    /**
+     * 应用内语言：全部页面 Activity 都继承本类，在这里统一把「设置里的语言」包进 base context，
+     * 于是 stringResource / getString 自动读到目标语言资源。切换语言后由设置页重启任务栈生效。
+     */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleWrap.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

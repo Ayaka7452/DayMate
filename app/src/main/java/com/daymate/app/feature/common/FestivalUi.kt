@@ -22,8 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.data.festival.FestivalDay
+import com.ayaka7452.daymate.R
+import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -40,7 +43,7 @@ fun FestivalBadge(isOffDay: Boolean, modifier: Modifier = Modifier) {
         modifier = modifier
     ) {
         Text(
-            if (isOffDay) "休" else "班",
+            if (isOffDay) Tr.s(R.string.festival_badge_off) else Tr.s(R.string.festival_badge_work),
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
         )
@@ -63,7 +66,7 @@ fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("今天", style = MaterialTheme.typography.labelLarge)
+            Text(Tr.s(R.string.common_today), style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.width(8.dp))
             Text(
                 day.name,
@@ -105,16 +108,16 @@ fun FestivalCountdownCard(
                 Icon(Icons.Filled.CloudDownload, contentDescription = null)
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("节假日数据未下载", style = MaterialTheme.typography.bodyLarge)
+                    Text(Tr.s(R.string.festival_ui_no_data), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "前往「设置 → 节假日数据」下载",
+                        Tr.s(R.string.festival_ui_go_download),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
             festival == null -> Text(
-                "已缓存的法定节假日已全部结束，可在设置中更新",
+                Tr.s(R.string.festival_ui_all_finished),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
             )
@@ -124,17 +127,17 @@ fun FestivalCountdownCard(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "下一个节日",
+                        Tr.s(R.string.festival_ui_next),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.outline
                     )
-                    val dateStr = festival.date.format(DateTimeFormatter.ofPattern("M月d日"))
+                    val dateStr = festival.date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md)))
                     Text(
                         "${festival.name} · $dateStr",
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        "创建倒数事件",
+                        Tr.s(R.string.festival_ui_create_event),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -148,7 +151,7 @@ fun FestivalCountdownCard(
                         modifier = Modifier.alignByBaseline()
                     )
                     Text(
-                        "天",
+                        Tr.s(R.string.unit_days),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.alignByBaseline()
@@ -191,7 +194,7 @@ fun EventCountdownCard(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (past) "最近的倒数日（已过期）" else "最近的倒数日",
+                    if (past) Tr.s(R.string.festival_ui_recent_expired) else Tr.s(R.string.festival_ui_recent),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -202,7 +205,7 @@ fun EventCountdownCard(
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Text(
-                    "查看事件",
+                    Tr.s(R.string.festival_ui_view_event),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -216,7 +219,7 @@ fun EventCountdownCard(
                     modifier = Modifier.alignByBaseline()
                 )
                 Text(
-                    "天",
+                    stringResource(R.string.unit_days),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.alignByBaseline()

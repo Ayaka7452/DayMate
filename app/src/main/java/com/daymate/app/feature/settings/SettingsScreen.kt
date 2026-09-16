@@ -53,9 +53,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.StorageConfig
+import com.ayaka7452.daymate.core.i18n.AppLanguage
+import com.ayaka7452.daymate.core.i18n.LocaleWrap
+import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.data.festival.FestivalRegion
 import com.ayaka7452.daymate.data.festival.FestivalRepository
 import com.ayaka7452.daymate.feature.common.EmojiCatalog
 import com.ayaka7452.daymate.feature.common.EmojiPicker
@@ -107,6 +113,17 @@ fun SettingsScreen(
     var autoUpdateCurrent by remember { mutableStateOf(festivalRepo.autoUpdateCurrent()) }
     var showBadgeEmojiDialog by remember { mutableStateOf(false) }
 
+    // ===== 界面语言 =====
+    // 存储在 SharedPreferences（不是 DataStore）：attachBaseContext 是同步调用，
+    // 必须在任何 IO 之前就知道该用哪个 Locale，否则首帧会先按旧语言渲染再重建、肉眼可见闪烁。
+    val appLanguage by container.localeStore.language
+        .collectAsState(initial = container.localeStore.current())
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    /** 待确认的节日源切换：语言与数据源区域不符时先问一句，两个入口（切语言 / 点提示）共用。 */
+    var pendingRegionSwitch by remember { mutableStateOf<FestivalRegion?>(null) }
+    /** 上面那次切换是否由「换语言」引发——决定弹窗说「同时切换」还是「切换」。 */
+    var pendingFromLanguage by remember { mutableStateOf(false) }
+
     // 数据备份：选择文件夹仅作 SAF 导出/导入目标，不需要任何存储权限（全屏覆盖）
     var showSetup by remember { mutableStateOf(false) }
     // 备份子页是同 Activity 内的状态切换：返回手势先回设置主页，而不是退出设置
@@ -115,44 +132,89 @@ fun SettingsScreen(
     Crossfade(targetState = showSetup, label = "settings_backup") { setup ->
         if (setup) {
             StorageSetupBody(
-                title = "数据备份",
+                title = stringResource(R.string.settings_data_backup),
                 showBack = true,
                 onBack = { showSetup = false }
             )
         } else {
 
     val themeOptions = listOf(
-        "system" to "跟随系统",
-        "light" to "始终浅色",
-        "dark" to "始终深色"
+        "system" to stringResource(R.string.settings_theme_system),
+        "light" to stringResource(R.string.settings_theme_light),
+        "dark" to stringResource(R.string.settings_theme_dark)
     )
     val sortOptions = listOf(
-        "remaining_asc" to "剩余天数升序",
-        "remaining_desc" to "剩余天数降序",
-        "manual" to "手动排序"
+        "remaining_asc" to stringResource(R.string.settings_sort_remaining_asc),
+        "remaining_desc" to stringResource(R.string.settings_sort_remaining_desc),
+        "manual" to stringResource(R.string.settings_sort_manual)
     )
     val homeCardOptions = listOf(
-        "festival" to "下一个节假日（默认）",
-        "event" to "最近的倒数日",
-        "off" to "关闭"
+        "festival" to stringResource(R.string.settings_home_card_festival),
+        "event" to stringResource(R.string.settings_home_card_event),
+        "off" to stringResource(R.string.common_close)
     )
     // 配色选项：value / 短标签（横排显示）/ 色板色（system 特殊渲染为四色圆）
     val colorOptions: List<Triple<String, String, Color>> = listOf(
-        Triple("white", "默认", Color(0xFF00668C)),
-        Triple("system", "自动", Color.Transparent),
-        Triple("blue", "蓝", Color(0xFF1565C0)),
-        Triple("green", "绿", Color(0xFF2E7D32)),
-        Triple("orange", "橙", Color(0xFFE65100)),
-        Triple("purple", "紫", Color(0xFF6A1B9A))
+        Triple("white", stringResource(R.string.settings_color_default), Color(0xFF00668C)),
+        Triple("system", stringResource(R.string.settings_color_auto), Color.Transparent),
+        Triple("blue", stringResource(R.string.settings_color_blue), Color(0xFF1565C0)),
+        Triple("green", stringResource(R.string.settings_color_green), Color(0xFF2E7D32)),
+        Triple("orange", stringResource(R.string.settings_color_orange), Color(0xFFE65100)),
+        Triple("purple", stringResource(R.string.settings_color_purple), Color(0xFF6A1B9A))
     )
+
+    /**
+     * 目标语言建议的节日源区域。
+     *
+     * 「自动检测」必须用**未包装的 Application context** 取系统语言：Activity 的 base 已被
+     * attachBaseContext 按旧设置包过，从它读只会读回旧语言。显式选的语言则直接走
+     * [LocaleWrap.resolveLocale] 拿 Locale.code —— 不能拿 `AppLanguage.tag` 去比，
+     * `"zh-Hans"` 这类带子标签的串在 [FestivalRegion.forLanguage] 里匹配不到 `"zh"`，
+     * 会一路落到 else 分支误判成美国。
+     */
+    fun regionForLanguage(lang: AppLanguage): FestivalRegion {
+        val locale = if (lang == AppLanguage.AUTO) {
+            LocaleWrap.effective(ctx.applicationContext)
+        } else {
+            LocaleWrap.resolveLocale(lang, java.util.Locale.getDefault())
+        }
+        return FestivalRegion.forLanguage(locale.language)
+    }
+
+    /** 语言是 per-Activity 的（attachBaseContext 只在创建时跑），必须重建整个任务栈才全局生效。 */
+    fun restartForLanguage() {
+        val intent = android.content.Intent(ctx, com.ayaka7452.daymate.MainActivity::class.java).apply {
+            addFlags(
+                android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            )
+        }
+        ctx.startActivity(intent)
+        (ctx as? android.app.Activity)?.finish()
+    }
+
+    fun chooseLanguage(lang: AppLanguage) {
+        container.localeStore.set(lang)
+        val target = regionForLanguage(lang)
+        val current = festivalRepo.regionOfCurrentSource()
+        // 只在「当前用的是内置区域源」且与目标区域不符时询问。
+        // 用户手填的 URL 是他自己选的，不擅自替换。
+        if (current != null && current != target) {
+            showLanguageDialog = false
+            pendingFromLanguage = true
+            pendingRegionSwitch = target
+        } else {
+            restartForLanguage()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置") },
+                title = { Text(stringResource(R.string.common_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -165,7 +227,42 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            Text("主题", style = MaterialTheme.typography.titleMedium)
+            // ===== 语言（放最前：切换后会重建整个任务栈，是最「重」的一项设置） =====
+            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.settings_lang_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showLanguageDialog = true }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Language, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    // 每种语言用它自己的写法（中文/粵語/日本語/한국어）：用户即使看不懂当前界面语言，
+                    // 也一定能认出母语那一项——与各系统设置的通行做法一致。
+                    if (appLanguage == AppLanguage.AUTO) stringResource(R.string.settings_lang_auto)
+                    else appLanguage.nativeName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Default.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline
+                )
+            }
+
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
+            Text(stringResource(R.string.settings_theme_section), style = MaterialTheme.typography.titleMedium)
             themeOptions.forEach { (value, label) ->
                 Row(
                     modifier = Modifier
@@ -189,7 +286,7 @@ fun SettingsScreen(
 
             // ===== 配色（横排色板，选中带圈） =====
             Text(
-                "配色",
+                stringResource(R.string.settings_color_section),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 8.dp)
@@ -226,7 +323,7 @@ fun SettingsScreen(
             HorizontalDivider()
 
             Text(
-                "默认排序",
+                stringResource(R.string.settings_default_sort_section),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
@@ -256,12 +353,12 @@ fun SettingsScreen(
 
             // ===== 主页顶部卡片 =====
             Text(
-                "主页顶部卡片",
+                stringResource(R.string.settings_home_top_card_section),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "主页列表顶部卡片显示的内容。",
+                stringResource(R.string.settings_home_top_card_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)
@@ -288,8 +385,8 @@ fun SettingsScreen(
             }
             TextButton(onClick = {
                 scope.launch { container.settingsRepository.setHomeTopCard("festival") }
-                Toast.makeText(ctx, "已恢复默认设置", Toast.LENGTH_SHORT).show()
-            }) { Text("恢复默认") }
+                Toast.makeText(ctx, ctx.getString(R.string.settings_restored_default), Toast.LENGTH_SHORT).show()
+            }) { Text(stringResource(R.string.settings_restore_default)) }
 
             // 节日卡片右侧角标 emoji（卡片只显示放假节日，不需要「休/班」标记）
             Row(
@@ -300,9 +397,9 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("节日卡片角标", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_badge_emoji), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "卡片右侧显示的表情符号",
+                        stringResource(R.string.settings_badge_emoji_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -315,12 +412,12 @@ fun SettingsScreen(
 
             // ===== 数据备份（主库在内部，所选文件夹仅作备份目标） =====
             Text(
-                "数据备份",
+                stringResource(R.string.settings_data_backup),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "主数据库保存在应用内部，无需存储权限。所选文件夹用于导出与恢复备份。",
+                stringResource(R.string.settings_backup_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
@@ -334,10 +431,10 @@ fun SettingsScreen(
             ) {
                 Icon(Icons.Filled.Folder, contentDescription = null)
                 Spacer(Modifier.width(12.dp))
-                Text("数据备份", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.settings_data_backup), style = MaterialTheme.typography.bodyLarge)
             }
             Text(
-                "备份位置：${StorageConfig.displayPath(StorageConfig.backupUri(ctx))}",
+                stringResource(R.string.settings_backup_location, StorageConfig.displayPath(StorageConfig.backupUri(ctx))),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(start = 8.dp, top = 2.dp)
@@ -352,9 +449,9 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("修改后自动备份", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_auto_backup_section), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (backupConfigured) "数据修改后自动备份到所选文件夹" else "需先选择备份文件夹",
+                        if (backupConfigured) stringResource(R.string.settings_auto_backup_desc_on) else stringResource(R.string.settings_auto_backup_desc_off),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -371,12 +468,12 @@ fun SettingsScreen(
 
             // ===== 隐私：截图限制 =====
             Text(
-                "隐私",
+                stringResource(R.string.settings_privacy_section),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "周期管家与保险箱默认禁止截屏与录屏，也不会出现在最近任务缩略图中。",
+                stringResource(R.string.settings_privacy_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)
@@ -389,10 +486,9 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("周期管家允许截图", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_cycle_screenshot_section), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (allowScreenshotCycle) "已允许截屏与录屏，密码验证页仍受限制"
-                        else "已阻止截屏、录屏与最近任务缩略图",
+                        if (allowScreenshotCycle) stringResource(R.string.settings_cycle_screenshot_on) else stringResource(R.string.settings_cycle_screenshot_off),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -412,10 +508,9 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("保险箱允许截图", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_vault_screenshot_section), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (allowScreenshotVault) "已允许截屏与录屏，解锁与设密页仍受限制"
-                        else "已阻止截屏、录屏与最近任务缩略图",
+                        if (allowScreenshotVault) stringResource(R.string.settings_vault_screenshot_on) else stringResource(R.string.settings_cycle_screenshot_off),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -433,12 +528,12 @@ fun SettingsScreen(
 
             // ===== 节假日数据（在线下载 + 本地缓存，无内置离线数据） =====
             Text(
-                "节假日数据",
+                stringResource(R.string.settings_festival_section),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                "由应用从所选数据源下载并缓存到本机。跟随节日与节日角标等功能需要该数据。",
+                stringResource(R.string.settings_festival_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)
@@ -453,13 +548,33 @@ fun SettingsScreen(
                 Icon(Icons.Filled.CloudDownload, contentDescription = null)
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("数据源", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_source_section), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "当前：$festivalSourceLabel",
+                        stringResource(R.string.settings_source_current, festivalSourceLabel),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
+            }
+            // 语言与当前数据源区域不符时给条小字（点它切换，仍要过确认）。
+            // 只在「当前用的确实是内置区域源」时才提示——用户手填的 URL 是他自己选的，
+            // 与 chooseLanguage 里「不擅自替换自定义源」保持同一口径，否则自定义源用户会被一直絮叨。
+            // 以 festivalSourceLabel 为 remember 的 key：换源时该 state 会变，提示随之重新判定。
+            val suggestedRegion = regionForLanguage(appLanguage)
+            val currentRegion = remember(festivalSourceLabel) { festivalRepo.regionOfCurrentSource() }
+            if (currentRegion != null && currentRegion != suggestedRegion) {
+                Text(
+                    stringResource(R.string.settings_source_suggest, Tr.s(suggestedRegion.labelRes)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            pendingFromLanguage = false
+                            pendingRegionSwitch = suggestedRegion
+                        }
+                        .padding(vertical = 6.dp)
+                )
             }
             Row(
                 modifier = Modifier
@@ -474,9 +589,9 @@ fun SettingsScreen(
                 Icon(Icons.Filled.DateRange, contentDescription = null)
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("缓存年份", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_cache_years_section), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "已选 ${FestivalRepository.yearsText(festivalYears)} · 随年份自动更新",
+                        stringResource(R.string.settings_years_selected, FestivalRepository.yearsText(festivalYears)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -508,11 +623,11 @@ fun SettingsScreen(
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(
-                        if (festivalDownloading) "正在下载…" else "下载数据",
+                        if (festivalDownloading) stringResource(R.string.settings_downloading) else stringResource(R.string.settings_download_data),
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
-                        "${FestivalRepository.yearsText(festivalYears)} · $festivalStatus",
+                        stringResource(R.string.settings_years_status, FestivalRepository.yearsText(festivalYears), festivalStatus),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -526,10 +641,9 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("自动更新当年数据", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_auto_update_section), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (autoUpdateCurrent) "启动时若当年数据缺失，会自动下载一次（每天最多一次）"
-                        else "关闭时仅在手动点击「下载数据」时联网",
+                        if (autoUpdateCurrent) stringResource(R.string.settings_auto_update_on) else stringResource(R.string.settings_auto_update_off),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -561,16 +675,99 @@ fun SettingsScreen(
             ) {
                 Icon(Icons.Default.Info, contentDescription = null)
                 Spacer(Modifier.width(12.dp))
-                Text("关于", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.bodyLarge)
             }
         }
+    }
+
+    // 语言选择弹窗
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(stringResource(R.string.settings_lang_dialog_title)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    AppLanguage.entries.forEach { lang ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { chooseLanguage(lang) }
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = appLanguage == lang,
+                                onClick = { chooseLanguage(lang) }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                if (lang == AppLanguage.AUTO) stringResource(R.string.settings_lang_auto)
+                                else lang.nativeName,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
+
+    // 节日源切换确认（切语言时自动问 / 点节日区小字时问，共用同一套文案）
+    val regionToSwitch = pendingRegionSwitch
+    if (regionToSwitch != null) {
+        val regionName = Tr.s(regionToSwitch.labelRes)
+        /**
+         * 关掉这个确认框。
+         *
+         * 语言在 [chooseLanguage] 里**已经写进存储**了，只是还没重建界面——所以只要这次
+         * 弹框是由换语言触发的，无论用户是确认还是取消，都必须重启任务栈把语言生效。
+         * 早先「点框外重启、点取消不重启」两种出口行为不一致，取消后界面会一直是旧语言，
+         * 直到下次冷启动才悄悄变过去。
+         */
+        fun closeRegionDialog() {
+            val needRestart = pendingFromLanguage
+            pendingRegionSwitch = null
+            pendingFromLanguage = false
+            if (needRestart) restartForLanguage()
+        }
+        AlertDialog(
+            onDismissRequest = { closeRegionDialog() },
+            title = {
+                Text(
+                    stringResource(
+                        if (pendingFromLanguage) R.string.settings_lang_festival_title
+                        else R.string.settings_source_switch_title
+                    )
+                )
+            },
+            text = { Text(stringResource(R.string.settings_source_switch_msg, regionName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    festivalRepo.setRegion(regionToSwitch)
+                    festivalSourceLabel = festivalRepo.sourceLabel()
+                    pendingRegionSwitch = null
+                    pendingFromLanguage = false
+                    restartForLanguage()
+                }) { Text(stringResource(R.string.common_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { closeRegionDialog() }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
     }
 
     // 节日卡片角标 emoji 选择弹窗（与文件夹图标共用统一选择器：常用集 + 「更多」全量）
     if (showBadgeEmojiDialog) {
         AlertDialog(
             onDismissRequest = { showBadgeEmojiDialog = false },
-            title = { Text("节日卡片角标") },
+            title = { Text(stringResource(R.string.settings_badge_emoji)) },
             text = {
                 EmojiPicker(
                     selected = homeBadgeEmoji,
@@ -584,7 +781,7 @@ fun SettingsScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showBadgeEmojiDialog = false }) { Text("关闭") }
+                TextButton(onClick = { showBadgeEmojiDialog = false }) { Text(stringResource(R.string.common_close)) }
             }
         )
     }
@@ -594,12 +791,12 @@ fun SettingsScreen(
         val currentUrl = festivalRepo.sourceUrl()
         AlertDialog(
             onDismissRequest = { showFestivalSourceDialog = false },
-            title = { Text("节假日数据源") },
+            title = { Text(stringResource(R.string.settings_source_dialog_title)) },
             text = {
                 Column {
                     WidgetEventOption(
-                        title = "holiday-cn（默认）",
-                        subtitle = "跟随国务院通知发布 · GitHub 开源数据",
+                        title = Tr.s(FestivalRegion.CN.labelRes),
+                        subtitle = stringResource(R.string.settings_source_holidaycn_subtitle),
                         selected = currentUrl == FestivalRepository.SOURCE_HOLIDAY_CN
                     ) {
                         festivalRepo.setSourceUrl(FestivalRepository.SOURCE_HOLIDAY_CN)
@@ -607,8 +804,8 @@ fun SettingsScreen(
                         showFestivalSourceDialog = false
                     }
                     WidgetEventOption(
-                        title = "自定义 URL…",
-                        subtitle = "按数据结构自动识别，兼容主流节假日数据源",
+                        title = stringResource(R.string.settings_custom_url),
+                        subtitle = stringResource(R.string.settings_source_custom_subtitle),
                         selected = currentUrl != FestivalRepository.SOURCE_HOLIDAY_CN
                     ) {
                         festivalCustomUrl = festivalRepo.sourceUrl()
@@ -618,7 +815,7 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showFestivalSourceDialog = false }) { Text("关闭") }
+                TextButton(onClick = { showFestivalSourceDialog = false }) { Text(stringResource(R.string.common_close)) }
             }
         )
     }
@@ -627,21 +824,20 @@ fun SettingsScreen(
     if (showFestivalCustomInput) {
         AlertDialog(
             onDismissRequest = { showFestivalCustomInput = false },
-            title = { Text("自定义数据源 URL") },
+            title = { Text(stringResource(R.string.settings_custom_source_url)) },
             text = {
                 Column {
                     OutlinedTextField(
                         value = festivalCustomUrl,
                         onValueChange = { festivalCustomUrl = it },
                         label = { Text("URL") },
-                        supportingText = { Text("含 {year} 占位符则按年下载；不含则下载整份文件后按年缓存") },
+                        supportingText = { Text(stringResource(R.string.settings_custom_url_hint)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "按结构自动识别，已兼容 holiday-cn、日期为键、节假日/工作日 Map、" +
-                            "data.list 数组等主流格式；节日名会统一成规范写法。",
+                        stringResource(R.string.settings_custom_url_formats),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -655,12 +851,12 @@ fun SettingsScreen(
                         festivalSourceLabel = festivalRepo.sourceLabel()
                         showFestivalCustomInput = false
                     } else {
-                        Toast.makeText(ctx, "请填写以 http 开头的地址", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, ctx.getString(R.string.settings_url_http_hint), Toast.LENGTH_SHORT).show()
                     }
-                }) { Text("确定") }
+                }) { Text(stringResource(R.string.common_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { showFestivalCustomInput = false }) { Text("取消") }
+                TextButton(onClick = { showFestivalCustomInput = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -672,13 +868,11 @@ fun SettingsScreen(
         val years = festivalRepo.selectableYears()
         AlertDialog(
             onDismissRequest = { showFestivalYearsDialog = false },
-            title = { Text("缓存年份") },
+            title = { Text(stringResource(R.string.settings_cache_years_section)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
-                        "勾选需要缓存的年份，选择会随年份自动更新。次年放假安排一般在当年 11 月前后公布，" +
-                            "未公布前下载会提示「尚未发布」，不会覆盖已有缓存。\n" +
-                            "未勾选明年时，年底的跨年节日（如元旦）会取不到日期。",
+                        stringResource(R.string.settings_years_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -703,11 +897,11 @@ fun SettingsScreen(
                         ) {
                             Checkbox(checked = checked, onCheckedChange = null, enabled = !required)
                             Spacer(Modifier.width(8.dp))
-                            Text("$y 年", style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(R.string.settings_year_n, y), style = MaterialTheme.typography.bodyLarge)
                             Spacer(Modifier.weight(1f))
                             Text(
-                                (if (y in cached) "已缓存" else "未缓存") +
-                                    (if (required) " · 必选" else ""),
+                                (if (y in cached) stringResource(R.string.settings_cached) else stringResource(R.string.settings_not_cached)) +
+                                    (if (required) stringResource(R.string.settings_required_tag) else ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
@@ -721,10 +915,10 @@ fun SettingsScreen(
                     festivalRepo.setSelectedOffsets(festivalOffsetDraft)
                     festivalYears = festivalRepo.selectedYears()
                     showFestivalYearsDialog = false
-                }) { Text("确定") }
+                }) { Text(stringResource(R.string.common_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { showFestivalYearsDialog = false }) { Text("取消") }
+                TextButton(onClick = { showFestivalYearsDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -834,10 +1028,10 @@ private fun DataMaintenanceSection(container: AppContainer) {
             Toast.makeText(
                 ctx,
                 if (r.ok) {
-                    if (r.snapshotCreated) "修复完成：已留快照 daymate.db.bak，并同步到备份"
-                    else "修复完成，已同步到备份"
+                    if (r.snapshotCreated) ctx.getString(R.string.settings_repair_done_snapshot)
+                    else ctx.getString(R.string.settings_repair_done)
                 } else {
-                    "修复失败：${r.failureReason.orEmpty()}"
+                    ctx.getString(R.string.settings_repair_failed, r.failureReason.orEmpty())
                 },
                 Toast.LENGTH_LONG
             ).show()
@@ -845,12 +1039,12 @@ private fun DataMaintenanceSection(container: AppContainer) {
     }
 
     Text(
-        "数据维护",
+        stringResource(R.string.settings_maintenance_section),
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(top = 16.dp)
     )
     Text(
-        "检查数据库完整性与冗余数据。仅报告，不修改现有内容。",
+        stringResource(R.string.settings_maintenance_desc),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
         modifier = Modifier.padding(top = 4.dp)
@@ -869,7 +1063,7 @@ private fun DataMaintenanceSection(container: AppContainer) {
                     if (rep.hasProblems) {
                         showIssues = true
                     } else {
-                        Toast.makeText(ctx, "检查完成，未发现问题", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, ctx.getString(R.string.settings_check_ok), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -881,14 +1075,14 @@ private fun DataMaintenanceSection(container: AppContainer) {
         Column {
             Text(
                 when {
-                    scanning -> "正在检查…"
-                    repairing -> "正在修复…"
-                    else -> "检查数据库"
+                    scanning -> stringResource(R.string.settings_scanning)
+                    repairing -> stringResource(R.string.settings_repairing)
+                    else -> stringResource(R.string.settings_check_db)
                 },
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                "检查完整性、碎片、字段使用与冗余数据，不修改任何内容",
+                stringResource(R.string.settings_check_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -906,22 +1100,22 @@ private fun DataMaintenanceSection(container: AppContainer) {
         val fixable = scanned.hasFixableIssues
         AlertDialog(
             onDismissRequest = { showIssues = false },
-            title = { Text(if (fixable) "发现可修复的问题" else "发现异常数据") },
+            title = { Text(if (fixable) stringResource(R.string.settings_issues_fixable) else stringResource(R.string.settings_issues_anomaly)) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     scanned.issues.forEach {
-                        Text("· $it", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.settings_bullet, it), style = MaterialTheme.typography.bodyMedium)
                     }
                     if (scanned.notices.isNotEmpty()) {
                         if (scanned.issues.isNotEmpty()) Spacer(Modifier.padding(vertical = 6.dp))
                         Text(
-                            if (fixable) "以下项目不会被修复：" else "以下项目不会自动清理：",
+                            if (fixable) stringResource(R.string.settings_not_fixed) else stringResource(R.string.settings_not_auto_cleaned),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
                         scanned.notices.forEach {
                             Text(
-                                "· $it",
+                                stringResource(R.string.settings_bullet, it),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
@@ -930,7 +1124,7 @@ private fun DataMaintenanceSection(container: AppContainer) {
                     if (fixable) {
                         Spacer(Modifier.padding(vertical = 6.dp))
                         Text(
-                            "修复仅执行无损维护：修正无效引用并回收碎片空间，不会删改任何数据。",
+                            stringResource(R.string.settings_repair_lossless),
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -941,14 +1135,14 @@ private fun DataMaintenanceSection(container: AppContainer) {
                     TextButton(onClick = {
                         showIssues = false
                         if (StorageConfig.backupUri(ctx) == null) showNoBackupWarning = true else runRepair()
-                    }) { Text("立即修复") }
+                    }) { Text(stringResource(R.string.settings_repair_now)) }
                 } else {
-                    TextButton(onClick = { showIssues = false }) { Text("好") }
+                    TextButton(onClick = { showIssues = false }) { Text(stringResource(R.string.common_ok)) }
                 }
             },
             dismissButton = {
                 if (fixable) {
-                    TextButton(onClick = { showIssues = false }) { Text("取消") }
+                    TextButton(onClick = { showIssues = false }) { Text(stringResource(R.string.common_cancel)) }
                 }
             }
         )
@@ -958,21 +1152,20 @@ private fun DataMaintenanceSection(container: AppContainer) {
     if (showNoBackupWarning) {
         AlertDialog(
             onDismissRequest = { showNoBackupWarning = false },
-            title = { Text("未设置本地备份文件夹") },
+            title = { Text(stringResource(R.string.settings_no_backup_folder)) },
             text = {
                 Text(
-                    "修复前将不会创建 daymate.db.bak 快照。\n\n" +
-                        "如需保留快照，请先在「数据备份」中选择备份文件夹。"
+                    stringResource(R.string.settings_no_backup_hint)
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     showNoBackupWarning = false
                     runRepair()
-                }) { Text("继续修复") }
+                }) { Text(stringResource(R.string.settings_continue_repair)) }
             },
             dismissButton = {
-                TextButton(onClick = { showNoBackupWarning = false }) { Text("取消") }
+                TextButton(onClick = { showNoBackupWarning = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -992,7 +1185,10 @@ private fun MaintenanceReportCard(
         val after = lastRepair?.takeIf { it.ok }?.after
         if (lastRepair != null && !lastRepair.ok) {
             Text(
-                "修复未完成：${lastRepair.failureReason ?: "未知原因"}。数据未受影响。",
+                stringResource(
+                    R.string.settings_repair_incomplete,
+                    lastRepair.failureReason ?: stringResource(R.string.settings_unknown_reason)
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(bottom = 4.dp)
@@ -1001,62 +1197,62 @@ private fun MaintenanceReportCard(
 
         if (lastRepair != null && after != null) {
             ResultLine(
-                "数据库大小",
+                stringResource(R.string.settings_db_size),
                 formatBytes(lastRepair.before.totalBytes) + " → " + formatBytes(after.totalBytes)
             )
             ResultLine(
-                "已回收空间",
+                stringResource(R.string.settings_reclaimed_space),
                 formatBytes((lastRepair.before.totalBytes - after.totalBytes).coerceAtLeast(0))
             )
             ResultLine(
-                "已修复无效引用",
-                if (lastRepair.fixedDanglingRefs > 0) "${lastRepair.fixedDanglingRefs} 处" else "无需修复"
+                stringResource(R.string.settings_fixed_dangling),
+                if (lastRepair.fixedDanglingRefs > 0) stringResource(R.string.settings_unit_places, lastRepair.fixedDanglingRefs) else stringResource(R.string.settings_no_repair_needed)
             )
             ResultLine(
-                "已修复异常时间",
-                if (lastRepair.fixedTimestamps > 0) "${lastRepair.fixedTimestamps} 条" else "无需修复"
+                stringResource(R.string.settings_fixed_timestamps),
+                if (lastRepair.fixedTimestamps > 0) stringResource(R.string.settings_unit_items, lastRepair.fixedTimestamps) else stringResource(R.string.settings_no_repair_needed)
             )
             ResultLine(
-                "修复前快照",
-                if (lastRepair.snapshotCreated) "已保存 daymate.db.bak" else "未创建（无本地备份）"
+                stringResource(R.string.settings_pre_repair_snapshot),
+                if (lastRepair.snapshotCreated) stringResource(R.string.settings_snapshot_saved) else stringResource(R.string.settings_snapshot_not_created)
             )
         } else {
-            ResultLine("数据库大小", formatBytes(report.totalBytes))
+            ResultLine(stringResource(R.string.settings_db_size), formatBytes(report.totalBytes))
             ResultLine(
-                "可回收空间",
-                formatBytes(report.reclaimableBytes) + "（碎片 ${(report.freeRatio * 100).toInt()}%）"
+                stringResource(R.string.settings_reclaimable_space),
+                formatBytes(report.reclaimableBytes) + stringResource(R.string.settings_fragment_ratio, (report.freeRatio * 100).toInt())
             )
         }
 
         ResultLine(
-            "结构完整性",
-            if (report.integrityOk) "正常" else "异常：${report.integrityDetail.orEmpty()}"
+            stringResource(R.string.settings_integrity),
+            if (report.integrityOk) stringResource(R.string.settings_normal) else stringResource(R.string.settings_abnormal, report.integrityDetail.orEmpty())
         )
         ResultLine(
-            "残留无用字段",
-            if (report.zombieColumns.isEmpty()) "无" else report.zombieColumns.joinToString("、")
+            stringResource(R.string.settings_zombie_fields),
+            if (report.zombieColumns.isEmpty()) stringResource(R.string.common_none) else report.zombieColumns.joinToString("、")
         )
-        ResultLine("无效文件夹引用", if (report.danglingRefs > 0) "${report.danglingRefs} 处" else "无")
+        ResultLine(stringResource(R.string.settings_dangling_refs), if (report.danglingRefs > 0) stringResource(R.string.settings_unit_places, report.danglingRefs) else stringResource(R.string.common_none))
 
         // ===== 字段利用率：哪些字段在实际数据里从未被填过 =====
         Spacer(Modifier.padding(vertical = 4.dp))
         Text(
-            "未使用的字段",
+            stringResource(R.string.settings_unused_fields),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(top = 4.dp)
         )
         if (report.unusedFields.isEmpty()) {
-            Text("无，所有字段均有数据", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.settings_all_fields_used), style = MaterialTheme.typography.bodySmall)
         } else {
             report.unusedFields.forEach {
                 Text(
-                    "· ${it.tableLabel} · ${it.fieldLabel}（${it.total} 条记录均未填写）",
+                    stringResource(R.string.settings_unused_field_item, Tr.s(it.tableRes), Tr.s(it.fieldRes), it.total),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
             Text(
-                "以上字段均有对应功能，当前数据中未使用，不会被删除。",
+                stringResource(R.string.settings_fields_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 2.dp)
@@ -1066,19 +1262,19 @@ private fun MaintenanceReportCard(
         // ===== 冗余数据：只提示，不自动清理 =====
         Spacer(Modifier.padding(vertical = 4.dp))
         Text(
-            "冗余数据",
+            stringResource(R.string.settings_redundancy),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(top = 4.dp)
         )
         if (report.redundancies.isEmpty()) {
-            Text("无", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.common_none), style = MaterialTheme.typography.bodySmall)
         } else {
             report.redundancies.forEach {
-                Text("· ${it.label}：${it.count} 处", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.settings_redundancy_item, Tr.s(it.labelRes), it.count), style = MaterialTheme.typography.bodySmall)
             }
             Text(
-                "以上项目仅作提示，不会自动清理。",
+                stringResource(R.string.settings_redundancy_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 2.dp)
@@ -1088,21 +1284,21 @@ private fun MaintenanceReportCard(
         // ===== 现有数据行数 =====
         Spacer(Modifier.padding(vertical = 4.dp))
         Text(
-            "现有数据（未修改）",
+            stringResource(R.string.settings_existing_data),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(top = 4.dp)
         )
         Text(
             report.tables.joinToString(" · ") {
-                it.label + " " + (if (it.rows < 0) "?" else it.rows.toString())
+                Tr.s(it.labelRes) + " " + (if (it.rows < 0) "?" else it.rows.toString())
             },
             style = MaterialTheme.typography.bodySmall
         )
         val recycled = report.tables.sumOf { if (it.inRecycleBin < 0) 0L else it.inRecycleBin }
         if (recycled > 0) {
             Text(
-                "回收站内另有 $recycled 条已删除条目，不做清理。可在「回收站」中处理。",
+                stringResource(R.string.settings_recycle_note, recycled),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(top = 4.dp)
