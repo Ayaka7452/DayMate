@@ -697,7 +697,9 @@ private fun CycleOverviewScreen(
 
     // 重叠二次确认弹窗：登记/补记区间与已有记录重叠时出现，可选填备注作为特殊情况保存
     pendingSpecial?.let { pending ->
-        var noteText by remember(pending) { mutableStateOf(stringResource(R.string.cycle_default_special_note)) }
+        // remember 的 calculation 是 @DisallowComposableCalls，这里不能调 stringResource；
+        // 用 Tr.s 取（等价、且非 Composable 位置通用）。
+        var noteText by remember(pending) { mutableStateOf(Tr.s(R.string.cycle_default_special_note)) }
         AlertDialog(
             onDismissRequest = { pendingSpecial = null },
             title = { Text(stringResource(R.string.cycle_confirm_special)) },
@@ -1023,7 +1025,9 @@ private fun CycleSettingsScreen(
     val passwordEnabled by container.settingsRepository.cyclePasswordEnabled.collectAsState(initial = false)
     val eventEnabled by container.settingsRepository.cycleEventEnabled.collectAsState(initial = false)
     val entryEnabled by container.settingsRepository.cycleEntryEnabled.collectAsState(initial = false)
-    val eventTitle by container.settingsRepository.cycleEventTitle.collectAsState(initial = stringResource(R.string.cycle_title))
+    /** 「周期管家快捷事件」的默认标题。名称留空时回落到它，重命名弹窗里也用同一个值。 */
+    val cycleTitleDef = stringResource(R.string.cycle_title)
+    val eventTitle by container.settingsRepository.cycleEventTitle.collectAsState(initial = cycleTitleDef)
     val vaultSet by container.settingsRepository.vaultPasswordSet.collectAsState(initial = false)
 
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }

@@ -1226,7 +1226,7 @@ private fun VaultEventDialog(
                     if (existing == null) {
                         container.vaultRepository.add(
                             VaultEventEntity(
-                                title = title.ifBlank { stringResource(R.string.common_unnamed) },
+                                title = title.ifBlank { Tr.s(R.string.common_unnamed) },
                                 targetDateEpochDay = epochDay,
                                 refDays = refValue,
                                 displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
@@ -1238,7 +1238,7 @@ private fun VaultEventDialog(
                     } else {
                         container.vaultRepository.update(
                             existing.copy(
-                                title = title.ifBlank { stringResource(R.string.common_unnamed) },
+                                title = title.ifBlank { Tr.s(R.string.common_unnamed) },
                                 targetDateEpochDay = epochDay,
                                 refDays = refValue,
                                 displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },

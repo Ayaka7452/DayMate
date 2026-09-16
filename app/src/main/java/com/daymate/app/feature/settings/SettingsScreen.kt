@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -709,9 +711,11 @@ fun SettingsScreen(
                     }
                 }
             },
-            dismissButton = {
+            // M3 的 AlertDialog：带 confirmButton 的那个重载里它是必填参数，
+            // 只给 title/text/dismissButton 会两个重载都不匹配（编译器报 candidates is applicable）。
+            confirmButton = {
                 TextButton(onClick = { showLanguageDialog = false }) {
-                    Text(stringResource(R.string.common_cancel))
+                    Text(stringResource(R.string.common_done))
                 }
             }
         )
