@@ -40,12 +40,18 @@ object NoteCatalog {
     /** 一个预置项。[key] 落库，[label] 为展示文案。 */
     data class Preset(val key: String, val label: String)
 
-    /** 各大类下的预置项；自定义类无预置项（由用户输入文本）。 */
+    /**
+     * 各大类下的预置项；自定义类无预置项（由用户输入文本）。
+     *
+     * 性生活一栏刻意**只记行为、不记性欲**。Clue 确有 `sex drive`（性欲高/低）项，但那建立在
+     * 它会参与周期分析的前提上；DayMate 的日常记录**不参与任何推算**（见 CycleNoteEntity），
+     * 记性欲就只剩留痕，而且「感受」混进「行为」栏语义不统一。保护与否才是真正有参考价值的
+     * 信息（备孕 / 避孕），且它本就是性行为的一个属性。要记性欲的人可走「自定义」自由填写。
+     */
     val presets: Map<Category, List<Preset>> = mapOf(
         Category.SEX to listOf(
-            Preset("sex_intercourse", "有性生活"),
-            Preset("sex_drive_up", "性欲提升"),
-            Preset("sex_drive_down", "性欲减退")
+            Preset("sex_protected", "有保护性行为"),
+            Preset("sex_unprotected", "无保护性行为")
         ),
         Category.BLEED to listOf(
             Preset("bleed_spotting", "点滴出血"),
@@ -73,6 +79,17 @@ object NoteCatalog {
             Preset("mood_stress", "压力大")
         ),
         Category.CUSTOM to emptyList()
+    )
+
+    /**
+     * 互斥组：同组预置项不可能同时成立（key → 组名）。界面据此把同组项做成单选。
+     *
+     * 「有保护 / 无保护」一次只可能成立一个。多选 UI 若不特判，用户能同时勾上两项，
+     * 落库就是一条自相矛盾的记录——这种矛盾数据后续既无法解释也无法修正。
+     */
+    val exclusiveGroups: Map<String, String> = mapOf(
+        "sex_protected" to "sex_protection",
+        "sex_unprotected" to "sex_protection"
     )
 
     /** 除自定义外、可在界面上选择的大类（自定义单独用一个输入框表达，不混在分段里）。 */

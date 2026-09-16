@@ -5,8 +5,14 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.Canvas
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -276,6 +282,10 @@ private fun CycleOverviewScreen(
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
     // 日历点选的日期（null = 未选中，展示今天的信息）。点同一天可取消选中，与「今日」高亮互不干扰。
     var selectedDay by remember { mutableStateOf<Long?>(null) }
+    // 收起动画期间 selectedDay 已被置 null，用「最后一次选中日」兜底渲染详情内容——
+    // 否则内容会先跳成今天的资料、再随卡片一起滑走，看起来像闪了一下。
+    // 只在点击回调里更新（不在组合期写状态），保持单向数据流。
+    var lastDetailDay by remember { mutableStateOf<Long?>(null) }
     var showAddNote by remember { mutableStateOf(false) }
     var showDeleteNote by remember { mutableStateOf(false) }
 
@@ -360,7 +370,14 @@ private fun CycleOverviewScreen(
                             cycleDays = cycleDays,
                             today = today,
                             selectedDay = selectedDay,
-                            onSelectDay = { day -> selectedDay = if (selectedDay == day) null else day }
+                            onSelectDay = { day ->
+                                if (selectedDay == day) {
+                                    selectedDay = null          // 再点同一天 = 收起
+                                } else {
+                                    selectedDay = day
+                                    lastDetailDay = day
+                                }
+                            }
                         )
                     } else {
                         CycleRing(
@@ -396,20 +413,31 @@ private fun CycleOverviewScreen(
             }
 
             // ===== 选中日详情区（仅日历视图、仅在有选中时出现）=====
-            // 位置紧贴日历下方：点选的即时反馈要离被点的格子近，不能等滚到页面底部才看见
-            if (showCalendar && selectedDay != null) {
-                val detailDay = selectedDay!!
-                Spacer(Modifier.height(16.dp))
-                CycleDayDetail(
-                    day = detailDay,
-                    logs = logs,
-                    dayNotes = notes.filter { it.dateEpochDay == detailDay },
-                    cycleDays = cycleDays,
-                    today = today,
-                    onBackToToday = { selectedDay = null },
-                    onAdd = { showAddNote = true },
-                    onDelete = { showDeleteNote = true }
-                )
+            // 位置紧贴日历下方：点选的即时反馈要离被点的格子近，不能等滚到页面底部才看见。
+            // 展开/收起走纵向滑动而非瞬间出现——高度突变会让下方那排按钮整块跳一下，看着像页面重排。
+            // 内嵌 animateContentSize：换一天时记录条数不同导致高度变化，也让它平滑过渡而不是硬切。
+            AnimatedVisibility(
+                visible = showCalendar && selectedDay != null,
+                enter = expandVertically(expandFrom = Alignment.Top, animationSpec = tween(220)) +
+                    fadeIn(animationSpec = tween(180)),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(200)) +
+                    fadeOut(animationSpec = tween(140))
+            ) {
+                // 退出动画期间 selectedDay 已置 null，用「最后一次选中日」兜底渲染，避免内容中途跳变
+                val detailDay = selectedDay ?: lastDetailDay ?: today
+                Column(Modifier.animateContentSize()) {
+                    Spacer(Modifier.height(16.dp))
+                    CycleDayDetail(
+                        day = detailDay,
+                        logs = logs,
+                        dayNotes = notes.filter { it.dateEpochDay == detailDay },
+                        cycleDays = cycleDays,
+                        today = today,
+                        onCollapse = { selectedDay = null },
+                        onAdd = { showAddNote = true },
+                        onDelete = { showDeleteNote = true }
+                    )
+                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -2116,7 +2144,8 @@ private fun CycleDayDetail(
     dayNotes: List<CycleNoteEntity>,
     cycleDays: Int,
     today: Long,
-    onBackToToday: () -> Unit,
+    /** 收起详情区（＝取消选中）。点「今天」同样会展开详情，所以这个按钮的语义是「收起」，不是「回到今天」。 */
+    onCollapse: () -> Unit,
     onAdd: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -2195,10 +2224,9 @@ private fun CycleDayDetail(
                     Text("删除记录", maxLines = 1)
                 }
             }
-            if (day != today) {
-                TextButton(onClick = onBackToToday, modifier = Modifier.align(Alignment.End)) {
-                    Text("回到今天")
-                }
+            // 始终显示：点「今天」也会展开详情，此时同样需要一条收起的出口（原先只在非今天时显示，是个死路）
+            TextButton(onClick = onCollapse, modifier = Modifier.align(Alignment.End)) {
+                Text("收起")
             }
         }
     }
@@ -2293,9 +2321,17 @@ private fun AddNoteDialog(
                     ) {
                         NoteCatalog.presets[category].orEmpty().forEach { p ->
                             NoteChip(p.label, selected = p.key in selectedKeys) {
-                                selectedKeys =
-                                    if (p.key in selectedKeys) selectedKeys - p.key
-                                    else selectedKeys + p.key
+                                selectedKeys = if (p.key in selectedKeys) {
+                                    selectedKeys - p.key
+                                } else {
+                                    // 互斥组内先踢掉同组其它项，否则会落一条「既保护又无保护」的矛盾记录
+                                    val group = NoteCatalog.exclusiveGroups[p.key]
+                                    val base = if (group == null) selectedKeys
+                                    else selectedKeys.filterNot {
+                                        NoteCatalog.exclusiveGroups[it] == group
+                                    }.toSet()
+                                    base + p.key
+                                }
                             }
                         }
                     }
@@ -2305,7 +2341,7 @@ private fun AddNoteDialog(
                     value = noteText,
                     onValueChange = { noteText = it.take(NoteCatalog.MAX_NOTE_LENGTH) },
                     label = { Text("补充说明（可选）") },
-                    placeholder = { Text("例如：有保护措施、量少") },
+                    placeholder = { Text("例如：量少、第一天") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
