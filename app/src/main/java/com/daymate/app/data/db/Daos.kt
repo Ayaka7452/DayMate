@@ -204,3 +204,40 @@ interface CycleLogDao {
     @Delete
     suspend fun delete(log: CycleLogEntity)
 }
+
+/**
+ * 周期管家：日常记录（症状/情绪/性生活等）读写。
+ *
+ * 与 [CycleLogDao] 分开是刻意为之：日常记录不参与周期推算，两者不该在同一处被误用。
+ * 日历需按日批量取记录，故 [observeAll] 一次读全量（单用户量级小，避免按日多次查询）。
+ */
+@Dao
+interface CycleNoteDao {
+
+    @Query("SELECT * FROM cycle_notes ORDER BY dateEpochDay DESC, id ASC")
+    fun observeAll(): Flow<List<CycleNoteEntity>>
+
+    @Query("SELECT * FROM cycle_notes ORDER BY dateEpochDay DESC, id ASC")
+    suspend fun getAll(): List<CycleNoteEntity>
+
+    @Query("SELECT * FROM cycle_notes WHERE dateEpochDay = :day ORDER BY id ASC")
+    suspend fun getByDay(day: Long): List<CycleNoteEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(note: CycleNoteEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(notes: List<CycleNoteEntity>)
+
+    @Update
+    suspend fun update(note: CycleNoteEntity)
+
+    @Delete
+    suspend fun delete(note: CycleNoteEntity)
+
+    @Query("DELETE FROM cycle_notes WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
+    @Query("SELECT COUNT(*) FROM cycle_notes")
+    suspend fun countAll(): Int
+}

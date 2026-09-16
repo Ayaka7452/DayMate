@@ -164,6 +164,9 @@ class DbRepair(
         ),
         "cycle_logs" to setOf(
             "id", "startDateEpochDay", "periodDays", "note", "createdAt", "updatedAt"
+        ),
+        "cycle_notes" to setOf(
+            "id", "dateEpochDay", "category", "presetKey", "label", "note", "createdAt"
         )
     )
 
@@ -193,7 +196,9 @@ class DbRepair(
         FieldSpec("vault_events", "保险箱条目", "linkedFestival", "跟随节日"),
         FieldSpec("vault_folders", "保险箱文件夹", "icon", "图标"),
         FieldSpec("vault_folders", "保险箱文件夹", "color", "自定义颜色"),
-        FieldSpec("cycle_logs", "周期记录", "note", "异常标记")
+        FieldSpec("cycle_logs", "周期记录", "note", "异常标记"),
+        FieldSpec("cycle_notes", "日常记录", "presetKey", "预置项"),
+        FieldSpec("cycle_notes", "日常记录", "note", "补充说明")
     )
 
     /** 只体检、不修改任何内容。 */
@@ -334,7 +339,8 @@ class DbRepair(
                 )
             ),
             TableStat("vault_folders", "保险箱文件夹", count(d, "vault_folders"), 0, 0),
-            TableStat("cycle_logs", "周期记录", count(d, "cycle_logs"), 0, 0)
+            TableStat("cycle_logs", "周期记录", count(d, "cycle_logs"), 0, 0),
+            TableStat("cycle_notes", "日常记录", count(d, "cycle_notes"), 0, 0)
         )
 
         var badTs = 0L
@@ -440,6 +446,15 @@ class DbRepair(
             "SELECT COUNT(*) FROM (SELECT 1 FROM cycle_logs " +
                 "GROUP BY startDateEpochDay HAVING COUNT(*) > 1)"
         )
+        // 日常记录只报告不清理：同一天重复勾同一个小项多半是误操作，但删除与否该由用户决定
+        add(
+            "名称为空的日常记录",
+            "SELECT COUNT(*) FROM cycle_notes WHERE TRIM(IFNULL(label, '')) = ''"
+        )
+        add(
+            "日常记录日期超出范围",
+            "SELECT COUNT(*) FROM cycle_notes WHERE dateEpochDay < -200000 OR dateEpochDay > 100000"
+        )
         add(
             "回收站中超过 30 天的条目",
             "SELECT (SELECT COUNT(*) FROM events WHERE isDeleted = 1 AND deletedAt > 0 " +
@@ -456,7 +471,8 @@ class DbRepair(
         "folders" to listOf("createdAt"),
         "vault_events" to listOf("createdAt", "updatedAt"),
         "vault_folders" to listOf("createdAt"),
-        "cycle_logs" to listOf("createdAt", "updatedAt")
+        "cycle_logs" to listOf("createdAt", "updatedAt"),
+        "cycle_notes" to listOf("createdAt")
     )
 
     private fun checkpoint(d: androidx.sqlite.db.SupportSQLiteDatabase) {

@@ -37,6 +37,11 @@ class AppContainer(context: Context) {
     val vaultFolderRepository = VaultFolderRepository(mainDb.vaultFolderDao(), ::notifyDataChanged)
     val vaultBridge = VaultBridge(eventRepository, vaultRepository)
     val cycleRepository = com.ayaka7452.daymate.data.repo.CycleRepository(mainDb.cycleLogDao(), ::notifyDataChanged)
+
+    /** 周期管家的日常记录（症状/情绪/性生活/自定义）。与经期记录分表，不参与推算。 */
+    val cycleNoteRepository =
+        com.ayaka7452.daymate.data.repo.CycleNoteRepository(mainDb.cycleNoteDao(), ::notifyDataChanged)
+
     val cycleEventBridge = CycleEventBridge(eventRepository, cycleRepository, settingsRepository)
 
     /**

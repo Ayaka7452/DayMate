@@ -12,9 +12,10 @@ import androidx.room.migration.Migration
         FolderEntity::class,
         VaultEventEntity::class,
         VaultFolderEntity::class,
-        CycleLogEntity::class
+        CycleLogEntity::class,
+        CycleNoteEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -23,6 +24,7 @@ abstract class DayMateDatabase : RoomDatabase() {
     abstract fun vaultEventDao(): VaultEventDao
     abstract fun vaultFolderDao(): VaultFolderDao
     abstract fun cycleLogDao(): CycleLogDao
+    abstract fun cycleNoteDao(): CycleNoteDao
 
     companion object {
         /** v1 -> v2：新增回收站软删除字段。 */
@@ -231,6 +233,35 @@ abstract class DayMateDatabase : RoomDatabase() {
         }
 
         /**
+         * v9 -> v10：周期管家新增「日常记录」表 cycle_notes（症状 / 情绪 / 性生活 / 自定义等）。
+         *
+         * 纯新增表，不改动任何既有表——老用户的经期记录、倒数日、保险箱数据一律原样保留。
+         * `dateEpochDay` 建索引：日历按日取记录、详情区按日查询都走这一列。
+         * `IF NOT EXISTS` 幂等，避免异常设备上重复执行失败。
+         */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS cycle_notes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        dateEpochDay INTEGER NOT NULL,
+                        category TEXT NOT NULL,
+                        presetKey TEXT,
+                        label TEXT NOT NULL,
+                        note TEXT,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_cycle_notes_dateEpochDay " +
+                        "ON cycle_notes(dateEpochDay)"
+                )
+            }
+        }
+
+        /**
          * 重建一张事件表并丢弃 repeatYearly 列，见 [MIGRATION_8_9] 的说明。
          * @param table 目标表名（重建完成后仍是该名字）。
          * @param parentTable 外键指向的父表（folders / vault_folders），用于剔除悬空引用。
@@ -310,7 +341,8 @@ abstract class DayMateDatabase : RoomDatabase() {
             return Room.databaseBuilder(context, DayMateDatabase::class.java, "daymate.db")
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9
+                    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                    MIGRATION_9_10
                 )
                 .build()
         }

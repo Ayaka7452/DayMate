@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -38,8 +40,10 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
@@ -87,7 +91,9 @@ import androidx.core.content.ContextCompat
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.security.VaultCrypto
 import com.ayaka7452.daymate.core.util.CycleCalculator
+import com.ayaka7452.daymate.core.util.NoteCatalog
 import com.ayaka7452.daymate.data.db.CycleLogEntity
+import com.ayaka7452.daymate.data.db.CycleNoteEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -195,6 +201,8 @@ private fun CycleOverviewScreen(
     onOpenSettings: () -> Unit
 ) {
     val logs by container.cycleRepository.observeAll().collectAsState(initial = emptyList())
+    // 日常记录（症状/情绪/性生活/自定义）：只用于日历标记与当日详情，不参与任何周期推算
+    val notes by container.cycleNoteRepository.observeAll().collectAsState(initial = emptyList())
     val cycleManual by container.settingsRepository.cycleDays.collectAsState(initial = CycleCalculator.DEFAULT_CYCLE_DAYS)
     val periodManual by container.settingsRepository.cyclePeriodDays.collectAsState(initial = CycleCalculator.DEFAULT_PERIOD_DAYS)
     val cycleAuto by container.settingsRepository.cycleCycleAuto.collectAsState(initial = true)
@@ -266,6 +274,10 @@ private fun CycleOverviewScreen(
     val todayIsPeriodEnd =
         activeLog != null && today == activeLog.startDateEpochDay + activeLog.periodDays - 1
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
+    // 日历点选的日期（null = 未选中，展示今天的信息）。点同一天可取消选中，与「今日」高亮互不干扰。
+    var selectedDay by remember { mutableStateOf<Long?>(null) }
+    var showAddNote by remember { mutableStateOf(false) }
+    var showDeleteNote by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -344,8 +356,11 @@ private fun CycleOverviewScreen(
                     if (cal) {
                         CycleCalendarMonth(
                             logs = logs,
+                            notes = notes,
                             cycleDays = cycleDays,
-                            today = today
+                            today = today,
+                            selectedDay = selectedDay,
+                            onSelectDay = { day -> selectedDay = if (selectedDay == day) null else day }
                         )
                     } else {
                         CycleRing(
@@ -378,6 +393,23 @@ private fun CycleOverviewScreen(
                     ViewToggle("圆环", selected = !showCalendar) { manualCalendar = false }
                     ViewToggle("日历", selected = showCalendar) { manualCalendar = true }
                 }
+            }
+
+            // ===== 选中日详情区（仅日历视图、仅在有选中时出现）=====
+            // 位置紧贴日历下方：点选的即时反馈要离被点的格子近，不能等滚到页面底部才看见
+            if (showCalendar && selectedDay != null) {
+                val detailDay = selectedDay!!
+                Spacer(Modifier.height(16.dp))
+                CycleDayDetail(
+                    day = detailDay,
+                    logs = logs,
+                    dayNotes = notes.filter { it.dateEpochDay == detailDay },
+                    cycleDays = cycleDays,
+                    today = today,
+                    onBackToToday = { selectedDay = null },
+                    onAdd = { showAddNote = true },
+                    onDelete = { showDeleteNote = true }
+                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -482,7 +514,8 @@ private fun CycleOverviewScreen(
                         Modifier.weight(1f)
                     )
                     InfoCard(
-                        "当前阶段",
+                        // 明确限定为「今天」：选中其它日期时详情区会显示那天的阶段，两者不能都叫「当前阶段」而打架
+                        "今日阶段",
                         if (todayIsPeriodEnd) "今日结束" else phase.label,
                         "周期第 " + (today - lastLog.startDateEpochDay + 1) + " 天",
                         Modifier.weight(1f)
@@ -633,7 +666,9 @@ private fun CycleOverviewScreen(
             title = { Text("确认作为特殊情况记录？") },
             text = {
                 Column {
-                    Text(pending.reason + "。\n特殊情况仅标记当天，不按经期天数向后延伸。可附备注说明。")
+                    // 三种 reason 文案结尾并不统一（「日期重叠」无句号，另两种自带句号），
+                    // 直接拼接会产出「。。」——统一去掉结尾句号后由此处补一个
+                    Text(pending.reason.trimEnd('。') + "。\n特殊情况仅标记当天，不按经期天数向后延伸。可附备注说明。")
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = noteText,
@@ -735,6 +770,14 @@ private fun CycleOverviewScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
+                        "日常记录",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        "在日历上点选任意日期，即可为那天添加日常记录（性生活、出血与分泌物、身体症状、情绪，或自己填写）。日常记录只作留痕，不参与周期与排卵推算，也不会点亮经期圆点——随手记一条症状不会影响预测结果。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
                         "周期四个阶段",
                         style = MaterialTheme.typography.titleSmall
                     )
@@ -747,7 +790,7 @@ private fun CycleOverviewScreen(
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "· 日期底色代表当天所处阶段。\n· 实心圆点：已登记的经期日。\n· 空心圆点：预测的经期日，到来后变为实心。",
+                        "· 日期底色代表当天所处阶段。\n· 实心圆点：已登记的经期日。\n· 空心圆点：预测的经期日，到来后变为实心。\n· 右上角小圆点：当天有日常记录，点选该日可查看。\n· 粗蓝框：今天；细蓝框：当前选中的日期，再次点击可取消。",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -759,6 +802,32 @@ private fun CycleOverviewScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+            }
+        )
+    }
+
+    // 添加记录弹窗（仅从选中日详情区唤起；选中日即记录日）
+    val detailDay = selectedDay
+    if (showAddNote && detailDay != null) {
+        AddNoteDialog(
+            day = detailDay,
+            onDismiss = { showAddNote = false },
+            onConfirm = { newNotes ->
+                scope.launch { container.cycleNoteRepository.addAll(newNotes) }
+                showAddNote = false
+            }
+        )
+    }
+
+    // 删除记录弹窗：列出该日全部记录供勾选，勾选后确认即删
+    if (showDeleteNote && detailDay != null) {
+        DeleteNotesDialog(
+            day = detailDay,
+            dayNotes = notes.filter { it.dateEpochDay == detailDay },
+            onDismiss = { showDeleteNote = false },
+            onConfirm = { ids ->
+                scope.launch { container.cycleNoteRepository.deleteByIds(ids) }
+                showDeleteNote = false
             }
         )
     }
@@ -912,6 +981,8 @@ private fun CycleSettingsScreen(
     val periodManual by container.settingsRepository.cyclePeriodDays.collectAsState(initial = CycleCalculator.DEFAULT_PERIOD_DAYS)
     val cycleAuto by container.settingsRepository.cycleCycleAuto.collectAsState(initial = true)
     val periodAuto by container.settingsRepository.cyclePeriodAuto.collectAsState(initial = true)
+    // 日常记录：历史记录管理页按日分组展示与删除（不参与本页任何推算）
+    val notes by container.cycleNoteRepository.observeAll().collectAsState(initial = emptyList())
     val passwordEnabled by container.settingsRepository.cyclePasswordEnabled.collectAsState(initial = false)
     val eventEnabled by container.settingsRepository.cycleEventEnabled.collectAsState(initial = false)
     val eventTitle by container.settingsRepository.cycleEventTitle.collectAsState(initial = "周期管家")
@@ -945,9 +1016,11 @@ private fun CycleSettingsScreen(
         if (hist) {
             CycleHistoryScreen(
                 logs = logs,
+                notes = notes,
                 onBack = { showHistory = false },
                 onEdit = { editingLog = it },
-                onDelete = { deletingLog = it }
+                onDelete = { deletingLog = it },
+                onDeleteNotes = { ids -> scope.launch { container.cycleNoteRepository.deleteByIds(ids) } }
             )
         } else {
     Scaffold(
@@ -1498,15 +1571,25 @@ private fun formatDate(epochDay: Long): String =
 private fun formatRange(startEpochDay: Long, days: Int): String =
     formatDate(startEpochDay) + " ~ " + formatDate(startEpochDay + days - 1)
 
-/** 历史记录管理子页：全部经期记录 + 调整/删除入口。 */
+/** 历史记录管理子页：经期记录（可调整/删除）+ 日常记录（按日分组，可整日删除）。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CycleHistoryScreen(
     logs: List<CycleLogEntity>,
+    notes: List<CycleNoteEntity>,
     onBack: () -> Unit,
     onEdit: (CycleLogEntity) -> Unit,
-    onDelete: (CycleLogEntity) -> Unit
+    onDelete: (CycleLogEntity) -> Unit,
+    onDeleteNotes: (List<Long>) -> Unit
 ) {
+    // 0 = 经期记录，1 = 日常记录。页内状态不进设置：用户从设置进来通常只看一类，看完即走
+    var tab by remember { mutableStateOf(0) }
+    var deletingNotesDay by remember { mutableStateOf<Long?>(null) }
+    // 按日期倒序分组：同一天的记录聚成一块，删除也以「一天」为单位
+    val noteGroups = remember(notes) {
+        notes.groupBy { it.dateEpochDay }.entries.sortedByDescending { it.key }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1519,64 +1602,142 @@ private fun CycleHistoryScreen(
             )
         }
     ) { padding ->
-        if (logs.isEmpty()) {
-            Box(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.Center
             ) {
-                Text(
-                    "尚无记录",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
+                Row(
+                    modifier = Modifier
+                        .background(
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                            RoundedCornerShape(50)
+                        )
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    ViewToggle("经期记录", selected = tab == 0) { tab = 0 }
+                    ViewToggle("日常记录", selected = tab == 1) { tab = 1 }
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
-                items(logs, key = { it.id }) { log ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                formatRange(log.startDateEpochDay, log.periodDays) + " · " + log.periodDays + "天",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            val dow = LocalDate.ofEpochDay(log.startDateEpochDay)
-                                .dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
-                            Text(
-                                dow,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                            log.note?.let { note ->
+
+            val empty = if (tab == 0) logs.isEmpty() else noteGroups.isEmpty()
+            if (empty) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (tab == 0) "尚无经期记录" else "尚无日常记录\n在日历上点选日期即可添加",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+                return@Column
+            }
+
+            if (tab == 0) {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(logs, key = { it.id }) { log ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
                                 Text(
-                                    "备注：" + note,
+                                    formatRange(log.startDateEpochDay, log.periodDays) + " · " + log.periodDays + "天",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                val dow = LocalDate.ofEpochDay(log.startDateEpochDay)
+                                    .dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
+                                Text(
+                                    dow,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.tertiary
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                                log.note?.let { note ->
+                                    Text(
+                                        "备注：" + note,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                            }
+                            TextButton(onClick = { onEdit(log) }) { Text("调整") }
+                            IconButton(onClick = { onDelete(log) }) {
+                                Icon(
+                                    Icons.Default.Delete, contentDescription = "删除",
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                 )
                             }
                         }
-                        TextButton(onClick = { onEdit(log) }) { Text("调整") }
-                        IconButton(onClick = { onDelete(log) }) {
-                            Icon(
-                                Icons.Default.Delete, contentDescription = "删除",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    }
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    noteGroups.forEach { (day, dayNotes) ->
+                        item(key = "noteHead$day") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        formatDate(day),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        LocalDate.ofEpochDay(day).dayOfWeek
+                                            .getDisplayName(TextStyle.FULL, Locale.CHINA),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                                IconButton(onClick = { deletingNotesDay = day }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "删除该日记录",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+                        }
+                        items(dayNotes, key = { it.id }) { n ->
+                            Box(Modifier.padding(horizontal = 20.dp)) { NoteRow(n) }
+                        }
+                        item(key = "noteDiv$day") {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
             }
         }
+    }
+
+    // 整日删除：复用详情区那套「勾选后确认」的弹窗，交互与入口保持一致
+    deletingNotesDay?.let { day ->
+        DeleteNotesDialog(
+            day = day,
+            dayNotes = notes.filter { it.dateEpochDay == day },
+            onDismiss = { deletingNotesDay = null },
+            onConfirm = { ids ->
+                onDeleteNotes(ids)
+                deletingNotesDay = null
+            }
+        )
     }
 }
 
@@ -1645,12 +1806,25 @@ private fun InfoCard(
     }
 }
 
-/** 月历视图：每天底色 = 当日所处阶段，圆点 = 已登记经期日；可翻月。已登记区间按各记录自身的持续天数。 */
+/**
+ * 月历视图：每天底色 = 当日所处阶段，圆点 = 已登记经期日；可翻月。已登记区间按各记录自身的持续天数。
+ *
+ * 三种「框」的语义必须互不混淆（用户明确提过这个痛点）：
+ *  - **今日**：3dp 主色粗框 + 内侧 2dp 白衬。白衬是关键——排卵期底色用的是 Material 默认
+ *    tertiary 紫红（#7D5260），与主色 #00668C 同属暗色，旧版 1.5dp 单色框在排卵期里几乎看不见；
+ *    加一圈白衬后粗框在任何阶段底色上都跳得出来，也不必牺牲品牌色。
+ *  - **选中**：1.5dp 主色细框 + 内侧 1.5dp 白衬。与今日同一套视觉语言，**仅以粗细区分**，
+ *    用户不必学两套规则；同一格既是今日又是选中时只画粗的那道。
+ *  - **有记录**：右上角一枚小圆点。位置与「圆点在数字下方」的经期语义天然分开，不会与实心/空心圆点混淆。
+ */
 @Composable
 private fun CycleCalendarMonth(
     logs: List<CycleLogEntity>,
+    notes: List<CycleNoteEntity>,
     cycleDays: Int,
-    today: Long
+    today: Long,
+    selectedDay: Long?,
+    onSelectDay: (Long) -> Unit
 ) {
     var monthOffset by remember { mutableStateOf(0) }
     val month = LocalDate.now().plusMonths(monthOffset.toLong())
@@ -1671,6 +1845,8 @@ private fun CycleCalendarMonth(
         logs.forEach { set.addAll(CycleCalculator.periodRange(it.startDateEpochDay, it.periodDays)) }
         set
     }
+    // 有日常记录的日期集合（只用于格子右上角的小圆点，不参与任何阶段着色）
+    val noteDays = remember(notes) { notes.map { it.dateEpochDay }.toSet() }
 
     Column(Modifier.fillMaxWidth()) {
         // 月份导航
@@ -1739,39 +1915,79 @@ private fun CycleCalendarMonth(
                                 phase == CycleCalculator.Phase.OVULATION -> onOvulationColor
                                 else -> plainTextColor
                             }
-                            Column(
+                            val isToday = epochDay == today
+                            val isSelected = selectedDay == epochDay
+                            val hasNote = noteDays.contains(epochDay)
+                            Box(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(1.dp)
-                                    .background(bg, RoundedCornerShape(8.dp)),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(bg)
+                                    .clickable { onSelectDay(epochDay) },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    dayNum.toString(),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = fg,
-                                    fontWeight = if (epochDay == today) FontWeight.Bold else FontWeight.Normal
-                                )
-                                when {
-                                    loggedDays.contains(epochDay) ->
-                                        Box(Modifier.size(4.dp).background(fg, CircleShape))
-                                    futurePeriod ->
-                                        // 空心圆点：尚未到来的经期日（到来/登记确认后变实心）
-                                        Box(
-                                            Modifier
-                                                .size(6.dp)
-                                                .border(1.2.dp, periodColor, CircleShape)
-                                        )
-                                    else -> Spacer(Modifier.height(4.dp))
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        dayNum.toString(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = fg,
+                                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    when {
+                                        loggedDays.contains(epochDay) ->
+                                            Box(Modifier.size(4.dp).background(fg, CircleShape))
+                                        futurePeriod ->
+                                            // 空心圆点：尚未到来的经期日（到来/登记确认后变实心）
+                                            Box(
+                                                Modifier
+                                                    .size(6.dp)
+                                                    .border(1.2.dp, periodColor, CircleShape)
+                                            )
+                                        else -> Spacer(Modifier.height(4.dp))
+                                    }
                                 }
-                            }
-                            if (epochDay == today) {
-                                Box(
-                                    Modifier
-                                        .matchParentSize()
-                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                                )
+                                // 当日有日常记录：右上角一枚小圆点（与数字下方的经期圆点分区，不会看混）
+                                if (hasNote) {
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(top = 4.dp, end = 4.dp)
+                                            .size(4.dp)
+                                            .background(fg, CircleShape)
+                                    )
+                                }
+                                if (isToday) {
+                                    // 今日：粗主色框 + 白衬（白衬保证在排卵期紫红底上也清晰）
+                                    Box(
+                                        Modifier
+                                            .matchParentSize()
+                                            .border(3.dp, periodColor, RoundedCornerShape(9.dp))
+                                    )
+                                    Box(
+                                        Modifier
+                                            .matchParentSize()
+                                            .padding(3.dp)
+                                            .border(2.dp, Color.White, RoundedCornerShape(6.dp))
+                                    )
+                                } else if (isSelected) {
+                                    // 选中：同款视觉语言，仅比今日细一半，一眼可分
+                                    Box(
+                                        Modifier
+                                            .matchParentSize()
+                                            .border(1.5.dp, periodColor, RoundedCornerShape(9.dp))
+                                    )
+                                    Box(
+                                        Modifier
+                                            .matchParentSize()
+                                            .padding(1.5.dp)
+                                            .border(1.5.dp, Color.White, RoundedCornerShape(7.dp))
+                                    )
+                                }
                             }
                         }
                     }
@@ -1779,4 +1995,431 @@ private fun CycleCalendarMonth(
             }
         }
     }
+}
+
+// ============================ 日常记录：详情区 / 添加 / 删除 ============================
+
+/**
+ * 描述某一天在周期里的定位，返回 (阶段标签, 副说明)。
+ *
+ * 口径必须与 [CycleCalculator.phaseOfAnyDay] 完全一致，否则会出现「日历底色是黄体期、
+ * 详情区却写排卵期」这种自相矛盾的展示。锚点推进逻辑与之一一对应：先把锚点推到不晚于该日，
+ * 再以「锚点 + 周期天数」为下次经期，避免逾期未登记时算出负的「距下次经期天数」。
+ */
+private fun describeDay(
+    day: Long,
+    logs: List<CycleLogEntity>,
+    cycleDays: Int,
+    today: Long
+): Pair<String, String> {
+    if (logs.isEmpty()) return "尚无记录" to "登记一次经期后即可推算阶段"
+
+    // 落在任一已登记经期区间内 → 月经期（按该记录自身的持续天数）
+    logs.firstOrNull { day in CycleCalculator.periodRange(it.startDateEpochDay, it.periodDays) }
+        ?.let { return "月经期" to ("经期第 " + (day - it.startDateEpochDay + 1) + " 天") }
+
+    val entries = logs.map { it.startDateEpochDay to it.periodDays }
+    val phase = CycleCalculator.phaseOfAnyDay(day, entries, cycleDays)
+
+    // 锚点推进：与 phaseOfAnyDay 同款，保证 nextStart 恒晚于 day。
+    // 两个方向都要覆盖——记录都在未来时要向前虚拟推算，否则 days 早于最早记录时会算出错位的阶段。
+    val base = logs.lastOrNull { it.startDateEpochDay <= day } ?: logs.last()
+    val anchorStart: Long
+    if (base.startDateEpochDay > day) {
+        val k = (base.startDateEpochDay - day + cycleDays - 1) / cycleDays
+        anchorStart = base.startDateEpochDay - k * cycleDays
+    } else {
+        var s = base.startDateEpochDay
+        while (s + cycleDays <= day) s += cycleDays
+        anchorStart = s
+    }
+    val nextStart = anchorStart + cycleDays
+    val ovu = CycleCalculator.effectiveOvulationDay(anchorStart, base.periodDays, nextStart)
+    val window = CycleCalculator.ovulationWindow(anchorStart, base.periodDays, nextStart)
+
+    return when {
+        phase == CycleCalculator.Phase.PERIOD ->
+            "预测经期" to ("系统预测，尚未登记 · " +
+                if (day > today) "还有 " + (day - today) + " 天" else "已过 " + (today - day) + " 天")
+        day == ovu ->
+            "排卵日" to ("受孕概率最高 · 排卵期 " + formatDate(window.first) + " ~ " + formatDate(window.last))
+        phase == CycleCalculator.Phase.OVULATION ->
+            "排卵期" to ("排卵日 " + formatDate(ovu) + " · 窗口 " + formatDate(window.first) + " ~ " + formatDate(window.last))
+        phase == CycleCalculator.Phase.LUTEAL ->
+            "黄体期" to ("距下次经期 " + (nextStart - day) + " 天")
+        else ->
+            "卵泡期" to ("距排卵日 " + (ovu - day) + " 天")
+    }
+}
+
+/** 阶段标签的配色（与圆环/日历同一套色板，保证三处说法一致）。 */
+@Composable
+private fun phaseChipColors(label: String): Pair<Color, Color> = when (label) {
+    "月经期" -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+    "预测经期" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.onSurface
+    "排卵日", "排卵期" -> MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
+    "卵泡期" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f) to MaterialTheme.colorScheme.onSurface
+}
+
+/** 记录大类的色条颜色：用于详情区列表与历史页，让「症状/情绪/性生活」一眼可分。 */
+@Composable
+private fun noteCategoryColor(category: String): Color = when (NoteCatalog.Category.of(category)) {
+    NoteCatalog.Category.SEX -> Color(0xFFD4537E)
+    NoteCatalog.Category.BLEED -> MaterialTheme.colorScheme.primary
+    NoteCatalog.Category.SYMPTOM -> Color(0xFFBA7517)
+    NoteCatalog.Category.MOOD -> MaterialTheme.colorScheme.tertiary
+    NoteCatalog.Category.CUSTOM -> MaterialTheme.colorScheme.secondary
+}
+
+/** 一条日常记录：左侧大类色条 + 名称 +（可选）补充说明。 */
+@Composable
+private fun NoteRow(note: CycleNoteEntity) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .height(16.dp)
+                .background(noteCategoryColor(note.category), RoundedCornerShape(2.dp))
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(note.label, style = MaterialTheme.typography.bodyMedium)
+        note.note?.let { extra ->
+            Spacer(Modifier.width(8.dp))
+            Text(
+                extra,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+/**
+ * 选中日的详情区：阶段定位 + 当日记录 + 添加/删除入口。
+ *
+ * 位置紧贴日历下方——点某天之后的即时反馈必须离被点的格子足够近，否则用户不知道点中了什么。
+ * 本区只做展示与入口，不含任何推算副作用：日常记录永远不参与周期计算（见 CycleNoteEntity）。
+ */
+@Composable
+private fun CycleDayDetail(
+    day: Long,
+    logs: List<CycleLogEntity>,
+    dayNotes: List<CycleNoteEntity>,
+    cycleDays: Int,
+    today: Long,
+    onBackToToday: () -> Unit,
+    onAdd: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val (phaseLabel, sub) = describeDay(day, logs, cycleDays, today)
+    val (chipBg, chipFg) = phaseChipColors(phaseLabel)
+    val date = LocalDate.ofEpochDay(day)
+    val dateText = date.format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)) + " " +
+        date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (day == today) "今天 · " + dateText else dateText,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        sub,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(chipBg)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(phaseLabel, style = MaterialTheme.typography.labelSmall, color = chipFg)
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+            Spacer(Modifier.height(10.dp))
+
+            Text(
+                "当日记录",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.height(4.dp))
+            if (dayNotes.isEmpty()) {
+                Text(
+                    "暂无记录",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                )
+            } else {
+                dayNotes.forEach { NoteRow(it) }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            // 层级约定：实心 = 会动数据的执行动作；空心 = 次级/破坏性动作
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
+                    Text("添加记录", maxLines = 1)
+                }
+                OutlinedButton(
+                    onClick = onDelete,
+                    enabled = dayNotes.isNotEmpty(),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("删除记录", maxLines = 1)
+                }
+            }
+            if (day != today) {
+                TextButton(onClick = onBackToToday, modifier = Modifier.align(Alignment.End)) {
+                    Text("回到今天")
+                }
+            }
+        }
+    }
+}
+
+/** 记录选择用的圆角 chip（与「圆环/日历」切换同一套外观，全 App 只此一种 chip 样式）。 */
+@Composable
+private fun NoteChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+        )
+    }
+}
+
+/**
+ * 添加记录弹窗：大类分段 → 预置项多选（或自定义文本）→ 补充说明。
+ *
+ * 补充说明是**本次添加的所有项共用**的一条备注：绝大多数时候用户只勾一项，此时语义与
+ * 「给这条记录写备注」完全一致；勾多项时仍然合理（例如同时勾「痛经 + 乏力」写「第一天，量少」）。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AddNoteDialog(
+    day: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (List<CycleNoteEntity>) -> Unit
+) {
+    var category by remember { mutableStateOf(NoteCatalog.Category.SYMPTOM) }
+    var selectedKeys by remember { mutableStateOf(emptySet<String>()) }
+    var customText by remember { mutableStateOf("") }
+    var noteText by remember { mutableStateOf("") }
+
+    val isCustom = category == NoteCatalog.Category.CUSTOM
+    val canSave = if (isCustom) customText.trim().isNotEmpty() else selectedKeys.isNotEmpty()
+
+    fun switchTo(c: NoteCatalog.Category) {
+        category = c
+        selectedKeys = emptySet()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("添加记录 · " + formatDate(day)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    NoteCatalog.selectable.forEach { c ->
+                        NoteChip(c.label, selected = category == c) { switchTo(c) }
+                    }
+                    NoteChip("自定义", selected = isCustom) { switchTo(NoteCatalog.Category.CUSTOM) }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                if (isCustom) {
+                    OutlinedTextField(
+                        value = customText,
+                        onValueChange = { customText = it.take(NoteCatalog.MAX_LABEL_LENGTH) },
+                        label = { Text("记录内容") },
+                        placeholder = { Text("例如：泡脚、喝红糖水") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        "选择要记录的项目（可多选）",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        NoteCatalog.presets[category].orEmpty().forEach { p ->
+                            NoteChip(p.label, selected = p.key in selectedKeys) {
+                                selectedKeys =
+                                    if (p.key in selectedKeys) selectedKeys - p.key
+                                    else selectedKeys + p.key
+                            }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it.take(NoteCatalog.MAX_NOTE_LENGTH) },
+                    label = { Text("补充说明（可选）") },
+                    placeholder = { Text("例如：有保护措施、量少") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = canSave,
+                onClick = {
+                    val extra = noteText.trim().ifEmpty { null }
+                    val now = System.currentTimeMillis()
+                    val items = if (isCustom) {
+                        listOf(
+                            CycleNoteEntity(
+                                dateEpochDay = day,
+                                category = NoteCatalog.CUSTOM_KEY,
+                                presetKey = null,
+                                label = customText.trim(),
+                                note = extra,
+                                createdAt = now
+                            )
+                        )
+                    } else {
+                        NoteCatalog.presets[category].orEmpty()
+                            .filter { it.key in selectedKeys }
+                            .map {
+                                CycleNoteEntity(
+                                    dateEpochDay = day,
+                                    category = category.key,
+                                    presetKey = it.key,
+                                    label = it.label,
+                                    note = extra,
+                                    createdAt = now
+                                )
+                            }
+                    }
+                    onConfirm(items)
+                }
+            ) { Text("添加") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+}
+
+/**
+ * 删除记录弹窗：列出该日全部记录供勾选，默认全选。
+ *
+ * 弹窗本身就是「删除前确认」这一关——危险操作按钮用 error 色、文案写明不可恢复，
+ * 再叠一层「你确定吗」只会让删除变啰嗦而不会更安全。
+ */
+@Composable
+private fun DeleteNotesDialog(
+    day: Long,
+    dayNotes: List<CycleNoteEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<Long>) -> Unit
+) {
+    var checkedIds by remember(dayNotes) { mutableStateOf(dayNotes.map { it.id }.toSet()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("删除记录 · " + formatDate(day)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    "勾选要删除的记录，删除后不可恢复。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(Modifier.height(8.dp))
+                dayNotes.forEach { n ->
+                    val on = n.id in checkedIds
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                checkedIds = if (on) checkedIds - n.id else checkedIds + n.id
+                            },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = on,
+                            onCheckedChange = { v ->
+                                checkedIds = if (v) checkedIds + n.id else checkedIds - n.id
+                            }
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(n.label, style = MaterialTheme.typography.bodyMedium)
+                            val meta = listOfNotNull(NoteCatalog.labelOf(n.category), n.note)
+                                .joinToString(" · ")
+                            if (meta.isNotEmpty()) {
+                                Text(
+                                    meta,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = checkedIds.isNotEmpty(),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                onClick = { onConfirm(checkedIds.toList()) }
+            ) { Text("删除选中（" + checkedIds.size + "）") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
 }

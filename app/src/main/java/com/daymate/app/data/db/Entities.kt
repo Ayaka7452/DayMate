@@ -71,6 +71,32 @@ data class CycleLogEntity(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+/**
+ * 周期管家：日常记录（「这天发生了什么」）。
+ *
+ * 与 [CycleLogEntity] **严格分离**，这是刻意的设计约束：
+ *  - 本表**不参与任何周期/经期天数/排卵推算**——随手记一条「痛经」不该污染经期均值与预测锚点；
+ *  - 本表**不点亮日历上的经期圆点**（实心/空心），经期语义只由 [CycleLogEntity] 承担。
+ * 日历上仅以一个小圆点表示「这天有记录」，点选后到详情区看具体内容。
+ *
+ * 可选项来自 [com.ayaka7452.daymate.core.util.NoteCatalog]，另允许用户自由填写（presetKey = null）。
+ */
+@Entity(tableName = "cycle_notes", indices = [Index("dateEpochDay")])
+data class CycleNoteEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** 记录所属日期（epoch day）。 */
+    val dateEpochDay: Long,
+    /** 大类 key，取值见 NoteCatalog.Category：SEX / BLEED / SYMPTOM / MOOD / CUSTOM。 */
+    val category: String,
+    /** 预置项 key；用户自定义填写时为 null。仅用于排序与后续统计，展示文案一律以 [label] 为准。 */
+    val presetKey: String? = null,
+    /** 展示文案：预置项为其名称，自定义项为用户输入。冗余存储以便目录调整后旧记录仍可读。 */
+    val label: String,
+    /** 补充说明（可选，如「有保护措施」「量少」）。 */
+    val note: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
 @Entity(
     tableName = "vault_events",
     foreignKeys = [
