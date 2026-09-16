@@ -818,7 +818,7 @@ private fun CycleOverviewScreen(
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        "· 日期底色代表当天所处阶段。\n· 实心圆点：已登记的经期日。\n· 空心圆点：预测的经期日，到来后变为实心。\n· 右上角小圆点：当天有日常记录，点选该日可查看。\n· 粗蓝框：今天；细蓝框：当前选中的日期，再次点击可取消。",
+                        "· 日期底色代表当天所处阶段。\n· 实心圆点：已登记的经期日。\n· 空心圆点：预测的经期日，到来后变为实心。\n· 右上角小圆点：当天有日常记录，点选该日可查看。\n· 细蓝框：今天；粗蓝框：当前选中的日期，收起详情后粗框消失。",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -1013,6 +1013,7 @@ private fun CycleSettingsScreen(
     val notes by container.cycleNoteRepository.observeAll().collectAsState(initial = emptyList())
     val passwordEnabled by container.settingsRepository.cyclePasswordEnabled.collectAsState(initial = false)
     val eventEnabled by container.settingsRepository.cycleEventEnabled.collectAsState(initial = false)
+    val entryEnabled by container.settingsRepository.cycleEntryEnabled.collectAsState(initial = false)
     val eventTitle by container.settingsRepository.cycleEventTitle.collectAsState(initial = "周期管家")
     val vaultSet by container.settingsRepository.vaultPasswordSet.collectAsState(initial = false)
 
@@ -1228,6 +1229,14 @@ private fun CycleSettingsScreen(
                 TextButton(onClick = { showEventNameDialog = true }) {
                     Text("自定义事件名称：$eventTitle")
                 }
+            }
+            ToggleRow(
+                title = "在主页显示入口按钮",
+                subtitle = "开启后，点主页右下角的加号会先展开——露出「新增」提示与周期管家入口，再点一次才新建事件。",
+                checked = entryEnabled,
+                enabled = true
+            ) { want ->
+                scope.launch { container.settingsRepository.setCycleEntryEnabled(want) }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -1838,12 +1847,14 @@ private fun InfoCard(
  * 月历视图：每天底色 = 当日所处阶段，圆点 = 已登记经期日；可翻月。已登记区间按各记录自身的持续天数。
  *
  * 三种「框」的语义必须互不混淆（用户明确提过这个痛点）：
- *  - **今日**：3dp 主色粗框 + 内侧 2dp 白衬。白衬是关键——排卵期底色用的是 Material 默认
- *    tertiary 紫红（#7D5260），与主色 #00668C 同属暗色，旧版 1.5dp 单色框在排卵期里几乎看不见；
- *    加一圈白衬后粗框在任何阶段底色上都跳得出来，也不必牺牲品牌色。
- *  - **选中**：1.5dp 主色细框 + 内侧 1.5dp 白衬。与今日同一套视觉语言，**仅以粗细区分**，
- *    用户不必学两套规则；同一格既是今日又是选中时只画粗的那道。
+ *  - **选中**：3dp 主色粗框 + 内侧 2dp 白衬。粗框给「用户主动点开的那天」——最需要一眼锁定，所以给最重的视觉。
+ *    白衬是关键：排卵期底色用的是 Material 默认 tertiary 紫红（#7D5260），与主色 #00668C 同属暗色，
+ *    单色框在排卵期里几乎看不见；加一圈白衬后粗框在任何阶段底色上都跳得出来，也不必牺牲品牌色。
+ *  - **今日**：1.5dp 主色细框 + 内侧 1.5dp 白衬。与选中同一套视觉语言，**仅以粗细区分**，用户不必学两套规则。
  *  - **有记录**：右上角一枚小圆点。位置与「圆点在数字下方」的经期语义天然分开，不会与实心/空心圆点混淆。
+ *
+ * 同一格既是选中又是今日时，**只画粗的那道**（选中优先）。
+ * 详情区收起后 [selectedDay] 归 null，粗框随之消失——框表达的是「当前正在查看这天」，而不是给那天永久盖戳。
  */
 @Composable
 private fun CycleCalendarMonth(
@@ -1989,8 +2000,10 @@ private fun CycleCalendarMonth(
                                             .background(fg, CircleShape)
                                     )
                                 }
-                                if (isToday) {
-                                    // 今日：粗主色框 + 白衬（白衬保证在排卵期紫红底上也清晰）
+                                // 选中优先：粗框＝「我正在看的这天」。收起详情区后 selectedDay 归 null，
+                                // 粗框随之消失，只留今天的细框——框表达的是「当前正在查看」，不是永久标注。
+                                if (isSelected) {
+                                    // 选中：粗主色框 + 白衬（白衬保证在排卵期紫红底上也清晰）
                                     Box(
                                         Modifier
                                             .matchParentSize()
@@ -2002,8 +2015,8 @@ private fun CycleCalendarMonth(
                                             .padding(3.dp)
                                             .border(2.dp, Color.White, RoundedCornerShape(6.dp))
                                     )
-                                } else if (isSelected) {
-                                    // 选中：同款视觉语言，仅比今日细一半，一眼可分
+                                } else if (isToday) {
+                                    // 今日：同款视觉语言，仅比选中细一半，一眼可分
                                     Box(
                                         Modifier
                                             .matchParentSize()

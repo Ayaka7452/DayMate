@@ -2,16 +2,24 @@
 
 package com.ayaka7452.daymate.feature.home
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +43,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
@@ -47,6 +56,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -66,6 +76,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -119,6 +130,9 @@ fun HomeScreen(
     // 节日卡片右侧角标 emoji（默认 ☀️）
     val homeBadgeEmoji by container.settingsRepository.homeBadgeEmoji
         .collectAsState(initial = "☀️")
+    // 周期管家入口按钮：默认关，需在「周期管家 → 设置 → 隐私与快捷事件」里开启
+    val cycleEntryEnabled by container.settingsRepository.cycleEntryEnabled
+        .collectAsState(initial = false)
 
     // 云备份指示器：备份位置含云端（both/cloud）且 WebDAV 配置完整时常驻显示
     val cloudEnabled by container.autoBackup.cloudEnabled.collectAsState(initial = false)
@@ -126,6 +140,10 @@ fun HomeScreen(
     var showCloudSheet by remember { mutableStateOf(false) }
 
     var showAddSheet by remember { mutableStateOf(false) }
+    // FAB 展开态：开关开启后，点 + 号先展开（月亮升起、+ 号左侧出现「新增」），再点一次才真正新建。
+    // 让用户先看清右下角还有哪些入口，避免直接弹面板把人推到「事件 / 文件夹」二选一里。
+    // 开关关闭时这个状态永远是 false，点 + 号一步新建，与改动前完全一致。
+    var fabExpanded by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
     var folderDialogTarget by remember { mutableStateOf<FolderEntity?>(null) }
     var pendingMoveAfterCreate by remember { mutableStateOf(false) }
@@ -305,6 +323,9 @@ fun HomeScreen(
         if (searchActive) closeSearch() else exitSelection()
     }
 
+    // FAB 展开态下按返回键先收起，而不是直接退出 App
+    BackHandler(enabled = fabExpanded && !searchActive && !selectionMode) { fabExpanded = false }
+
     Scaffold(
         topBar = {
             if (selectionMode) {
@@ -438,8 +459,87 @@ fun HomeScreen(
         },
         floatingActionButton = {
             if (!selectionMode) {
-                FloatingActionButton(onClick = { showAddSheet = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "新建")
+                // 两枚按钮右对齐成一列：小按钮（周期管家）在上，新建加号在下。
+                // 用 Alignment.End 而不是居中——让 40dp 小按钮的右边缘与 56dp 加号的右边缘对齐，
+                // 两枚按钮落在同一条竖线上，视觉上才是一组；居中会让小按钮相对加号偏左半个差值。
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // 周期管家入口：只在展开态出现（开关关着则永不出现），所以平时右下角仍只有一枚加号。
+                    // 从下往上撑开——它长在加号上方，若从上方展开会像从屏幕外掉进来。
+                    AnimatedVisibility(
+                        visible = cycleEntryEnabled && fabExpanded,
+                        enter = fadeIn(tween(140)) + expandVertically(
+                            expandFrom = Alignment.Bottom,
+                            animationSpec = tween(200)
+                        ),
+                        exit = fadeOut(tween(100)) + shrinkVertically(
+                            shrinkTowards = Alignment.Bottom,
+                            animationSpec = tween(160)
+                        )
+                    ) {
+                        SmallFloatingActionButton(
+                            onClick = {
+                                fabExpanded = false
+                                onNavigate(Routes.CYCLE)
+                            },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ) {
+                            Icon(Icons.Filled.Nightlight, contentDescription = "周期管家")
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // 「新增」标签：贴在加号左侧、自右向左滑出，收起时宽度归零不占位。
+                        // 加号第一次点只展开、不弹面板，这个标签就是把「再点一次会发生什么」说清楚。
+                        AnimatedVisibility(
+                            visible = cycleEntryEnabled && fabExpanded,
+                            enter = fadeIn(tween(140)) + expandHorizontally(
+                                expandFrom = Alignment.End,
+                                animationSpec = tween(200)
+                            ),
+                            exit = fadeOut(tween(100)) + shrinkHorizontally(
+                                shrinkTowards = Alignment.End,
+                                animationSpec = tween(160)
+                            )
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "新增",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .shadow(2.dp, RoundedCornerShape(10.dp))
+                                        .background(
+                                            MaterialTheme.colorScheme.surface,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                            }
+                        }
+                        FloatingActionButton(
+                            onClick = {
+                                if (cycleEntryEnabled && !fabExpanded) {
+                                    // 第一次：只展开，把右下角还有什么摊开给用户看
+                                    fabExpanded = true
+                                } else {
+                                    // 第二次（或开关关闭时）：执行新建
+                                    fabExpanded = false
+                                    showAddSheet = true
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "新建")
+                        }
+                    }
                 }
             }
         }
@@ -659,6 +759,20 @@ fun HomeScreen(
                 }
                 }
             }
+        }
+
+        // 展开态遮罩：点空白处收起。压在列表之上、顶栏之下——顶栏的搜索/菜单仍可正常点，
+        // 不把整页都吃掉。用 indication = null，避免整屏泛出水波纹。
+        if (fabExpanded && cycleEntryEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { fabExpanded = false }
+            )
         }
     }
 

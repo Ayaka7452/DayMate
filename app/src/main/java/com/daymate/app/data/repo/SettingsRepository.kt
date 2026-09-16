@@ -29,6 +29,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val CYCLE_EVENT_ENABLED = booleanPreferencesKey("cycle_event_enabled") // 主页快捷事件开关
         private val CYCLE_EVENT_TITLE = stringPreferencesKey("cycle_event_title")   // 快捷事件自定义名（默认「周期管家」）
         private val CYCLE_EVENT_ID = longPreferencesKey("cycle_event_id")           // 快捷事件的事件 id
+        private val CYCLE_ENTRY_ENABLED = booleanPreferencesKey("cycle_entry_enabled") // 主页新建按钮上方的常驻入口按钮（默认关）
         private val CYCLE_DEFAULT_CALENDAR = booleanPreferencesKey("cycle_default_calendar") // 周期管家默认视图（false=圆环，true=日历）
         private val CYCLE_CYCLE_AUTO = booleanPreferencesKey("cycle_cycle_auto")     // 周期天数自动按记录均值推算（默认开；手改即固定）
         private val CYCLE_PERIOD_AUTO = booleanPreferencesKey("cycle_period_auto")   // 经期天数自动按记录均值推算（默认开；手改即固定）
@@ -161,6 +162,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val cyclePeriodDays: Flow<Int> = dataStore.data.map { it[CYCLE_PERIOD_DAYS] ?: 5 }
     val cyclePasswordEnabled: Flow<Boolean> = dataStore.data.map { it[CYCLE_PASSWORD] ?: false }
     val cycleEventEnabled: Flow<Boolean> = dataStore.data.map { it[CYCLE_EVENT_ENABLED] ?: false }
+    /** 主页右下角、新建按钮上方的常驻入口按钮（默认关，需在周期管家设置里开启）。 */
+    val cycleEntryEnabled: Flow<Boolean> = dataStore.data.map { it[CYCLE_ENTRY_ENABLED] ?: false }
     val cycleEventTitle: Flow<String> = dataStore.data.map { it[CYCLE_EVENT_TITLE] ?: "周期管家" }
     val cycleEventId: Flow<Long> = dataStore.data.map { it[CYCLE_EVENT_ID] ?: -1L }
     val cycleDefaultCalendar: Flow<Boolean> = dataStore.data.map { it[CYCLE_DEFAULT_CALENDAR] ?: false }
@@ -197,6 +200,10 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setCycleEventId(id: Long) {
         dataStore.edit { it[CYCLE_EVENT_ID] = id }
+    }
+
+    suspend fun setCycleEntryEnabled(enabled: Boolean) {
+        dataStore.edit { it[CYCLE_ENTRY_ENABLED] = enabled }
     }
 
     suspend fun setCycleDefaultCalendar(calendar: Boolean) {
