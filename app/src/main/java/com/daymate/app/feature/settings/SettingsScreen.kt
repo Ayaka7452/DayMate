@@ -23,10 +23,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -98,6 +100,10 @@ fun SettingsScreen(
     var showFestivalSourceDialog by remember { mutableStateOf(false) }
     var showFestivalCustomInput by remember { mutableStateOf(false) }
     var festivalCustomUrl by remember { mutableStateOf(festivalRepo.sourceUrl()) }
+    // 可自选缓存年份（当前年 ±3），默认去年/今年/明年
+    var showFestivalYearsDialog by remember { mutableStateOf(false) }
+    var festivalYears by remember { mutableStateOf(festivalRepo.selectedYears()) }
+    var festivalYearDraft by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var showBadgeEmojiDialog by remember { mutableStateOf(false) }
 
     // 数据备份：选择文件夹仅作 SAF 导出/导入目标，不需要任何存储权限（全屏覆盖）
@@ -457,10 +463,31 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable {
+                        festivalYearDraft = festivalYears.toSet()
+                        showFestivalYearsDialog = true
+                    }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.DateRange, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("缓存年份", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "已选 ${FestivalRepository.yearsText(festivalYears)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .clickable(enabled = !festivalDownloading) {
                         festivalDownloading = true
                         scope.launch {
-                            val result = festivalRepo.updateFromNetwork()
+                            val result = festivalRepo.updateFromNetwork(festivalYears)
                             festivalDownloading = false
                             festivalStatus = festivalRepo.dataStatusText()
                             Toast.makeText(ctx, result.summaryText(), Toast.LENGTH_SHORT).show()
@@ -484,10 +511,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
-                        run {
-                            val y = java.time.LocalDate.now().year
-                            "范围：${y - 1}–${y + 1} 年 · $festivalStatus"
-                        },
+                        "${FestivalRepository.yearsText(festivalYears)} · $festivalStatus",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -550,7 +574,7 @@ fun SettingsScreen(
                 Column {
                     WidgetEventOption(
                         title = "holiday-cn（默认）",
-                        subtitle = "GitHub 开源数据 · jsDelivr CDN",
+                        subtitle = "跟随国务院通知发布 · GitHub 开源数据",
                         selected = currentUrl == FestivalRepository.SOURCE_HOLIDAY_CN
                     ) {
                         festivalRepo.setSourceUrl(FestivalRepository.SOURCE_HOLIDAY_CN)
@@ -558,19 +582,9 @@ fun SettingsScreen(
                         showFestivalSourceDialog = false
                     }
                     WidgetEventOption(
-                        title = "timor.tech",
-                        subtitle = "免费节假日 API",
-                        selected = currentUrl == FestivalRepository.SOURCE_TIMOR
-                    ) {
-                        festivalRepo.setSourceUrl(FestivalRepository.SOURCE_TIMOR)
-                        festivalSourceLabel = festivalRepo.sourceLabel()
-                        showFestivalSourceDialog = false
-                    }
-                    WidgetEventOption(
                         title = "自定义 URL…",
-                        subtitle = "使用 {year} 作为年份占位符，需返回 holiday-cn 或 timor 格式",
-                        selected = currentUrl != FestivalRepository.SOURCE_HOLIDAY_CN &&
-                            currentUrl != FestivalRepository.SOURCE_TIMOR
+                        subtitle = "按数据结构自动识别，兼容主流节假日数据源",
+                        selected = currentUrl != FestivalRepository.SOURCE_HOLIDAY_CN
                     ) {
                         festivalCustomUrl = festivalRepo.sourceUrl()
                         showFestivalCustomInput = true
@@ -590,27 +604,100 @@ fun SettingsScreen(
             onDismissRequest = { showFestivalCustomInput = false },
             title = { Text("自定义数据源 URL") },
             text = {
-                OutlinedTextField(
-                    value = festivalCustomUrl,
-                    onValueChange = { festivalCustomUrl = it },
-                    label = { Text("URL（{year} 为年份占位符）") },
-                    supportingText = { Text("自动识别 holiday-cn 与 timor.tech 两种数据格式") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column {
+                    OutlinedTextField(
+                        value = festivalCustomUrl,
+                        onValueChange = { festivalCustomUrl = it },
+                        label = { Text("URL") },
+                        supportingText = { Text("含 {year} 占位符则按年下载；不含则下载整份文件后按年缓存") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "按结构自动识别，已兼容 holiday-cn、日期为键、节假日/工作日 Map、" +
+                            "data.list 数组等主流格式；节日名会统一成规范写法。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
                     val u = festivalCustomUrl.trim()
-                    if (u.startsWith("http") && u.contains("{year}")) {
+                    if (u.startsWith("http")) {
                         festivalRepo.setSourceUrl(u)
                         festivalSourceLabel = festivalRepo.sourceLabel()
                         showFestivalCustomInput = false
+                    } else {
+                        Toast.makeText(ctx, "请填写以 http 开头的地址", Toast.LENGTH_SHORT).show()
                     }
                 }) { Text("确定") }
             },
             dismissButton = {
                 TextButton(onClick = { showFestivalCustomInput = false }) { Text("取消") }
+            }
+        )
+    }
+
+    // 缓存年份选择弹窗（当前年 ±3，勾选后「下载数据」按所选年份逐一拉取）
+    if (showFestivalYearsDialog) {
+        val years = festivalRepo.selectableYears()
+        AlertDialog(
+            onDismissRequest = { showFestivalYearsDialog = false },
+            title = { Text("缓存年份") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        "勾选需要缓存的年份。次年放假安排一般在当年 11 月前后公布，" +
+                            "未公布前下载会提示「尚未发布」，不会覆盖已有缓存。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    val cached = remember(showFestivalYearsDialog) { festivalRepo.cachedYears().toSet() }
+                    years.forEach { y ->
+                        val checked = y in festivalYearDraft
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    festivalYearDraft = if (checked) {
+                                        festivalYearDraft - y
+                                    } else {
+                                        festivalYearDraft + y
+                                    }
+                                }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(checked = checked, onCheckedChange = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("$y 年", style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                if (y in cached) "已缓存" else "未缓存",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val picked = festivalYearDraft.sorted()
+                    if (picked.isNotEmpty()) {
+                        festivalRepo.setSelectedYears(picked)
+                        festivalYears = picked
+                    } else {
+                        Toast.makeText(ctx, "至少选择一个年份", Toast.LENGTH_SHORT).show()
+                    }
+                    showFestivalYearsDialog = false
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFestivalYearsDialog = false }) { Text("取消") }
             }
         )
     }

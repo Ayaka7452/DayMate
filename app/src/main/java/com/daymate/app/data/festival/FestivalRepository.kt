@@ -10,7 +10,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDate
 
-/** 单个节假日条目：name 节日名（调休上班日为「调休上班（XX）」），isOffDay true=放假 / false=调休上班。
+/** 单个节假日条目：name 节日名（调休上班日沿用所属节日名，仅 isOffDay=false 区分），
+ *  isOffDay true=放假 / false=调休上班。
  *  isEstimate 仅用于表单快选的「预估日期」（缓存里没有该节日未来日期时按上次日期+1年推算，
  *  农历节日可能不准），下载到新一年数据后会自动校正，不会持久化到缓存。 */
 data class FestivalDay(
@@ -20,43 +21,93 @@ data class FestivalDay(
     val isEstimate: Boolean = false
 )
 
-/** 一次在线更新的结果：okYears 成功缓存的年份，failedYears 失败年份。 */
-data class FestivalUpdateResult(val okYears: List<Int>, val failedYears: List<Int>) {
+/**
+ * 一次在线更新的结果：
+ *  - [okYears] 成功解析并写入缓存的年份；
+ *  - [notPublishedYears] 数据源里该年份还没内容（如次年放假安排尚未发布）——**不是失败**；
+ *  - [failedYears] 网络异常、格式无法识别等真正的失败。
+ */
+data class FestivalUpdateResult(
+    val okYears: List<Int>,
+    val notPublishedYears: List<Int>,
+    val failedYears: List<Int>
+) {
     val success: Boolean get() = okYears.isNotEmpty()
-    fun summaryText(): String = when {
-        okYears.isEmpty() -> "下载失败，请检查网络或数据源"
-        failedYears.isEmpty() -> "已更新 ${okYears.min()}–${okYears.max()} 年"
-        else -> "更新了 ${okYears.joinToString("、")}；失败：${failedYears.joinToString("、")}"
+
+    fun summaryText(): String {
+        val parts = buildList {
+            if (okYears.isNotEmpty()) add("已更新 ${okYears.joinToString("、")} 年")
+            if (notPublishedYears.isNotEmpty()) add("${notPublishedYears.joinToString("、")} 年放假安排尚未发布")
+            if (failedYears.isNotEmpty()) add("${failedYears.joinToString("、")} 年下载失败")
+        }
+        return when {
+            parts.isEmpty() -> "没有可下载的年份"
+            // 全部都是「还没发布」：不报失败，明确告诉用户数据源还没出
+            okYears.isEmpty() && failedYears.isEmpty() -> "所选的年份放假安排尚未发布"
+            else -> parts.joinToString("；")
+        }
     }
 }
 
 /**
  * 中国法定节假日数据仓库：**不内置离线数据**，完全依赖「在线下载 + 本地文件缓存」。
  *
- * App 运行时自行下载数据并解析——内置两种已知公开格式的解析器（自动识别）：
+ * 默认数据源为 holiday-cn（NateScarlet，跟随国务院通知发布，jsDelivr CDN 国内可达）；
+ * 用户可在设置中换成任意 URL——解析器按结构自动识别，不绑定具体厂商，已覆盖：
  *  1. holiday-cn：{"year":2026,"days":[{"name":"元旦","date":"2026-01-01","isOffDay":true}]}
- *  2. timor.tech：{"code":0,"holiday":{"01-01":{"holiday":true,"name":"元旦","date":"2026-01-01"}}}
+ *  2. timor.tech 老格式：{"holiday":{"01-01":{"holiday":true,"name":"元旦","date":"2026-01-01"}}}
+ *  3. 日期为键：{"2026-01-01":{"name":"元旦","isOffDay":true}}（jiejiariapi 等）
+ *  4. 节假日/工作日双 Map：{"holidays":{"2026-01-01":"New Year's Day,元旦,1"},"workdays":{…}}（chinese-days）
+ *  5. 包裹在 data / data.list 下的日条目数组（apihubs 等）
+ *  6. 以年份为键：{"2026":[…]}
+ *  7. 顶层就是日条目数组：[{…}]
  *
- * 数据源 URL 可在设置中更换（含 {year} 占位符），默认为 holiday-cn 的 jsDelivr CDN。
+ * 节日名会统一成规范写法（chinese-days 的「清明」→「清明节」），因为「跟随节日」事件
+ * 按名字锚定，不统一的话换数据源会让既有事件失效。
+ *
+ * URL 含 `{year}` 占位符时按年逐个下载；不含占位符（如全量 JSON）则下载一次、按年份切分。
  * 下载成功后按「归一化格式」（与 holiday-cn 相同的精简结构）写入 filesDir/festival_cache/{year}.json；
  * 所有查询只读缓存——缓存为空时查询返回 null/空列表，由调用方提示用户去设置下载。
  */
 class FestivalRepository(private val appContext: Context) {
 
     companion object {
-        /** 默认源：holiday-cn 开源数据（GitHub 权威发布，jsDelivr CDN 国内可达）。 */
+        /** 默认源：holiday-cn 开源数据（跟随国务院通知发布，jsDelivr CDN 国内可达）。 */
         const val SOURCE_HOLIDAY_CN = "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json"
-        /** 备选源：timor.tech 免费节假日 API。 */
-        const val SOURCE_TIMOR = "https://timor.tech/api/holiday/year/{year}"
         const val DEFAULT_SOURCE = SOURCE_HOLIDAY_CN
+
+        /** URL 中的年份占位符；缺省表示「整份文件源」。 */
+        const val YEAR_PLACEHOLDER = "{year}"
+
+        /** 设置页可选缓存年份的前后跨度：当前年 -3 ～ +3。 */
+        private const val YEAR_SPAN_BEFORE = 3
+        private const val YEAR_SPAN_AFTER = 3
 
         private const val PREFS = "festival_prefs"
         private const val KEY_SOURCE = "source_url"
+        private const val KEY_YEARS = "cache_years"
         private const val CACHE_DIR = "festival_cache"
+
+        /** 把年份列表渲染成「2025–2027 年」（连续）或「2025、2027 年」（不连续）。 */
+        fun yearsText(years: List<Int>): String {
+            if (years.isEmpty()) return "无"
+            val s = years.sorted()
+            return if (s.last() - s.first() == s.size - 1) "${s.first()}–${s.last()} 年"
+            else s.joinToString("、") + " 年"
+        }
     }
 
     private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val cacheDir = File(appContext.filesDir, CACHE_DIR)
+
+    init {
+        // 老版本可能选过已下线的 timor.tech（现返回 403）——自动切回默认源，
+        // 否则升级后下载会静默失败，而用户看不出是数据源挂了。
+        val stored = prefs.getString(KEY_SOURCE, null)?.trim()
+        if (stored != null && stored.contains("timor.tech", ignoreCase = true)) {
+            prefs.edit().putString(KEY_SOURCE, DEFAULT_SOURCE).apply()
+        }
+    }
 
     // ---------- 数据源管理（设置页可编辑） ----------
 
@@ -66,10 +117,28 @@ class FestivalRepository(private val appContext: Context) {
         prefs.edit().putString(KEY_SOURCE, url.trim()).apply()
     }
 
-    fun sourceLabel(): String = when (sourceUrl()) {
-        SOURCE_HOLIDAY_CN -> "holiday-cn（默认）"
-        SOURCE_TIMOR -> "timor.tech"
-        else -> "自定义源"
+    fun sourceLabel(): String =
+        if (sourceUrl() == SOURCE_HOLIDAY_CN) "holiday-cn（默认）" else "自定义源"
+
+    // ---------- 缓存年份选择 ----------
+
+    /** 设置页可勾选的年份范围（当前年 ±3）。 */
+    fun selectableYears(today: LocalDate = LocalDate.now()): List<Int> =
+        ((today.year - YEAR_SPAN_BEFORE)..(today.year + YEAR_SPAN_AFTER)).toList()
+
+    /** 默认下载范围：去年、今年、明年（明年数据通常尚未发布，联网后可自动补上）。 */
+    fun defaultYears(today: LocalDate = LocalDate.now()): List<Int> =
+        listOf(today.year - 1, today.year, today.year + 1)
+
+    /** 用户勾选的缓存年份；从未设置过则为默认范围。 */
+    fun selectedYears(): List<Int> {
+        val raw = prefs.getString(KEY_YEARS, null) ?: return defaultYears()
+        val parsed = raw.split(",").mapNotNull { it.trim().toIntOrNull() }.distinct().sorted()
+        return parsed.ifEmpty { defaultYears() }
+    }
+
+    fun setSelectedYears(years: Collection<Int>) {
+        prefs.edit().putString(KEY_YEARS, years.distinct().sorted().joinToString(",")).apply()
     }
 
     private fun cacheFile(year: Int): File = cacheDir.apply { mkdirs() }.let { File(it, "$year.json") }
@@ -86,15 +155,18 @@ class FestivalRepository(private val appContext: Context) {
 
     fun hasData(): Boolean = cachedYears().isNotEmpty()
 
+    /** 某年份是否已有可用缓存（设置页逐年份显示状态用）。 */
+    fun isCached(year: Int): Boolean = loadYear(year).isNotEmpty()
+
     fun dataStatusText(): String {
         val years = cachedYears()
-        return if (years.isEmpty()) "未下载" else "已缓存 ${years.first()}–${years.last()} 年"
+        return if (years.isEmpty()) "未下载" else "已缓存 ${yearsText(years)}"
     }
 
     private fun loadYear(year: Int): List<FestivalDay> {
         val f = cacheFile(year)
         if (!f.exists()) return emptyList()
-        return runCatching { parseJson(f.readText())?.second ?: emptyList() }.getOrDefault(emptyList())
+        return runCatching { parseAny(f.readText())[year] ?: emptyList() }.getOrDefault(emptyList())
     }
 
     private fun allDays(): List<FestivalDay> =
@@ -147,28 +219,57 @@ class FestivalRepository(private val appContext: Context) {
     // ---------- 在线下载（App 自行拉取并解析） ----------
 
     /**
-     * 下载 [当前年-1, 当前年, 当前年+1] 三年的数据并写缓存。
-     * 单年失败不影响其他年份；全部失败时 success=false。
+     * 下载 [years] 各年数据并写缓存（默认取用户勾选的年份）。
+     *
+     * 单年失败不影响其他年份。数据源返回「空内容」或 HTTP 404（如国务院尚未公布次年放假安排）
+     * 归入 [FestivalUpdateResult.notPublishedYears]，与真正的网络失败区分开——避免把
+     * 「还没发布」误报成「下载失败」。
      */
-    suspend fun updateFromNetwork(): FestivalUpdateResult = withContext(Dispatchers.IO) {
-        val today = LocalDate.now()
-        val years = listOf(today.year - 1, today.year, today.year + 1)
-        val ok = mutableListOf<Int>()
-        val fail = mutableListOf<Int>()
-        for (y in years) {
-            try {
-                val text = download(sourceUrl().replace("{year}", y.toString()))
-                val (parsedYear, days) = parseJson(text)
-                    ?: throw IllegalArgumentException("无法识别的数据格式")
-                if (days.isEmpty()) throw IllegalArgumentException("数据为空")
-                cacheFile(y).writeText(normalize(parsedYear, days))
-                ok.add(y)
-            } catch (_: Exception) {
-                fail.add(y)
+    suspend fun updateFromNetwork(years: List<Int> = selectedYears()): FestivalUpdateResult =
+        withContext(Dispatchers.IO) {
+            val ok = mutableListOf<Int>()
+            val pending = mutableListOf<Int>()
+            val fail = mutableListOf<Int>()
+            val url = sourceUrl()
+            if (!url.contains(YEAR_PLACEHOLDER)) {
+                // 整份文件源（如 chinese-days 全量 JSON）：只下一次，按年份切分
+                val all = runCatching { parseAny(download(url)) }.getOrNull()
+                if (all.isNullOrEmpty()) {
+                    fail.addAll(years)
+                } else {
+                    for (y in years) commit(y, all[y].orEmpty(), ok, pending)
+                }
+            } else {
+                for (y in years) {
+                    try {
+                        val days = parseAny(download(url.replace(YEAR_PLACEHOLDER, y.toString())))[y].orEmpty()
+                        commit(y, days, ok, pending)
+                    } catch (_: DataNotPublished) {
+                        pending.add(y)
+                    } catch (_: Exception) {
+                        fail.add(y)
+                    }
+                }
             }
+            FestivalUpdateResult(ok.sorted(), pending.sorted(), fail.sorted())
         }
-        FestivalUpdateResult(ok, fail)
+
+    private fun commit(
+        year: Int,
+        days: List<FestivalDay>,
+        ok: MutableList<Int>,
+        pending: MutableList<Int>
+    ) {
+        if (days.isEmpty()) {
+            pending.add(year)
+        } else {
+            cacheFile(year).writeText(normalize(year, days))
+            ok.add(year)
+        }
     }
+
+    /** 该年份的文件还不存在/还没内容——「尚未发布」，不是失败。 */
+    private class DataNotPublished : RuntimeException()
 
     private fun download(url: String): String {
         val conn = URL(url).openConnection() as HttpURLConnection
@@ -176,14 +277,16 @@ class FestivalRepository(private val appContext: Context) {
         conn.readTimeout = 15_000
         conn.requestMethod = "GET"
         try {
-            if (conn.responseCode !in 200..299) throw RuntimeException("HTTP ${conn.responseCode}")
+            val code = conn.responseCode
+            if (code == 404) throw DataNotPublished()
+            if (code !in 200..299) throw RuntimeException("HTTP $code")
             return conn.inputStream.bufferedReader().use { it.readText() }
         } finally {
             conn.disconnect()
         }
     }
 
-    // ---------- 解析（写缓存用归一化格式，读缓存兼容两种来源的归一化结果） ----------
+    // ---------- 缓存读写（归一化格式） ----------
 
     private fun normalize(year: Int, days: List<FestivalDay>): String {
         val root = JSONObject()
@@ -200,41 +303,194 @@ class FestivalRepository(private val appContext: Context) {
         return root.toString()
     }
 
-    /** 自动识别 holiday-cn / timor.tech 两种格式；无法识别返回 null。 */
-    fun parseJson(text: String): Pair<Int, List<FestivalDay>>? = runCatching {
-        val root = JSONObject(text)
-        when {
-            root.has("days") -> {
-                // holiday-cn 格式
-                val arr = root.getJSONArray("days")
-                val days = mutableListOf<FestivalDay>()
-                for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
-                    val local = runCatching { LocalDate.parse(o.getString("date")) }.getOrNull() ?: continue
-                    days.add(FestivalDay(o.optString("name", "节假日"), local, o.optBoolean("isOffDay", true)))
-                }
-                if (days.isEmpty()) null else (root.optInt("year", days.first().date.year) to days)
+    // ---------- 解析：按结构自动识别，不绑定具体厂商 ----------
+
+    /** 解析任意主流节假日数据源返回体，返回「年份 → 条目」；无法识别返回空 Map。 */
+    fun parseAny(text: String): Map<Int, List<FestivalDay>> = runCatching {
+        val body = text.trimStart()
+        if (body.startsWith("[")) {
+            // 顶层就是日条目数组（少数 API 如此）
+            return@runCatching readDayArray(JSONArray(body), null)
+                .groupBy { it.date.year }
+                .mapValues { (_, v) -> v.sortedBy { it.date } }
+        }
+        val root = JSONObject(body)
+        val buckets = linkedMapOf<Int, MutableList<FestivalDay>>()
+        fun put(year: Int, day: FestivalDay) {
+            buckets.getOrPut(year) { mutableListOf() }.add(day)
+        }
+
+        // 形态 1/5：日条目数组（顶层 days / list / data，或 data.list / data.days）
+        val array = dayArrayOf(root)
+        if (array != null) {
+            val explicitYear = root.optInt("year", 0).takeIf { it > 0 }
+            for (d in readDayArray(array, explicitYear)) put(explicitYear ?: d.date.year, d)
+            return@runCatching sortBuckets(buckets)
+        }
+
+        // 形态 2/3/4：对象形态（值可能是对象，也可能是 "英文,中文,等级" 这类字符串）
+        val maps = mutableListOf<Pair<JSONObject, Boolean>>()
+        root.optJSONObject("holiday")?.let { maps.add(it to true) }    // timor.tech
+        root.optJSONObject("holidays")?.let { maps.add(it to true) }   // chinese-days
+        root.optJSONObject("workdays")?.let { maps.add(it to false) }  // chinese-days
+        if (maps.isEmpty() && root.keys().asSequence().any { parseDate(it) != null }) {
+            maps.add(root to true)                                     // 日期为键（jiejiariapi）
+        }
+        val fallbackYear = root.optInt("year", 0).takeIf { it > 0 }
+        for ((obj, offDefault) in maps) {
+            for (d in readDateKeyedMap(obj, offDefault, fallbackYear)) put(d.date.year, d)
+        }
+
+        // 形态 6：以年份为键
+        if (buckets.isEmpty()) {
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val year = key.toIntOrNull() ?: continue
+                val arr = root.optJSONArray(key)
+                    ?: root.optJSONObject(key)?.let { dayArrayOf(it) }
+                if (arr != null) for (d in readDayArray(arr, year)) put(year, d)
             }
-            root.has("holiday") -> {
-                // timor.tech 格式：key 为 MM-dd，date 字段为完整日期
-                val hol = root.getJSONObject("holiday")
-                val days = mutableListOf<FestivalDay>()
-                val keys = hol.keys()
-                while (keys.hasNext()) {
-                    val o = hol.getJSONObject(keys.next())
-                    val local = runCatching { LocalDate.parse(o.optString("date")) }.getOrNull() ?: continue
-                    val off = o.optBoolean("holiday", true)
-                    val name = if (off) {
-                        o.optString("name", "节假日").ifBlank { "节假日" }
-                    } else {
-                        val target = o.optString("target").takeIf { it.isNotBlank() }
-                        if (target != null) "调休上班（$target）" else "调休上班"
-                    }
-                    days.add(FestivalDay(name, local, off))
+        }
+        sortBuckets(buckets)
+    }.getOrDefault(emptyMap())
+
+    private fun sortBuckets(buckets: Map<Int, MutableList<FestivalDay>>): Map<Int, List<FestivalDay>> =
+        buckets.mapValues { (_, v) -> v.sortedBy { it.date } }
+
+    private fun dayArrayOf(root: JSONObject): JSONArray? =
+        root.optJSONArray("days")
+            ?: root.optJSONArray("list")
+            ?: root.optJSONArray("data")
+            ?: root.optJSONObject("data")?.let { dayArrayOf(it) }
+
+    /** 读「日条目数组」。无名字的「非放假」条目直接丢弃——它们只是普通工作日（如 apihubs 的全年流水）。 */
+    private fun readDayArray(arr: JSONArray, fallbackYear: Int?): List<FestivalDay> {
+        val out = mutableListOf<FestivalDay>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val date = parseDate(o.opt("date")?.toString())
+                ?: parseDate(o.opt("day")?.toString())
+                ?: fallbackYear?.let { y -> monthDayOf(o)?.let { md -> md.atYear(y) } }
+                ?: continue
+            val off = offDayOf(o, true)
+            val name = nameOf(o)
+            if (!off && name == null) continue
+            out.add(FestivalDay(name ?: "节假日", date, off))
+        }
+        return out
+    }
+
+    /** 读「以日期（或 MM-dd）为键」的对象；值可以是条目对象，也可以是 "英文,中文,等级" 这类字符串。 */
+    private fun readDateKeyedMap(
+        obj: JSONObject,
+        offDefault: Boolean,
+        fallbackYear: Int?
+    ): List<FestivalDay> {
+        val out = mutableListOf<FestivalDay>()
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            when (val v = obj.opt(key)) {
+                is JSONObject -> {
+                    val date = parseDate(v.opt("date")?.toString())
+                        ?: parseDate(key)
+                        ?: fallbackYear?.let { y -> monthDayOf(v)?.let { md -> md.atYear(y) } }
+                        ?: continue
+                    val off = offDayOf(v, offDefault)
+                    val name = nameOf(v)
+                    if (!off && name == null) continue
+                    out.add(FestivalDay(name ?: "节假日", date, off))
                 }
-                if (days.isEmpty()) null else (days.first().date.year to days)
+                // chinese-days："New Year's Day,元旦,1" → 取中文名（值也可能是纯中文名）
+                is String -> {
+                    val date = parseDate(key) ?: continue
+                    val parts = v.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    val name = (parts.getOrNull(1) ?: parts.firstOrNull())?.let { canonicalName(it) }
+                    if (!offDefault && name == null) continue
+                    out.add(FestivalDay(name ?: "节假日", date, offDefault))
+                }
+                else -> Unit
             }
+        }
+        return out
+    }
+
+    /** 条目名：优先取显式名字（统一成规范名）；取不到返回 null（由调用方决定是否丢弃）。 */
+    private fun nameOf(o: JSONObject): String? {
+        for (k in listOf("name", "name_cn", "holidayName", "festival", "title", "cn")) {
+            val s = o.optString(k, "").trim()
+            if (s.isNotEmpty() && s != "null") return canonicalName(s)
+        }
+        return null
+    }
+
+    /**
+     * 节日名归一化。各数据源对同一节日的写法略有差异（chinese-days 作「清明」、
+     * holiday-cn / jiejiariapi 作「清明节」），而「跟随节日」事件是按**名字**锚定的
+     * （见 EventRepository.nextOccurrenceOf），不统一的话换数据源会让既有事件
+     * 因名字对不上而停止滚动。读取时也走这里，所以**旧缓存无需重下**。
+     */
+    private fun canonicalName(raw: String): String = when (val s = raw.trim()) {
+        "清明", "清明节" -> "清明节"
+        "中秋", "中秋节" -> "中秋节"
+        "端午", "端午节" -> "端午节"
+        "五一", "五一劳动节", "劳动节" -> "劳动节"
+        "十一", "国庆", "国庆节" -> "国庆节"
+        else -> s
+    }
+
+    /**
+     * 是否放假。按字段语义逐个尝试；数字码只在 0/1/2 这类明确语义下才采信
+     * （apihubs 用 1=是 / 2=否，其余数字码含义不明则跳过，避免把普通工作日误判成假期）。
+     */
+    private fun offDayOf(o: JSONObject, fallback: Boolean): Boolean {
+        for (k in listOf("isOffDay", "isHoliday", "offDay", "holiday_recess")) {
+            asBool(o.opt(k))?.let { return it }
+        }
+        asBool(o.opt("holiday"))?.let { return it }
+        asBool(o.opt("isWorkday"))?.let { return !it }
+        asBool(o.opt("workday"))?.let { return !it }
+        return fallback
+    }
+
+    private fun asBool(v: Any?): Boolean? = when (v) {
+        is Boolean -> v
+        is Number -> when (v.toInt()) {
+            1 -> true
+            0, 2 -> false
             else -> null
         }
-    }.getOrNull()
+        is String -> when (v.trim().lowercase()) {
+            "true", "1", "y", "yes", "是" -> true
+            "false", "0", "2", "n", "no", "否" -> false
+            else -> null
+        }
+        else -> null
+    }
+
+    /** MM-dd 形式的键/字段 → MonthDay。 */
+    private fun monthDayOf(o: JSONObject): java.time.MonthDay? =
+        runCatching {
+            val m = o.optInt("month", 0)
+            val d = o.optInt("day", 0)
+            if (m in 1..12 && d in 1..31) java.time.MonthDay.of(m, d) else null
+        }.getOrNull()
+
+    /** 兼容 "2026-01-01" / "2026/1/1" / "20260101" / 数字 20260101。 */
+    private fun parseDate(raw: String?): LocalDate? {
+        val s = raw?.trim()?.takeIf { it.isNotEmpty() && it != "null" } ?: return null
+        return runCatching {
+            if (Regex("^\\d{8}$").matches(s)) {
+                LocalDate.of(s.substring(0, 4).toInt(), s.substring(4, 6).toInt(), s.substring(6, 8).toInt())
+            } else {
+                val m = Regex("^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})$").find(s) ?: return null
+                LocalDate.of(
+                    m.groupValues[1].toInt(),
+                    m.groupValues[2].toInt(),
+                    m.groupValues[3].toInt()
+                )
+            }
+        }.getOrNull()
+    }
 }
