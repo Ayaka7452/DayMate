@@ -400,12 +400,16 @@ class FestivalRepository(private val appContext: Context) {
      * 单年失败不影响其他年份。数据源返回「空内容」或 HTTP 404（如国务院尚未公布次年放假安排）
      * 归入 [FestivalUpdateResult.notPublishedYears]，与真正的网络失败区分开——避免把
      * 「还没发布」误报成「下载失败」。
+     *
+     * 「尚未发布」的未来年份若仍残留旧缓存，一律清掉（[dropStaleFutureCache]）——
+     * 源说没发布、状态却说已缓存，自相矛盾（v1.11.1 修）。
      */
     suspend fun updateFromNetwork(years: List<Int> = selectedYears()): FestivalUpdateResult =
         withContext(Dispatchers.IO) {
             val ok = mutableListOf<Int>()
             val pending = mutableListOf<Int>()
             val fail = mutableListOf<Int>()
+            val removed = mutableListOf<Int>()
             // 下载开始时就把目标源的键钉死：中途用户可能又切了源，写入必须落回发起时那个源
             val key = cacheKey()
             val url = sourceUrl()
@@ -415,15 +419,16 @@ class FestivalRepository(private val appContext: Context) {
                 if (all.isNullOrEmpty()) {
                     fail.addAll(years)
                 } else {
-                    for (y in years) commit(key, y, all[y].orEmpty(), ok, pending)
+                    for (y in years) commit(key, y, all[y].orEmpty(), ok, pending, removed)
                 }
             } else {
                 for (y in years) {
                     try {
                         val days = parseAny(download(url.replace(YEAR_PLACEHOLDER, y.toString())))[y].orEmpty()
-                        commit(key, y, days, ok, pending)
+                        commit(key, y, days, ok, pending, removed)
                     } catch (_: DataNotPublished) {
                         pending.add(y)
+                        if (dropStaleFutureCache(key, y)) removed.add(y)
                     } catch (_: Exception) {
                         fail.add(y)
                     }
@@ -431,7 +436,8 @@ class FestivalRepository(private val appContext: Context) {
             }
             // 下载完顺手清一次：年份滑走后旧缓存就没用了
             pruneOldCache()
-            if (ok.isNotEmpty()) changed()
+            // removed 也要触发重读：清残留会改变「已缓存」年份列表，设置页得跟着刷新
+            if (ok.isNotEmpty() || removed.isNotEmpty()) changed()
             FestivalUpdateResult(ok.sorted(), pending.sorted(), fail.sorted())
         }
 
@@ -440,14 +446,33 @@ class FestivalRepository(private val appContext: Context) {
         year: Int,
         days: List<FestivalDay>,
         ok: MutableList<Int>,
-        pending: MutableList<Int>
+        pending: MutableList<Int>,
+        removed: MutableList<Int>
     ) {
         if (days.isEmpty()) {
             pending.add(year)
+            if (dropStaleFutureCache(key, year)) removed.add(year)
         } else {
             cacheFile(year, key).writeText(normalize(year, days))
             ok.add(year)
         }
+    }
+
+    /**
+     * 源明确报告 [year]「尚未发布」（HTTP 404 或空内容）时，缓存里若仍留着该年份的数据，
+     * 那份数据只可能来自旧数据源的占位/生成内容——v1.9.1 前缓存不分源，裸命名文件被
+     * [migrateLegacyCache] 一律归到当前源名下（如 timor 时代生成的「未来年份占位」被归到 CN）。
+     * 国务院未公布前不可能有真实数据：留着会让「已缓存 2027」与下载提示「2027 尚未发布」
+     * 自相矛盾，占位日期还会静默驱动「跟随节日」事件——删掉，等真正发布后重下。
+     *
+     * 只清未来年份：今年/去年返回空更可能是 CDN/网络故障，保留缓存、下次下载自动恢复。
+     *
+     * @return 是否真的删掉了文件
+     */
+    private fun dropStaleFutureCache(key: String, year: Int, today: LocalDate = LocalDate.now()): Boolean {
+        if (year <= today.year) return false
+        val f = cacheFile(year, key)
+        return f.exists() && runCatching { f.delete() }.getOrDefault(false)
     }
 
     /** 该年份的文件还不存在/还没内容——「尚未发布」，不是失败。 */
