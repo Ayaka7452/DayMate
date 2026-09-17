@@ -8,6 +8,7 @@
     <string name="widget_label_square">DayMate · 方形</string>
     <string name="widget_description_square">在 2×2 方形卡片上顯示倒數日</string>
     <string name="common_cancel">取消</string>
+    <string name="common_password_placeholder">點擊此處來輸入密碼</string>
     <string name="common_back">返回</string>
     <string name="common_save">儲存</string>
     <string name="common_delete">刪除</string>
@@ -298,7 +299,7 @@
     <string name="cycle_error_wrong_password">密碼錯誤</string>
     <string name="cycle_biometric_title">驗證身分</string>
     <string name="cycle_biometric_subtitle">解鎖週期管家</string>
-    <string name="cycle_input_password">輸入密碼解鎖</string>
+    <string name="cycle_input_password">輸入密碼來解鎖週期管家</string>
     <string name="cycle_unlock">解鎖</string>
     <string name="cycle_use_fingerprint">使用指紋</string>
     <string name="cycle_history_title">歷史記錄管理</string>
@@ -337,7 +338,7 @@
     <string name="vault_complete_setup">完成設定</string>
     <string name="vault_verify_identity">驗證身份</string>
     <string name="vault_unlock_vault">解鎖 Vault</string>
-    <string name="vault_enter_password_unlock">輸入密碼解鎖</string>
+    <string name="vault_enter_password_unlock">輸入密碼來解鎖 Vault</string>
     <string name="vault_fingerprint_invalid">指紋憑證已失效，請使用密碼解鎖</string>
     <string name="vault_enter_password_prompt">請輸入密碼</string>
     <string name="vault_password_wrong">密碼錯誤</string>

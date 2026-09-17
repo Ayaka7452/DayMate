@@ -8,6 +8,7 @@
     <string name="widget_label_square">DayMate · Square</string>
     <string name="widget_description_square">Show a countdown on a 2×2 square card</string>
     <string name="common_cancel">Cancel</string>
+    <string name="common_password_placeholder">Tap here to enter password</string>
     <string name="common_back">Back</string>
     <string name="common_save">Save</string>
     <string name="common_delete">Delete</string>
@@ -298,7 +299,7 @@
     <string name="cycle_error_wrong_password">Wrong password</string>
     <string name="cycle_biometric_title">Verify identity</string>
     <string name="cycle_biometric_subtitle">Unlock Cycle Tracker</string>
-    <string name="cycle_input_password">Enter password to unlock</string>
+    <string name="cycle_input_password">Enter password to unlock Cycle Tracker</string>
     <string name="cycle_unlock">Unlock</string>
     <string name="cycle_use_fingerprint">Use fingerprint</string>
     <string name="cycle_history_title">History management</string>
@@ -337,7 +338,7 @@
     <string name="vault_complete_setup">Complete Setup</string>
     <string name="vault_verify_identity">Verify Identity</string>
     <string name="vault_unlock_vault">Unlock Vault</string>
-    <string name="vault_enter_password_unlock">Enter password to unlock</string>
+    <string name="vault_enter_password_unlock">Enter password to unlock Vault</string>
     <string name="vault_fingerprint_invalid">Fingerprint credential is no longer valid. Please unlock with your password.</string>
     <string name="vault_enter_password_prompt">Please enter your password</string>
     <string name="vault_password_wrong">Incorrect password</string>

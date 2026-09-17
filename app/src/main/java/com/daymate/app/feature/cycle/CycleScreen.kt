@@ -1591,10 +1591,11 @@ private fun CycleUnlockGate(
                     password = it
                     error = null
                 },
-                // 提示一律写在输入框**下方**的小字里（supportingText），不放进框内。
-                // 框内提示（label 未聚焦态 / placeholder）长得像「已经填好的内容」，
-                // 而这里要传达的是「还没输入，该输什么」——放下面才不会被误读。
-                // 出错时同一位置换成错误文案并染红，避免下方叠两行字。
+                // 框内只放一句「动作指引」placeholder（点击此处来输入密码）——空框太素，也没说明这里能打字；
+                // 「解锁的是什么功能」这种信息量更大的话放**下方** supportingText：
+                // 框内空间窄，且长句在框里会被读成「已经填好的内容」。
+                // 出错时支持文本同一位置换成错误文案并染红，避免下方叠两行字。
+                placeholder = { Text(stringResource(R.string.common_password_placeholder)) },
                 supportingText = { Text(error ?: stringResource(R.string.cycle_input_password)) },
                 isError = error != null,
                 visualTransformation = PasswordVisualTransformation(),

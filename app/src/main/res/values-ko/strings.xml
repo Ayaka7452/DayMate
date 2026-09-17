@@ -8,6 +8,7 @@
     <string name="widget_label_square">DayMate · 사각</string>
     <string name="widget_description_square">2×2 사각 카드에 디데이 표시</string>
     <string name="common_cancel">취소</string>
+    <string name="common_password_placeholder">여기를 눌러 비밀번호 입력</string>
     <string name="common_back">뒤로</string>
     <string name="common_save">저장</string>
     <string name="common_delete">삭제</string>
@@ -298,7 +299,7 @@
     <string name="cycle_error_wrong_password">비밀번호가 틀렸습니다</string>
     <string name="cycle_biometric_title">신원 확인</string>
     <string name="cycle_biometric_subtitle">사이클 관리 잠금 해제</string>
-    <string name="cycle_input_password">비밀번호 입력하여 잠금 해제</string>
+    <string name="cycle_input_password">비밀번호를 입력하여 사이클 관리 잠금 해제</string>
     <string name="cycle_unlock">잠금 해제</string>
     <string name="cycle_use_fingerprint">지문 사용</string>
     <string name="cycle_history_title">기록 관리</string>
@@ -337,7 +338,7 @@
     <string name="vault_complete_setup">설정 완료</string>
     <string name="vault_verify_identity">신원 확인</string>
     <string name="vault_unlock_vault">Vault 잠금 해제</string>
-    <string name="vault_enter_password_unlock">잠금 해제할 비밀번호 입력</string>
+    <string name="vault_enter_password_unlock">비밀번호를 입력하여 Vault 잠금 해제</string>
     <string name="vault_fingerprint_invalid">지문 자격 증명이 무효화되었습니다. 비밀번호로 잠금 해제하세요.</string>
     <string name="vault_enter_password_prompt">비밀번호를 입력하세요</string>
     <string name="vault_password_wrong">비밀번호가 틀렸습니다</string>

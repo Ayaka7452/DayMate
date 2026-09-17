@@ -322,8 +322,10 @@ private fun VaultUnlockScreen(
                 password = it
                 error = null
             },
-            // 提示写在输入框**下方**的小字里（supportingText），与周期管家解锁页保持一致；
-            // 框内提示会被读成「已填内容」，不适合承载「还没输入的说明」。
+            // 与周期管家解锁页保持一致：框内只放动作指引 placeholder（点击此处来输入密码），
+            // 说明「解锁的是哪个功能」放下方 supportingText——框内长句会被读成「已填内容」。
+            // 出错时同一位置换成错误文案并染红。
+            placeholder = { Text(stringResource(R.string.common_password_placeholder)) },
             supportingText = { Text(error ?: stringResource(R.string.vault_enter_password_unlock)) },
             isError = error != null,
             visualTransformation = PasswordVisualTransformation(),

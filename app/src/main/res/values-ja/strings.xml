@@ -8,6 +8,7 @@
     <string name="widget_label_square">DayMate · スクエア</string>
     <string name="widget_description_square">2×2 のスクエアカードにカウントダウンを表示</string>
     <string name="common_cancel">キャンセル</string>
+    <string name="common_password_placeholder">ここをタップしてパスワードを入力</string>
     <string name="common_back">戻る</string>
     <string name="common_save">保存</string>
     <string name="common_delete">削除</string>
@@ -298,7 +299,7 @@
     <string name="cycle_error_wrong_password">パスワードが違います</string>
     <string name="cycle_biometric_title">本人確認</string>
     <string name="cycle_biometric_subtitle">サイクル管理のロック解除</string>
-    <string name="cycle_input_password">パスワードを入力してロック解除</string>
+    <string name="cycle_input_password">パスワードを入力してサイクル管理のロックを解除</string>
     <string name="cycle_unlock">ロック解除</string>
     <string name="cycle_use_fingerprint">指紋を使用</string>
     <string name="cycle_history_title">履歴管理</string>
@@ -337,7 +338,7 @@
     <string name="vault_complete_setup">設定を完了</string>
     <string name="vault_verify_identity">本人確認</string>
     <string name="vault_unlock_vault">Vault のロック解除</string>
-    <string name="vault_enter_password_unlock">パスワードを入力してロック解除</string>
+    <string name="vault_enter_password_unlock">パスワードを入力して Vault のロックを解除</string>
     <string name="vault_fingerprint_invalid">指紋の資格情報が無効になりました。パスワードでロック解除してください。</string>
     <string name="vault_enter_password_prompt">パスワードを入力してください</string>
     <string name="vault_password_wrong">パスワードが違います</string>
