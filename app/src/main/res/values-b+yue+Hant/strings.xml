@@ -140,8 +140,8 @@
     <string name="settings_custom_url">自訂 URL…</string>
     <string name="settings_source_custom_subtitle">按資料結構自動識別，兼容主流假期資料來源</string>
     <string name="settings_custom_source_url">自訂資料來源 URL</string>
-    <string name="settings_custom_url_hint">含 {year} 佔位符就會按年下載；唔含就下載成個檔案之後按年快取</string>
-    <string name="settings_custom_url_formats">按結構自動識別，已經兼容 holiday-cn、日期做鍵、假期/工作日 Map、data.list 陣列等主流格式；節日名會統一成規範寫法。</string>
+    <string name="settings_custom_url_hint">含 {year} 佔位符就會按年下載，唔含就下載成個檔案之後按年快取</string>
+    <string name="settings_custom_url_formats">按結構自動識別，已經兼容 holiday-cn、日期做鍵、假期/工作日 Map、data.list 陣列等主流格式，節日名會統一成規範寫法。</string>
     <string name="settings_url_http_hint">請填寫以 http 開頭嘅地址</string>
     <string name="settings_years_hint">勾選需要快取嘅年份，選擇會跟住年份自動更新。下年放假安排一般喺當年 11 月前後公佈，未公佈之前下載會提示「尚未發佈」，唔會覆蓋已有快取。\n未勾選下年嗰陣，年底嘅跨年節日（例如元旦）會攞唔到日期。</string>
     <string name="settings_year_n">%1$d 年</string>
@@ -191,7 +191,7 @@
     <string name="settings_existing_data">現有資料（未修改）</string>
     <string name="settings_recycle_note">回收筒內另有 %1$d 條已刪除條目，唔做清理。可以喺「回收筒」入面處理。</string>
     <string name="settings_source_dialog_title">假期資料來源</string>
-    <string name="settings_region_dialog_hint">揀你想要邊個國家／地區嘅假期。每個資料來源都會各自留低快取，隨時可以切返轉頭。如果新來源冇咗某個節日，跟住嗰個節日嘅事件會照舊保留原本嘅目標日期。</string>
+    <string name="settings_region_dialog_hint">揀你想要邊個國家／地區嘅假期。每個資料來源都會各自留低快取，隨時可切返。如果新來源冇咗某個節日，跟住嗰個節日嘅事件會照舊保留原本嘅目標日期。</string>
     <string name="settings_unit_places">%1$d 處</string>
     <string name="settings_unit_items">%1$d 條</string>
     <string name="settings_no_repair_needed">無需修復</string>
@@ -246,11 +246,11 @@
     <string name="cycle_tips_daily_log">日常記錄</string>
     <string name="cycle_tips_daily_log_body">喺月曆上點選任意日期，就可以為嗰日加日常記錄（性生活、出血同分泌物、身體症狀、情緒，或者自己填寫）。日常記錄只係留個痕跡，唔參與週期同排卵推算，亦都唔會點亮經期圓點，順手記低一條症狀唔會影響預測結果。</string>
     <string name="cycle_tips_phases">週期四個階段</string>
-    <string name="cycle_tips_phases_body">· 月經期：經期出血嘅第 1 日去到結束，通常 3～7 日，對應圓環嘅深色段。\n· 卵泡期：月經結束之後到排卵之前，卵泡逐漸發育成熟，係子宮內膜重新增厚嘅階段。\n· 排卵期：排卵日一般喺下次經期前 14 日左右，前後各約 2 日係受孕機率最高嘅窗口。\n· 黃體期：排卵之後到下次經期嚟之前，身體分泌孕激素維持內膜；未受孕嘅話內膜脫落，進入下一個月經期。</string>
+    <string name="cycle_tips_phases_body">· 月經期：經期出血嘅第 1 日去到結束，通常 3～7 日，對應圓環嘅深色段。\n· 卵泡期：月經結束之後到排卵之前，卵泡逐漸發育成熟，係子宮內膜重新增厚嘅階段。\n· 排卵期：排卵日一般喺下次經期前 14 日左右，前後各約 2 日係受孕機率最高嘅窗口。\n· 黃體期：排卵之後到下次經期嚟之前，身體分泌孕激素維持內膜，未受孕嘅話內膜脫落，進入下一個月經期。</string>
     <string name="cycle_tips_calendar_marks">月曆標記</string>
-    <string name="cycle_tips_calendar_marks_body">· 日期底色代表當日所處階段。\n· 實心圓點：已經登記嘅經期日。\n· 空心圓點：預測嘅經期日，到咗之後變做實心。\n· 右上角細圓點：當日有日常記錄，點選嗰日可以睇。\n· 幼藍框：今日；粗藍框：而家揀選緊嘅日期，收埋詳情之後粗框就消失。</string>
+    <string name="cycle_tips_calendar_marks_body">· 日期底色代表當日所處階段。\n· 實心圓點：已經登記嘅經期日。\n· 空心圓點：預測嘅經期日，到咗之後變做實心。\n· 右上角細圓點：當日有日常記錄，點選嗰日可以睇。\n· 幼藍框：今日，粗藍框：而家揀選緊嘅日期，收埋詳情之後粗框就消失。</string>
     <string name="cycle_tips_accuracy">關於準確性</string>
-    <string name="cycle_tips_accuracy_body">週期長度同經期日數人人唔同，情緒、壓力、作息、出行、疾病等等都可能令週期提前或者延後。月曆法按平均值推算，同實際排卵時間可能差幾日。推算結果只供參考，唔可以作為避孕或者醫學診斷依據；如果週期長期紊亂或者伴有唔舒服，請諮詢醫生。</string>
+    <string name="cycle_tips_accuracy_body">週期長度同經期日數人人唔同，情緒、壓力、作息、出行、疾病等等都可能令週期提前或者延後。月曆法按平均值推算，同實際排卵時間可能差幾日。推算結果只供參考，唔可以作為避孕或者醫學診斷依據，如果週期長期紊亂或者伴有唔舒服，請諮詢醫生。</string>
     <string name="cycle_no_record">暫時未有大嘢記</string>
     <string name="cycle_register_prompt">請登記今次經期</string>
     <string name="cycle_days_to_next_period_n">距離下次經期 %1$d 日</string>
@@ -279,7 +279,7 @@
     <string name="cycle_event_name_custom">自訂事件名稱：%1$s</string>
     <string name="cycle_title_show_entry">喺主頁顯示入口按鈕</string>
     <string name="cycle_sub_show_entry">開啟之後，長按主頁右下角嘅加號，就可以喺加號上面展開經期管家入口。</string>
-    <string name="cycle_method_note">呢個功能用月曆法推算：排卵日大約係預測下次經期首日減 14 日。經期比較長嗰陣排卵日同階段劃分會自動微調，卵泡期唔短過 2 日、黃體期唔短過 11 日，全部都喺醫學共識波動區間入面。週期受壓力、作息、疾病等等影響會有波動，結果只供參考，唔可以作為避孕或者醫學診斷依據；如果有月經異常或者健康疑問，請諮詢醫生。</string>
+    <string name="cycle_method_note">呢個功能用月曆法推算：排卵日大約係預測下次經期首日減 14 日。經期比較長嗰陣排卵日同階段劃分會自動微調，卵泡期唔短過 2 日、黃體期唔短過 11 日，全部都喺醫學共識波動區間入面。週期受壓力、作息、疾病等等影響會有波動，結果只供參考，唔可以作為避孕或者醫學診斷依據，如果有月經異常或者健康疑問，請諮詢醫生。</string>
     <string name="cycle_delete_record_title">刪除呢條記錄？</string>
     <string name="cycle_delete_record_text">%1$s 嘅經期記錄會被刪除，推算會基於剩餘記錄進行。</string>
     <string name="cycle_event_name_title">快捷事件名稱</string>
@@ -299,7 +299,6 @@
     <string name="cycle_biometric_title">驗證身分</string>
     <string name="cycle_biometric_subtitle">解鎖經期管家</string>
     <string name="cycle_input_password">輸入密碼解鎖</string>
-    <string name="cycle_password_label">密碼（同 Vault 一致）</string>
     <string name="cycle_unlock">解鎖</string>
     <string name="cycle_use_fingerprint">使用指紋</string>
     <string name="cycle_history_title">歷史記錄管理</string>
@@ -398,7 +397,7 @@
     <string name="about_developer">由 Ayaka7452 開發</string>
     <string name="settings_language">語言</string>
     <string name="settings_lang_dialog_title">揀語言</string>
-    <string name="settings_lang_subtitle">自動偵測會跟系統語言；系統語言唔支援就用 English</string>
+    <string name="settings_lang_subtitle">自動偵測會跟系統語言，系統語言唔支援就用 English</string>
     <string name="date_pattern_md">M月d日</string>
     <string name="date_pattern_ymd">yyyy年M月d日</string>
     <string name="date_pattern_ym">yyyy年M月</string>
@@ -410,7 +409,7 @@
     <string name="note_sex_protected">有保護嘅性行為</string>
     <string name="note_sex_unprotected">冇保護嘅性行為</string>
     <string name="note_sex_solo">自我愉悅</string>
-    <string name="note_sex_protected_hint">注意：體外射精並不是有效嘅避孕手段，受孕風險好高；要留意自己身體、及早自我評估。呢種做法亦都擋唔到疾病傳播。</string>
+    <string name="note_sex_protected_hint">注意：體外射精並不是有效嘅避孕手段，受孕風險好高。如果你用過呢種方式，請改揀「冇保護嘅性行為」，並持續留意自己身體、及早自我評估。呢種做法亦都擋唔到疾病傳播。</string>
     <string name="note_sex_unprotected_hint">緊急避孕藥要喺事後 72 個鐘內食，越快食越好。如果要長期避孕，建議問過醫生再揀短效口服避孕藥（要按週期定時食）。記得保護好自己，有需要就去睇醫生檢查，防範疾病傳播。</string>
     <string name="note_bleed_spotting">點滴出血</string>
     <string name="note_bleed_brown">褐色分泌物</string>
@@ -444,7 +443,7 @@
     <string name="settings_source_region_custom">自訂資料來源</string>
     <string name="settings_source_suggest">你而家嘅語言建議用「%1$s」，撳一下轉</string>
     <string name="settings_source_switch_title">轉換節日資料來源？</string>
-    <string name="settings_source_switch_msg">會轉做「%1$s」，之後可以下載嗰邊嘅假期資料。已經下載嘅快取會保留，隨時轉返。跟節日嘅事件如果喺新來源搵唔到同名節日，就會保持原本嘅目標日期。</string>
+    <string name="settings_source_switch_msg">會轉做「%1$s」，之後可以下載嗰邊嘅假期資料。已經下載嘅快取會保留，隨時可轉返。跟節日嘅事件如果喺新來源搵唔到同名節日，就會保持原本嘅目標日期。</string>
     <string name="settings_lang_festival_title">順便轉埋節日資料來源？</string>
     <string name="festival_years_none">冇</string>
     <string name="festival_years_range">%1$s–%2$s 年</string>
@@ -458,7 +457,7 @@
     <string name="festival_summary_all_pending">揀咗嘅年份假期安排仲未出</string>
     <string name="festival_unnamed">假期</string>
     <string name="festival_list_sep">、</string>
-    <string name="festival_sentence_sep">；</string>
+    <string name="festival_sentence_sep">，</string>
     <string name="cycle_no_records">仲未有記錄</string>
     <string name="cycle_no_records_hint">登記一次經期就可以推算階段</string>
     <string name="cycle_predict_period">預測經期</string>
@@ -669,7 +668,7 @@
     <string name="storage_overwrite_title">覆蓋備份？</string>
     <string name="storage_overwrite_desc">會用而家 App 嘅資料覆蓋揀咗嘅資料夾入面嘅備份，原本嘅備份會被取代，冇得復原。</string>
     <string name="storage_blocked">操作已經阻止咗</string>
-    <string name="storage_blocked_local_desc">揀咗嘅備份入面有資料，但係而家 App 入面冇任何資料。繼續落去會用空資料覆蓋個備份，令備份永久消失，所以阻止咗。\n\n想攞返備份就用「由備份還原」；真係要備份而家嘅空資料，就請先喺 App 入面建立內容。</string>
+    <string name="storage_blocked_local_desc">揀咗嘅備份入面有資料，但係而家 App 入面冇任何資料。繼續落去會用空資料覆蓋個備份，令備份永久消失，所以阻止咗。\n\n想攞返備份就用「由備份還原」，真係要備份而家嘅空資料，就請先喺 App 入面建立內容。</string>
     <string name="storage_cloud_overwrite_title">覆蓋雲端備份？</string>
     <string name="storage_cloud_overwrite_desc">雲端（%1$s/daymate.db）已經有備份，會被而家 App 嘅資料取代。</string>
     <string name="storage_blocked_cloud_desc">雲端備份入面有資料，但係而家 App 入面冇任何資料。繼續落去會用空資料覆蓋雲端備份，令備份永久消失，所以阻止咗。想攞返備份就用「由備份還原」。</string>

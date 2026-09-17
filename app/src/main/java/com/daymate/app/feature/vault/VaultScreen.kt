@@ -316,24 +316,21 @@ private fun VaultUnlockScreen(
     }
 
     VaultScaffold(title = "Vault", onExit = onExit, showMenu = false) {
-        Text(stringResource(R.string.vault_enter_password_unlock), style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(16.dp))
         OutlinedTextField(
             value = password,
             onValueChange = {
                 password = it
                 error = null
             },
-            label = { Text(stringResource(R.string.vault_password)) },
+            // 提示写在输入框**下方**的小字里（supportingText），与周期管家解锁页保持一致；
+            // 框内提示会被读成「已填内容」，不适合承载「还没输入的说明」。
+            supportingText = { Text(error ?: stringResource(R.string.vault_enter_password_unlock)) },
+            isError = error != null,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
-        error?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = {
@@ -535,7 +532,7 @@ private fun VaultListScreen(
     // 截图限制已提升到 VaultScreen 顶层（同时覆盖解锁页与设密页），此处不再重复设置。
 
     VaultScaffold(
-        title = "🔒 Vault",
+        title = "Vault",
         onExit = onExit,
         selectionMode = selectionMode,
         totalSelected = totalSelected,

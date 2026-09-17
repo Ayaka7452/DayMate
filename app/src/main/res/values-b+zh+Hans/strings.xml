@@ -140,8 +140,8 @@
     <string name="settings_custom_url">自定义 URL…</string>
     <string name="settings_source_custom_subtitle">按数据结构自动识别，兼容主流节假日数据源</string>
     <string name="settings_custom_source_url">自定义数据源 URL</string>
-    <string name="settings_custom_url_hint">含 {year} 占位符则按年下载；不含则下载整份文件后按年缓存</string>
-    <string name="settings_custom_url_formats">按结构自动识别，已兼容 holiday-cn、日期为键、节假日/工作日 Map、data.list 数组等主流格式；节日名会统一成规范写法。</string>
+    <string name="settings_custom_url_hint">含 {year} 占位符则按年下载，不含则下载整份文件后按年缓存</string>
+    <string name="settings_custom_url_formats">按结构自动识别，已兼容 holiday-cn、日期为键、节假日/工作日 Map、data.list 数组等主流格式，节日名会统一成规范写法。</string>
     <string name="settings_url_http_hint">请填写以 http 开头的地址</string>
     <string name="settings_years_hint">勾选需要缓存的年份，选择会随年份自动更新。次年放假安排一般在当年 11 月前后公布，未公布前下载会提示「尚未发布」，不会覆盖已有缓存。\n未勾选明年时，年底的跨年节日（如元旦）会取不到日期。</string>
     <string name="settings_year_n">%1$d 年</string>
@@ -191,7 +191,7 @@
     <string name="settings_existing_data">现有数据（未修改）</string>
     <string name="settings_recycle_note">回收站内另有 %1$d 条已删除条目，不做清理。可在「回收站」中处理。</string>
     <string name="settings_source_dialog_title">节假日数据源</string>
-    <string name="settings_region_dialog_hint">选择你要的节日所属国家或地区。各数据源各自保留缓存，随时可以切回去。若新数据源里找不到某个节日，跟随该节日的事件会保持原目标日期不变。</string>
+    <string name="settings_region_dialog_hint">选择你要的节日所属国家或地区。各数据源各自保留缓存，随时可切回。若新数据源里找不到某个节日，跟随该节日的事件会保持原目标日期不变。</string>
     <string name="settings_unit_places">%1$d 处</string>
     <string name="settings_unit_items">%1$d 条</string>
     <string name="settings_no_repair_needed">无需修复</string>
@@ -246,11 +246,11 @@
     <string name="cycle_tips_daily_log">日常记录</string>
     <string name="cycle_tips_daily_log_body">在日历上点选任意日期，即可为那天添加日常记录（性生活、出血与分泌物、身体症状、情绪，或自己填写）。日常记录只作留痕，不参与周期与排卵推算，也不会点亮经期圆点，随手记一条症状不会影响预测结果。</string>
     <string name="cycle_tips_phases">周期四个阶段</string>
-    <string name="cycle_tips_phases_body">· 月经期：经期出血的第 1 天到结束，通常 3～7 天，对应圆环的深色段。\n· 卵泡期：月经结束后到排卵前，卵泡逐渐发育成熟，是子宫内膜重新增厚的阶段。\n· 排卵期：排卵日一般在下次经期前 14 天左右，其前后各约 2 天是受孕概率最高的窗口。\n· 黄体期：排卵后到下次经期来临前，身体分泌孕激素维持内膜；未受孕则内膜脱落，进入下一个月经期。</string>
+    <string name="cycle_tips_phases_body">· 月经期：经期出血的第 1 天到结束，通常 3～7 天，对应圆环的深色段。\n· 卵泡期：月经结束后到排卵前，卵泡逐渐发育成熟，是子宫内膜重新增厚的阶段。\n· 排卵期：排卵日一般在下次经期前 14 天左右，其前后各约 2 天是受孕概率最高的窗口。\n· 黄体期：排卵后到下次经期来临前，身体分泌孕激素维持内膜，未受孕则内膜脱落，进入下一个月经期。</string>
     <string name="cycle_tips_calendar_marks">日历标记</string>
-    <string name="cycle_tips_calendar_marks_body">· 日期底色代表当天所处阶段。\n· 实心圆点：已登记的经期日。\n· 空心圆点：预测的经期日，到来后变为实心。\n· 右上角小圆点：当天有日常记录，点选该日可查看。\n· 细蓝框：今天；粗蓝框：当前选中的日期，收起详情后粗框消失。</string>
+    <string name="cycle_tips_calendar_marks_body">· 日期底色代表当天所处阶段。\n· 实心圆点：已登记的经期日。\n· 空心圆点：预测的经期日，到来后变为实心。\n· 右上角小圆点：当天有日常记录，点选该日可查看。\n· 细蓝框：今天，粗蓝框：当前选中的日期，收起详情后粗框消失。</string>
     <string name="cycle_tips_accuracy">关于准确性</string>
-    <string name="cycle_tips_accuracy_body">周期长度与经期天数因人而异，情绪、压力、作息、出行、疾病等均可能导致周期提前或延后。日历法按平均值推算，与实际排卵时间可能存在数天误差。推算结果仅供参考，不可作为避孕或医学诊断依据；如周期长期紊乱或伴有不适，请咨询医生。</string>
+    <string name="cycle_tips_accuracy_body">周期长度与经期天数因人而异，情绪、压力、作息、出行、疾病等均可能导致周期提前或延后。日历法按平均值推算，与实际排卵时间可能存在数天误差。推算结果仅供参考，不可作为避孕或医学诊断依据，如周期长期紊乱或伴有不适，请咨询医生。</string>
     <string name="cycle_no_record">暂无记录</string>
     <string name="cycle_register_prompt">请登记本次经期</string>
     <string name="cycle_days_to_next_period_n">距下次经期 %1$d 天</string>
@@ -279,7 +279,7 @@
     <string name="cycle_event_name_custom">自定义事件名称：%1$s</string>
     <string name="cycle_title_show_entry">在主页显示入口按钮</string>
     <string name="cycle_sub_show_entry">开启后，长按主页右下角的加号，即可在加号上方展开周期管家入口。</string>
-    <string name="cycle_method_note">本功能采用日历法推算：排卵日约为预测下次经期首日减 14 天。经期较长时排卵日与阶段划分自动微调，卵泡期不短于 2 天、黄体期不短于 11 天，均在医学共识波动区间内。周期受压力、作息、疾病等影响存在波动，结果仅供参考，不可作为避孕或医学诊断依据；如有月经异常或健康疑问，请咨询医生。</string>
+    <string name="cycle_method_note">本功能采用日历法推算：排卵日约为预测下次经期首日减 14 天。经期较长时排卵日与阶段划分自动微调，卵泡期不短于 2 天、黄体期不短于 11 天，均在医学共识波动区间内。周期受压力、作息、疾病等影响存在波动，结果仅供参考，不可作为避孕或医学诊断依据，如有月经异常或健康疑问，请咨询医生。</string>
     <string name="cycle_delete_record_title">删除这条记录？</string>
     <string name="cycle_delete_record_text">%1$s 的经期记录将被删除，推算将基于剩余记录进行。</string>
     <string name="cycle_event_name_title">快捷事件名称</string>
@@ -299,7 +299,6 @@
     <string name="cycle_biometric_title">验证身份</string>
     <string name="cycle_biometric_subtitle">解锁周期管家</string>
     <string name="cycle_input_password">输入密码解锁</string>
-    <string name="cycle_password_label">密码（与 Vault 一致）</string>
     <string name="cycle_unlock">解锁</string>
     <string name="cycle_use_fingerprint">使用指纹</string>
     <string name="cycle_history_title">历史记录管理</string>
@@ -398,7 +397,7 @@
     <string name="about_developer">由 Ayaka7452 开发</string>
     <string name="settings_language">语言</string>
     <string name="settings_lang_dialog_title">选择语言</string>
-    <string name="settings_lang_subtitle">自动检测时跟随系统语言；系统语言不受支持时使用 English</string>
+    <string name="settings_lang_subtitle">自动检测时跟随系统语言，系统语言不受支持时使用 English</string>
     <string name="date_pattern_md">M月d日</string>
     <string name="date_pattern_ymd">yyyy年M月d日</string>
     <string name="date_pattern_ym">yyyy年M月</string>
@@ -410,7 +409,7 @@
     <string name="note_sex_protected">有保护性行为</string>
     <string name="note_sex_unprotected">无保护性行为</string>
     <string name="note_sex_solo">自我愉悦</string>
-    <string name="note_sex_protected_hint">注意：体外射精并不是有效的避孕手段，受孕风险很高；请留意身体状况、及时自我评估。这类做法也无法阻断疾病传播。</string>
+    <string name="note_sex_protected_hint">注意：体外射精并不是有效的避孕手段，受孕风险很高。如您采用过这种方式，请改选「无保护性行为」，并持续关注身体状况、及时自我评估。这类做法也无法阻断疾病传播。</string>
     <string name="note_sex_unprotected_hint">紧急避孕药需在事后 72 小时内服用，越早效果越好。若需长期避孕，建议咨询医生后选择短效口服避孕药（需按周期规律服用）。请做好自我保护，必要时就医检查，防范疾病传播。</string>
     <string name="note_bleed_spotting">点滴出血</string>
     <string name="note_bleed_brown">褐色分泌物</string>
@@ -444,7 +443,7 @@
     <string name="settings_source_region_custom">自定义数据源</string>
     <string name="settings_source_suggest">当前语言建议使用「%1$s」，点此切换</string>
     <string name="settings_source_switch_title">切换节日数据源？</string>
-    <string name="settings_source_switch_msg">将切换为「%1$s」，随后可下载该来源的节假日数据。已下载的缓存会保留，随时可以切回。跟随节日的事件若在新来源中找不到同名节日，会保持原目标日期不变。</string>
+    <string name="settings_source_switch_msg">将切换为「%1$s」，随后可下载该来源的节假日数据。已下载的缓存会保留，随时可切回。跟随节日的事件若在新来源中找不到同名节日，会保持原目标日期不变。</string>
     <string name="settings_lang_festival_title">同时切换节日数据源？</string>
     <string name="festival_years_none">无</string>
     <string name="festival_years_range">%1$s–%2$s 年</string>
@@ -458,7 +457,7 @@
     <string name="festival_summary_all_pending">所选的年份放假安排尚未发布</string>
     <string name="festival_unnamed">节假日</string>
     <string name="festival_list_sep">、</string>
-    <string name="festival_sentence_sep">；</string>
+    <string name="festival_sentence_sep">，</string>
     <string name="cycle_no_records">尚无记录</string>
     <string name="cycle_no_records_hint">登记一次经期后即可推算阶段</string>
     <string name="cycle_predict_period">预测经期</string>
@@ -669,7 +668,7 @@
     <string name="storage_overwrite_title">覆盖备份？</string>
     <string name="storage_overwrite_desc">将用当前应用数据覆盖所选文件夹中的备份。原有备份会被替换，此操作不可撤销。</string>
     <string name="storage_blocked">操作已阻止</string>
-    <string name="storage_blocked_local_desc">所选备份中含有数据，而当前应用内没有任何数据。继续将用空数据覆盖备份，导致备份数据永久丢失，因此已阻止该操作。\n\n如需取回备份，请使用「从备份恢复」；如确实要备份当前空数据，请先在应用中创建内容。</string>
+    <string name="storage_blocked_local_desc">所选备份中含有数据，而当前应用内没有任何数据。继续将用空数据覆盖备份，导致备份数据永久丢失，因此已阻止该操作。\n\n如需取回备份，请使用「从备份恢复」，如确实要备份当前空数据，请先在应用中创建内容。</string>
     <string name="storage_cloud_overwrite_title">覆盖云端备份？</string>
     <string name="storage_cloud_overwrite_desc">云端（%1$s/daymate.db）已有备份，将被当前应用数据替换。</string>
     <string name="storage_blocked_cloud_desc">云端备份中含有数据，而当前应用内没有任何数据。继续将用空数据覆盖云端备份，导致备份永久丢失，因此已阻止该操作。如需取回备份，请使用「从备份恢复」。</string>

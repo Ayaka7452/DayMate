@@ -248,7 +248,7 @@
     <string name="cycle_tips_phases">周期の4つのフェーズ</string>
     <string name="cycle_tips_phases_body">· 月経期：出血の第1日から終了まで、通常3～7日で、リングの濃いセグメントに相当します。\n· 卵胞期：月経終了後から排卵前まで、卵胞が成熟し子宮内膜が再び厚くなる時期です。\n· 排卵期：排卵日は一般的に次回生理の約14日前で、その前後各約2日が妊娠しやすいウィンドウです。\n· 黄体期：排卵後から次回生理まで、体がプロゲステロンを分泌して内膜を維持します。妊娠しなければ内膜が剥がれ、次の月経期に入ります。</string>
     <string name="cycle_tips_calendar_marks">カレンダーの印</string>
-    <string name="cycle_tips_calendar_marks_body">· 日付の背景色はその日のフェーズを示します。\n· 塗りつぶしの点：記録済みの生理日。\n· 白抜きの点：予測される生理日で、その日になると塗りつぶされます。\n· 右上の小さな点：その日にデイリーログがあり、タップすると表示できます。\n· 細い青枠：今日；太い青枠：現在選択中の日付（詳細を閉じると消えます）。</string>
+    <string name="cycle_tips_calendar_marks_body">· 日付の背景色はその日のフェーズを示します。\n· 塗りつぶしの点：記録済みの生理日。\n· 白抜きの点：予測される生理日で、その日になると塗りつぶされます。\n· 右上の小さな点：その日にデイリーログがあり、タップすると表示できます。\n· 細い青枠：今日、太い青枠：現在選択中の日付（詳細を閉じると消えます）。</string>
     <string name="cycle_tips_accuracy">精度について</string>
     <string name="cycle_tips_accuracy_body">周期の長さや生理の日数は人によって異なり、気分、ストレス、生活リズム、旅行、病気などで周期が早まったり遅れたりすることがあります。カレンダー法は平均値で推算するため、実際の排卵タイミングと数日の誤差が生じる場合があります。予測結果は参考程度で、避妊や医学的診断の根拠にはなりません。周期が長期間不順だったり不調を伴う場合は、医師に相談してください。</string>
     <string name="cycle_no_record">記録がありません</string>
@@ -299,7 +299,6 @@
     <string name="cycle_biometric_title">本人確認</string>
     <string name="cycle_biometric_subtitle">サイクル管理のロック解除</string>
     <string name="cycle_input_password">パスワードを入力してロック解除</string>
-    <string name="cycle_password_label">パスワード（Vault と共通）</string>
     <string name="cycle_unlock">ロック解除</string>
     <string name="cycle_use_fingerprint">指紋を使用</string>
     <string name="cycle_history_title">履歴管理</string>
@@ -410,7 +409,7 @@
     <string name="note_sex_protected">避妊ありの性行為</string>
     <string name="note_sex_unprotected">避妊なしの性行為</string>
     <string name="note_sex_solo">セルフプレジャー</string>
-    <string name="note_sex_protected_hint">注意：膣外射精は有効な避妊手段ではありません。妊娠のリスクが高いため、体調に気を配り、早めに自己判断を。感染症の伝播も防げません。</string>
+    <string name="note_sex_protected_hint">注意：膣外射精は有効な避妊手段ではありません。妊娠のリスクが高いため、この方法を用いた場合は「避妊なしの性行為」を選び直し、体調に気を配り、早めに自己判断を。感染症の伝播も防げません。</string>
     <string name="note_sex_unprotected_hint">緊急避妊薬は行為後72時間以内の服用が最も効果的で、早いほど確実です。長期的な避妊を希望する場合は、医師に相談して低用量ピル（周期に沿って規則的に服用）を選びましょう。ご自身を守り、必要なら受診して性感染症の予防を。</string>
     <string name="note_bleed_spotting">不正出血（少量）</string>
     <string name="note_bleed_brown">褐色のおりもの</string>
@@ -458,7 +457,7 @@
     <string name="festival_summary_all_pending">選択した年の祝日はまだ発表されていません</string>
     <string name="festival_unnamed">祝日</string>
     <string name="festival_list_sep">、</string>
-    <string name="festival_sentence_sep">；</string>
+    <string name="festival_sentence_sep">、</string>
     <string name="cycle_no_records">記録がありません</string>
     <string name="cycle_no_records_hint">月経を1回記録するとフェーズを予測できます</string>
     <string name="cycle_predict_period">予測月経</string>

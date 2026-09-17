@@ -248,7 +248,7 @@
     <string name="cycle_tips_phases">주기의 4단계</string>
     <string name="cycle_tips_phases_body">· 월경기: 출혈 1일차부터 종료까지, 보통 3~7일이며 링의 짙은 구간에 해당합니다.\n· 난포기: 월경 종료 후 배란 전까지, 난포가 성숙하고 자궁 내막이 다시 두꺼워지는 단계입니다.\n· 배란기: 배란일은 일반적으로 다음 생리 약 14일 전이며, 전후 약 2일이 임신 확률이 가장 높은 기간입니다.\n· 황체기: 배란 후 다음 생리 전까지, 몸이 프로게스테론을 분비해 내막을 유지합니다. 임신하지 않으면 내막이 떨어져 다음 월경기에 들어갑니다.</string>
     <string name="cycle_tips_calendar_marks">캘린더 표시</string>
-    <string name="cycle_tips_calendar_marks_body">· 날짜의 배경색은 해당일의 단계를 나타냅니다.\n· 채워진 점: 기록된 생리일.\n· 빈 점: 예측된 생리일로, 해당일이 되면 채워집니다.\n· 오른쪽 위 작은 점: 그날 데일리 로그가 있음을 나타내며, 날짜를 탭하면 확인할 수 있습니다.\n· 얇은 파란 테두리: 오늘; 두꺼운 파란 테두리: 현재 선택된 날짜(상세를 접으면 사라짐).</string>
+    <string name="cycle_tips_calendar_marks_body">· 날짜의 배경색은 해당일의 단계를 나타냅니다.\n· 채워진 점: 기록된 생리일.\n· 빈 점: 예측된 생리일로, 해당일이 되면 채워집니다.\n· 오른쪽 위 작은 점: 그날 데일리 로그가 있음을 나타내며, 날짜를 탭하면 확인할 수 있습니다.\n· 얇은 파란 테두리: 오늘, 두꺼운 파란 테두리: 현재 선택된 날짜(상세를 접으면 사라짐).</string>
     <string name="cycle_tips_accuracy">정확도에 대하여</string>
     <string name="cycle_tips_accuracy_body">주기 길이와 생리 기간은 사람마다 다르며, 기분, 스트레스, 수면, 출장, 질병 등으로 주기가 앞당겨지거나 늦어질 수 있습니다. 달력법은 평균값으로 계산하므로 실제 배란 시점과 며칠 차이가 날 수 있습니다. 예측 결과는 참고용이며 피임이나 의학적 진단의 근거가 될 수 없습니다. 주기가 장기간 불규칙하거나 불편함이 있다면 의사와 상담하세요.</string>
     <string name="cycle_no_record">기록 없음</string>
@@ -299,7 +299,6 @@
     <string name="cycle_biometric_title">신원 확인</string>
     <string name="cycle_biometric_subtitle">사이클 관리 잠금 해제</string>
     <string name="cycle_input_password">비밀번호 입력하여 잠금 해제</string>
-    <string name="cycle_password_label">비밀번호(Vault와 동일)</string>
     <string name="cycle_unlock">잠금 해제</string>
     <string name="cycle_use_fingerprint">지문 사용</string>
     <string name="cycle_history_title">기록 관리</string>
@@ -410,7 +409,7 @@
     <string name="note_sex_protected">피임한 성관계</string>
     <string name="note_sex_unprotected">피임하지 않은 성관계</string>
     <string name="note_sex_solo">자기 위로</string>
-    <string name="note_sex_protected_hint">주의: 질외사정은 효과적인 피임 수단이 아닙니다. 임신 위험이 높으니 몸 상태를 살피고 빠르게 스스로 점검하세요. 감염증 전파도 막지 못합니다.</string>
+    <string name="note_sex_protected_hint">주의: 질외사정은 효과적인 피임 수단이 아닙니다. 임신 위험이 높으니 이 방법을 사용했다면 “피임하지 않은 성관계”로 다시 선택하고, 몸 상태를 계속 살피며 빠르게 스스로 점검하세요. 감염증 전파도 막지 못합니다.</string>
     <string name="note_sex_unprotected_hint">응급 피임약은 관계 후 72시간 이내에 복용할 때 효과가 가장 좋으며, 빠를수록 좋습니다. 장기적인 피임이 필요하면 의사와 상담해 저용량 경구 피임약(주기에 맞춰 규칙적으로 복용)을 선택하세요. 스스로를 보호하고 필요하면 검진을 받아 성매개 감염증을 예방하세요.</string>
     <string name="note_bleed_spotting">소량 출혈</string>
     <string name="note_bleed_brown">갈색 분비물</string>
@@ -458,7 +457,7 @@
     <string name="festival_summary_all_pending">선택한 연도의 공휴일이 아직 발표되지 않았습니다</string>
     <string name="festival_unnamed">공휴일</string>
     <string name="festival_list_sep">, </string>
-    <string name="festival_sentence_sep">; </string>
+    <string name="festival_sentence_sep">, </string>
     <string name="cycle_no_records">기록 없음</string>
     <string name="cycle_no_records_hint">월경을 한 번 기록하면 단계를 예측할 수 있습니다</string>
     <string name="cycle_predict_period">예상 월경</string>
