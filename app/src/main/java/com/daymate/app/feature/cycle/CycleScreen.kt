@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -17,6 +18,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.LazyColumn
@@ -83,11 +85,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -1904,6 +1910,16 @@ private fun CycleCalendarMonth(
     var monthOffset by remember { mutableStateOf(0) }
     val month = LocalDate.now().plusMonths(monthOffset.toLong())
 
+    // ===== 左右滑动切月 =====
+    // 跟手：拖动时整块月历随手指平移（graphicsLayer 只走绘制层，不触发重新布局）。
+    // 松手：位移超过 1/5 宽度即翻月——先让整块滑出屏幕，再在对面就位后滑回来；
+    // monthOffset 选在「旧月已离场、新月未入场」的那一瞬间切换，月份标题与网格因此天然同步。
+    // 导航箭头仍走瞬时切换：连点翻月是高频操作，不该被动画窗口吞掉。
+    val scope = rememberCoroutineScope()
+    val slideX = remember { Animatable(0f) }
+    var calendarWidth by remember { mutableStateOf(0f) }
+    var flipping by remember { mutableStateOf(false) }
+
     // 颜色在 Composable 体内解析
     val periodColor = MaterialTheme.colorScheme.primary
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
@@ -1923,7 +1939,48 @@ private fun CycleCalendarMonth(
     // 有日常记录的日期集合（只用于格子右上角的小圆点，不参与任何阶段着色）
     val noteDays = remember(notes) { notes.map { it.dateEpochDay }.toSet() }
 
-    Column(Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clipToBounds()                 // 平移出界的部分裁掉，免得在屏幕边缘留一道残影
+            .onSizeChanged { calendarWidth = it.width.toFloat() }
+            .graphicsLayer { translationX = slideX.value }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragCancel = {
+                        scope.launch { slideX.animateTo(0f, tween(160, easing = FastOutSlowInEasing)) }
+                    },
+                    onDragEnd = {
+                        val w = calendarWidth
+                        val dx = slideX.value
+                        val threshold = w * 0.2f
+                        if (!flipping && w > 0f && (dx <= -threshold || dx >= threshold)) {
+                            // 向左滑 = 翻到下一个月，向右滑 = 翻回上一个月
+                            val dir = if (dx < 0f) 1 else -1
+                            flipping = true
+                            scope.launch {
+                                slideX.animateTo(-dir * w, tween(140, easing = FastOutSlowInEasing))
+                                monthOffset += dir
+                                slideX.snapTo(dir * w)
+                                slideX.animateTo(0f, tween(160, easing = FastOutSlowInEasing))
+                                flipping = false
+                            }
+                        } else {
+                            scope.launch { slideX.animateTo(0f, tween(160, easing = FastOutSlowInEasing)) }
+                        }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        if (!flipping) {
+                            change.consume()
+                            // 最多滑到整块离场为止，继续拖也不会拖出无边的空白
+                            val next = (slideX.value + dragAmount)
+                                .coerceIn(-calendarWidth, calendarWidth)
+                            scope.launch { slideX.snapTo(next) }
+                        }
+                    }
+                )
+            }
+    ) {
         // 月份导航
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = { monthOffset -= 1 }) {
