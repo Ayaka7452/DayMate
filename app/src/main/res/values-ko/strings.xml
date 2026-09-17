@@ -410,7 +410,7 @@
     <string name="note_sex_protected">피임한 성관계</string>
     <string name="note_sex_unprotected">피임하지 않은 성관계</string>
     <string name="note_sex_solo">자기 위로</string>
-    <string name="note_sex_protected_hint">주의: 질외사정은 효과적인 보호 수단이 아닙니다. 일부 남성이 자신의 감각을 위해 사용하는 방식일 뿐이며, 임신 위험은 여전히 높습니다. 몸 상태를 살피고 필요하면 빠르게 점검하세요. 감염증 전파도 막지 못합니다.</string>
+    <string name="note_sex_protected_hint">주의: 질외사정은 효과적인 피임 수단이 아닙니다. 임신 위험이 높으니 몸 상태를 살피고 빠르게 스스로 점검하세요. 감염증 전파도 막지 못합니다.</string>
     <string name="note_sex_unprotected_hint">응급 피임약은 관계 후 72시간 이내에 복용할 때 효과가 가장 좋으며, 빠를수록 좋습니다. 장기적인 피임이 필요하면 의사와 상담해 저용량 경구 피임약(주기에 맞춰 규칙적으로 복용)을 선택하세요. 스스로를 보호하고 필요하면 검진을 받아 성매개 감염증을 예방하세요.</string>
     <string name="note_bleed_spotting">소량 출혈</string>
     <string name="note_bleed_brown">갈색 분비물</string>

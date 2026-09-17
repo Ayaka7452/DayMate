@@ -410,7 +410,7 @@
     <string name="note_sex_protected">避妊ありの性行為</string>
     <string name="note_sex_unprotected">避妊なしの性行為</string>
     <string name="note_sex_solo">セルフプレジャー</string>
-    <string name="note_sex_protected_hint">注意：膣外射精は有効な防御策ではありません。男性が自分の感覚のために用いる行為にすぎず、妊娠のリスクは高いままです。体調に気を配り、必要なら早めに確認・受診を。感染症の伝播も防げません。</string>
+    <string name="note_sex_protected_hint">注意：膣外射精は有効な避妊手段ではありません。妊娠のリスクが高いため、体調に気を配り、早めに自己判断を。感染症の伝播も防げません。</string>
     <string name="note_sex_unprotected_hint">緊急避妊薬は行為後72時間以内の服用が最も効果的で、早いほど確実です。長期的な避妊を希望する場合は、医師に相談して低用量ピル（周期に沿って規則的に服用）を選びましょう。ご自身を守り、必要なら受診して性感染症の予防を。</string>
     <string name="note_bleed_spotting">不正出血（少量）</string>
     <string name="note_bleed_brown">褐色のおりもの</string>

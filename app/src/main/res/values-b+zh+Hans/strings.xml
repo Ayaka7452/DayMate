@@ -410,7 +410,7 @@
     <string name="note_sex_protected">有保护性行为</string>
     <string name="note_sex_unprotected">无保护性行为</string>
     <string name="note_sex_solo">自我愉悦</string>
-    <string name="note_sex_protected_hint">注意：体外射精并不算有效的保护措施，只是部分男性为个人体验而采用的做法，受孕风险依然很高；请留意身体状况、必要时及时评估。这类做法也无法阻断疾病传播。</string>
+    <string name="note_sex_protected_hint">注意：体外射精并不是有效的避孕手段，受孕风险很高；请留意身体状况、及时自我评估。这类做法也无法阻断疾病传播。</string>
     <string name="note_sex_unprotected_hint">紧急避孕药需在事后 72 小时内服用，越早效果越好。若需长期避孕，建议咨询医生后选择短效口服避孕药（需按周期规律服用）。请做好自我保护，必要时就医检查，防范疾病传播。</string>
     <string name="note_bleed_spotting">点滴出血</string>
     <string name="note_bleed_brown">褐色分泌物</string>

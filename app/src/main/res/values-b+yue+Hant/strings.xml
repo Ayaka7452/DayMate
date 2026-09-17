@@ -410,7 +410,7 @@
     <string name="note_sex_protected">有保護嘅性行為</string>
     <string name="note_sex_unprotected">冇保護嘅性行為</string>
     <string name="note_sex_solo">自我愉悅</string>
-    <string name="note_sex_protected_hint">注意：體外射精唔算係有效嘅保護措施，佢只係部分男性為咗個人體驗而用嘅做法，受孕風險一樣好高；要留意自己身體，有需要就及早評估。呢種做法亦都擋唔到疾病傳播。</string>
+    <string name="note_sex_protected_hint">注意：體外射精並不是有效嘅避孕手段，受孕風險好高；要留意自己身體、及早自我評估。呢種做法亦都擋唔到疾病傳播。</string>
     <string name="note_sex_unprotected_hint">緊急避孕藥要喺事後 72 個鐘內食，越快食越好。如果要長期避孕，建議問過醫生再揀短效口服避孕藥（要按週期定時食）。記得保護好自己，有需要就去睇醫生檢查，防範疾病傳播。</string>
     <string name="note_bleed_spotting">點滴出血</string>
     <string name="note_bleed_brown">褐色分泌物</string>
