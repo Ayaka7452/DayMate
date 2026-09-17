@@ -738,4 +738,29 @@
     <string name="webdav_e_connect">連唔到伺服器，請檢查地址同端口</string>
     <string name="webdav_e_timeout">連線逾時，請檢查網絡或者伺服器狀態</string>
     <string name="webdav_e_network">網絡錯誤：%1$s</string>
+
+    <!-- ===== 检查更新（v1.10.0）===== -->
+    <string name="update_check_section">檢查更新</string>
+    <string name="update_check_on">有新版本嗰陣提我</string>
+    <string name="update_check_off">熄咗，唔會自動檢查</string>
+    <string name="update_check_now">即刻檢查</string>
+    <string name="update_status_current">而家版本 %1$s</string>
+    <string name="update_status_checking">檢查緊…</string>
+    <string name="update_status_latest">已經係最新版本</string>
+    <string name="update_status_failed">檢查失敗，遲啲再試</string>
+    <string name="update_status_found">搵到新版本 %1$s</string>
+    <string name="update_dialog_title">搵到新版本 %1$s</string>
+    <string name="update_dialog_message">而家版本 %1$s，可以升到 %2$s</string>
+    <string name="update_dialog_notes">更新內容</string>
+    <string name="update_dialog_size">安裝包大小 %1$s</string>
+    <string name="update_now">即刻更新</string>
+    <string name="update_later">遲啲先</string>
+    <string name="update_notif_title">DayMate %1$s 更新</string>
+    <string name="update_channel_name">應用程式更新</string>
+    <string name="update_downloading">下載緊</string>
+    <string name="update_download_percent">已下載 %1$d%%</string>
+    <string name="update_download_done">下載完成，撳一下安裝</string>
+    <string name="update_download_failed">下載失敗，遲啲再試</string>
+    <string name="update_install_permission">要允許「安裝未知應用程式」先可以完成更新</string>
+
 </resources>

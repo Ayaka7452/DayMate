@@ -92,6 +92,7 @@ import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import com.ayaka7452.daymate.feature.common.ReorderMenuItems
 import com.ayaka7452.daymate.feature.common.SortModes
+import com.ayaka7452.daymate.feature.common.UpdateHost
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.highlightedText
 import com.ayaka7452.daymate.feature.common.matchesQuery
@@ -178,6 +179,10 @@ fun HomeScreen(
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // 检查更新：冷启动按节流规则查一次（24h 内不重复查、点过「稍后」的版本不再弹）。
+    // 整条链路（弹窗 → 通知权限 → 下载服务）都收在 UpdateHost 里，这里只挂一行。
+    UpdateHost(container)
 
     // 节假日数据（在线下载 + 本地缓存）：主页顶部横幅 + 下一节日倒数卡片
     val festivalRepo = remember { container.festivalRepository }

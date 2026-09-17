@@ -738,4 +738,29 @@
     <string name="webdav_e_connect">無法連線伺服器，請檢查位址與連接埠</string>
     <string name="webdav_e_timeout">連線逾時，請檢查網路或伺服器狀態</string>
     <string name="webdav_e_network">網路錯誤：%1$s</string>
+
+    <!-- ===== 检查更新（v1.10.0）===== -->
+    <string name="update_check_section">檢查更新</string>
+    <string name="update_check_on">發現新版本時提醒我</string>
+    <string name="update_check_off">已關閉，不再自動檢查</string>
+    <string name="update_check_now">立即檢查</string>
+    <string name="update_status_current">目前版本 %1$s</string>
+    <string name="update_status_checking">正在檢查…</string>
+    <string name="update_status_latest">已是最新版本</string>
+    <string name="update_status_failed">檢查失敗，請稍後再試</string>
+    <string name="update_status_found">發現新版本 %1$s</string>
+    <string name="update_dialog_title">發現新版本 %1$s</string>
+    <string name="update_dialog_message">目前版本 %1$s，可升級至 %2$s</string>
+    <string name="update_dialog_notes">更新內容</string>
+    <string name="update_dialog_size">安裝包大小 %1$s</string>
+    <string name="update_now">立即更新</string>
+    <string name="update_later">稍後</string>
+    <string name="update_notif_title">DayMate %1$s 更新</string>
+    <string name="update_channel_name">應用程式更新</string>
+    <string name="update_downloading">正在下載</string>
+    <string name="update_download_percent">已下載 %1$d%%</string>
+    <string name="update_download_done">下載完成，點擊安裝</string>
+    <string name="update_download_failed">下載失敗，請稍後重試</string>
+    <string name="update_install_permission">需要允許「安裝未知應用程式」才能完成更新</string>
+
 </resources>

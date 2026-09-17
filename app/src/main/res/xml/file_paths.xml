@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  更新安装包的共享路径。
+  下载落盘在应用私有目录（Android/data/<pkg>/files/update/），不需要任何存储权限；
+  安装时由 FileProvider 把该 URI 临时授给系统安装器。
+-->
+<paths>
+    <!-- 主路径：getExternalFilesDir("update") -->
+    <external-files-path name="update_ext" path="update/" />
+    <!-- 回退：外部私有目录不可用时用 filesDir/update -->
+    <files-path name="update_int" path="update/" />
+</paths>

@@ -64,10 +64,16 @@ import com.ayaka7452.daymate.core.StorageConfig
 import com.ayaka7452.daymate.core.i18n.AppLanguage
 import com.ayaka7452.daymate.core.i18n.LocaleWrap
 import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.core.update.UpdateCheckResult
+import com.ayaka7452.daymate.core.update.UpdateChecker
+import com.ayaka7452.daymate.core.update.UpdateInfo
+import com.ayaka7452.daymate.core.update.UpdatePrompt
 import com.ayaka7452.daymate.data.festival.FestivalRegion
 import com.ayaka7452.daymate.data.festival.FestivalRepository
 import com.ayaka7452.daymate.feature.common.EmojiCatalog
 import com.ayaka7452.daymate.feature.common.EmojiPicker
+import com.ayaka7452.daymate.feature.common.UpdateAvailableDialog
+import com.ayaka7452.daymate.feature.common.rememberUpdateStarter
 import com.ayaka7452.daymate.feature.setup.StorageSetupBody
 import com.ayaka7452.daymate.widget.WidgetRenderer
 import kotlinx.coroutines.launch
@@ -115,6 +121,19 @@ fun SettingsScreen(
     var festivalOffsetDraft by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var autoUpdateCurrent by remember { mutableStateOf(festivalRepo.autoUpdateCurrent()) }
     var showBadgeEmojiDialog by remember { mutableStateOf(false) }
+
+    // ===== 检查更新 =====
+    // 默认开启（启动时按 24h 节流查一次，有新版本弹窗）；关掉后不发起任何请求，
+    // 但下面的「立即检查」仍可手动触发——用户关掉的通常是「自动提醒」，不是「这个功能」。
+    val updateCheckEnabled by container.settingsRepository.updateCheckEnabled
+        .collectAsState(initial = true)
+    val updateCurrentVersion = remember { UpdateChecker.currentVersion(ctx) }
+    var updateChecking by remember { mutableStateOf(false) }
+    /** 「立即检查」的结果文案；null = 还没查过（显示当前版本号）。 */
+    var updateStatus by remember { mutableStateOf<String?>(null) }
+    /** 手动检查发现的新版本 → 复用主页那套更新弹窗。 */
+    var updateFound by remember { mutableStateOf<UpdateInfo?>(null) }
+    val startUpdate = rememberUpdateStarter()
 
     // 节日数据变更信号（切源 / 下载完成 / 启动时自动补下都会 +1）：在这台页面上重新读一次
     // 源名与缓存状态。没有它，切完区域自动下载完成后这里仍显示「未下载」，直到退出重进。
@@ -690,6 +709,79 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
+            // ===== 检查更新（默认开；关掉后启动时不再发请求，此处仍可手动检查） =====
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.update_check_section),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        if (updateCheckEnabled) stringResource(R.string.update_check_on)
+                        else stringResource(R.string.update_check_off),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = updateCheckEnabled,
+                    onCheckedChange = { enabled ->
+                        scope.launch { container.settingsRepository.setUpdateCheckEnabled(enabled) }
+                    }
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !updateChecking) {
+                        updateChecking = true
+                        updateStatus = null
+                        scope.launch {
+                            when (val result = UpdatePrompt.checkNow(ctx)) {
+                                is UpdateCheckResult.Available -> {
+                                    updateFound = result.info
+                                    updateStatus = Tr.s(R.string.update_status_found, result.info.version)
+                                }
+
+                                UpdateCheckResult.Latest ->
+                                    updateStatus = Tr.s(R.string.update_status_latest)
+
+                                UpdateCheckResult.Failed ->
+                                    updateStatus = Tr.s(R.string.update_status_failed)
+                            }
+                            updateChecking = false
+                        }
+                    }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Sync, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        stringResource(R.string.update_check_now),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        if (updateChecking) stringResource(R.string.update_status_checking)
+                        else updateStatus ?: stringResource(
+                            R.string.update_status_current, updateCurrentVersion
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -702,6 +794,20 @@ fun SettingsScreen(
                 Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.bodyLarge)
             }
         }
+    }
+
+    // 手动检查到新版本 → 复用主页那套更新弹窗（「稍后」在这里只是关掉弹窗，
+    // 不写「已忽略版本」——用户是主动来查的，下次进设置再点一次仍应看到提醒）
+    updateFound?.let { info ->
+        UpdateAvailableDialog(
+            info = info,
+            currentVersion = updateCurrentVersion,
+            onUpdate = {
+                updateFound = null
+                startUpdate(info)
+            },
+            onLater = { updateFound = null }
+        )
     }
 
     // 语言选择弹窗

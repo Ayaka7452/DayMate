@@ -738,4 +738,29 @@
     <string name="webdav_e_connect">サーバーに接続できません。アドレスとポートを確認してください。</string>
     <string name="webdav_e_timeout">接続がタイムアウトしました。ネットワークまたはサーバーの状態を確認してください。</string>
     <string name="webdav_e_network">ネットワークエラー：%1$s</string>
+
+    <!-- ===== 检查更新（v1.10.0）===== -->
+    <string name="update_check_section">アップデートを確認</string>
+    <string name="update_check_on">新しいバージョンがあれば通知</string>
+    <string name="update_check_off">オフ（自動確認しません）</string>
+    <string name="update_check_now">今すぐ確認</string>
+    <string name="update_status_current">現在のバージョン %1$s</string>
+    <string name="update_status_checking">確認中…</string>
+    <string name="update_status_latest">最新バージョンです</string>
+    <string name="update_status_failed">確認に失敗しました。後でもう一度お試しください</string>
+    <string name="update_status_found">新しいバージョン %1$s があります</string>
+    <string name="update_dialog_title">新しいバージョン %1$s</string>
+    <string name="update_dialog_message">現在 %1$s、%2$s に更新できます</string>
+    <string name="update_dialog_notes">更新内容</string>
+    <string name="update_dialog_size">ダウンロードサイズ %1$s</string>
+    <string name="update_now">今すぐ更新</string>
+    <string name="update_later">あとで</string>
+    <string name="update_notif_title">DayMate %1$s の更新</string>
+    <string name="update_channel_name">アプリの更新</string>
+    <string name="update_downloading">ダウンロード中</string>
+    <string name="update_download_percent">%1$d%% ダウンロード済み</string>
+    <string name="update_download_done">ダウンロード完了、タップしてインストール</string>
+    <string name="update_download_failed">ダウンロードに失敗しました。後でもう一度お試しください</string>
+    <string name="update_install_permission">更新を完了するには「提供元不明のアプリ」のインストールを許可してください</string>
+
 </resources>

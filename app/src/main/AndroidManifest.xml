@@ -6,6 +6,14 @@
     <!-- 小组件跨天/开机刷新：接收 BOOT_COMPLETED 必须声明该权限，否则广播不会投递 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- 检查更新：下载进度通知（Android 13+ 需运行时授权，未授权时前台服务仍可运行） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 下载安装包要走前台服务，Android 14 起必须同时声明类型权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- 拉起系统安装器（Android 8+ 还需用户在系统设置里允许「安装未知应用」） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!--WebDAV 备份可配置为 http://（局域网/自建 NAS）：
         Android 9+ 默认拒绝明文流量，此处显式放开，否则 HTTP 服务器无法连接。-->
     <application
@@ -130,6 +138,23 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/countdown_widget_square_info" />
         </receiver>
+
+        <!-- 检查更新：前台服务下载 APK，通知栏显示进度 -->
+        <service
+            android:name=".core.update.UpdateDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- 把私有目录里的 APK 临时授权给系统安装器（Android 7+ 不允许再传 file:// URI） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- 2×2「自动」模式多事件列表的数据源 -->
         <service

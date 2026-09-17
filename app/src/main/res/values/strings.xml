@@ -738,4 +738,29 @@
     <string name="webdav_e_connect">Could not connect to the server. Check the address and port.</string>
     <string name="webdav_e_timeout">Connection timed out. Check your network or the server status.</string>
     <string name="webdav_e_network">Network error: %1$s</string>
+
+    <!-- ===== 检查更新（v1.10.0）===== -->
+    <string name="update_check_section">Check for updates</string>
+    <string name="update_check_on">Notify me when a new version is available</string>
+    <string name="update_check_off">Off — no automatic checks</string>
+    <string name="update_check_now">Check now</string>
+    <string name="update_status_current">Current version %1$s</string>
+    <string name="update_status_checking">Checking…</string>
+    <string name="update_status_latest">Already up to date</string>
+    <string name="update_status_failed">Check failed, please try again later</string>
+    <string name="update_status_found">New version %1$s available</string>
+    <string name="update_dialog_title">New version %1$s</string>
+    <string name="update_dialog_message">You have %1$s, version %2$s is available.</string>
+    <string name="update_dialog_notes">What is new</string>
+    <string name="update_dialog_size">Download size %1$s</string>
+    <string name="update_now">Update now</string>
+    <string name="update_later">Later</string>
+    <string name="update_notif_title">DayMate update %1$s</string>
+    <string name="update_channel_name">App updates</string>
+    <string name="update_downloading">Downloading…</string>
+    <string name="update_download_percent">Downloaded %1$d%%</string>
+    <string name="update_download_done">Download complete — tap to install</string>
+    <string name="update_download_failed">Download failed, please try again later</string>
+    <string name="update_install_permission">Allow installing unknown apps to finish the update</string>
+
 </resources>

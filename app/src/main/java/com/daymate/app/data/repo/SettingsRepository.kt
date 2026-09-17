@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class SettingsRepository(private val dataStore: DataStore<Preferences>) {
@@ -37,6 +38,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val CYCLE_PERIOD_AUTO = booleanPreferencesKey("cycle_period_auto")   // 经期天数自动按记录均值推算（默认开；手改即固定）
         private val ALLOW_SCREENSHOT_CYCLE = booleanPreferencesKey("allow_screenshot_cycle") // 周期管家允许截屏（默认关＝阻止）
         private val ALLOW_SCREENSHOT_VAULT = booleanPreferencesKey("allow_screenshot_vault") // 保险箱允许截屏（默认关＝阻止）
+        private val UPDATE_CHECK = booleanPreferencesKey("update_check_enabled")             // 启动时检查新版本（默认开）
+        private val UPDATE_LAST_CHECK = longPreferencesKey("update_last_check")              // 上次检查时间戳（节流用）
+        private val UPDATE_SKIPPED = stringPreferencesKey("update_skipped_version")          // 用户点过「稍后」的版本
 
         /** 备份位置取值：仅本地 SAF 文件夹 / 本地 + WebDAV 云端 / 仅 WebDAV 云端。 */
         const val BACKUP_TARGET_LOCAL = "local"
@@ -210,5 +214,38 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setCycleDefaultCalendar(calendar: Boolean) {
         dataStore.edit { it[CYCLE_DEFAULT_CALENDAR] = calendar }
+    }
+
+    // ===== 检查更新 =====
+
+    /**
+     * 是否在启动时检查新版本（**默认开启**）。
+     * 关掉后不发起任何请求，设置页仍保留「立即检查」手动入口。
+     */
+    val updateCheckEnabled: Flow<Boolean> = dataStore.data.map { it[UPDATE_CHECK] ?: true }
+
+    suspend fun setUpdateCheckEnabled(enabled: Boolean) {
+        dataStore.edit { it[UPDATE_CHECK] = enabled }
+    }
+
+    /** 上次检查（含失败）的时间戳，用于「同一天不重复问」的节流。 */
+    suspend fun updateLastCheckAt(): Long = dataStore.data.first()[UPDATE_LAST_CHECK] ?: 0L
+
+    suspend fun setUpdateLastCheckAt(at: Long) {
+        dataStore.edit { it[UPDATE_LAST_CHECK] = at }
+    }
+
+    /**
+     * 用户点了「稍后」的版本号。
+     *
+     * 只对**这一个版本**闭嘴：等下一个版本发布时仍会正常提醒，
+     * 否则点过一次「稍后」＝永久静音，功能等于关掉了。
+     */
+    suspend fun updateSkippedVersion(): String? = dataStore.data.first()[UPDATE_SKIPPED]
+
+    suspend fun setUpdateSkippedVersion(version: String?) {
+        dataStore.edit {
+            if (version.isNullOrBlank()) it.remove(UPDATE_SKIPPED) else it[UPDATE_SKIPPED] = version
+        }
     }
 }
