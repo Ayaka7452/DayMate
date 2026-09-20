@@ -106,6 +106,9 @@ fun SettingsScreen(
     val allowScreenshotVault by container.settingsRepository.allowScreenshotVault
         .collectAsState(initial = false)
     val backupConfigured = StorageConfig.isBackupConfigured(ctx)
+    // 明日补班预告开关（默认开）：只关「预告」，当天补班横幅不受影响
+    val makeupHintEnabled by container.settingsRepository.makeupHintEnabled
+        .collectAsState(initial = true)
 
     // 节假日数据：不内置离线数据，由应用从可配置的数据源下载并缓存
     val festivalRepo = container.festivalRepository
@@ -696,6 +699,30 @@ fun SettingsScreen(
                     onCheckedChange = {
                         autoUpdateCurrent = it
                         festivalRepo.setAutoUpdateCurrent(it)
+                    }
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_makeup_hint), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.settings_makeup_hint_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = makeupHintEnabled,
+                    onCheckedChange = { enabled ->
+                        scope.launch { container.settingsRepository.setMakeupHintEnabled(enabled) }
+                        // 立即刷新小组件：关掉时角标当天就消失，不用等下次重建
+                        WidgetRenderer.refreshAll(ctx)
                     }
                 )
             }

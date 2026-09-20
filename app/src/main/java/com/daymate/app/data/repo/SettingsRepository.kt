@@ -39,6 +39,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val ALLOW_SCREENSHOT_CYCLE = booleanPreferencesKey("allow_screenshot_cycle") // 周期管家允许截屏（默认关＝阻止）
         private val ALLOW_SCREENSHOT_VAULT = booleanPreferencesKey("allow_screenshot_vault") // 保险箱允许截屏（默认关＝阻止）
         private val UPDATE_CHECK = booleanPreferencesKey("update_check_enabled")             // 启动时检查新版本（默认开）
+        private val MAKEUP_HINT = booleanPreferencesKey("makeup_tomorrow_hint_enabled")      // 明日补班预告（默认开）
         private val UPDATE_LAST_CHECK = longPreferencesKey("update_last_check")              // 上次检查时间戳（节流用）
         private val UPDATE_SKIPPED = stringPreferencesKey("update_skipped_version")          // 用户点过「稍后」的版本
 
@@ -226,6 +227,16 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setUpdateCheckEnabled(enabled: Boolean) {
         dataStore.edit { it[UPDATE_CHECK] = enabled }
+    }
+
+    /**
+     * 明日补班预告（**默认开启**）：补班前一天在主页/文件夹横幅与小组件上预告。
+     * 只关「预告」，当天补班横幅（今日XX调休补班）不受影响。
+     */
+    val makeupHintEnabled: Flow<Boolean> = dataStore.data.map { it[MAKEUP_HINT] ?: true }
+
+    suspend fun setMakeupHintEnabled(enabled: Boolean) {
+        dataStore.edit { it[MAKEUP_HINT] = enabled }
     }
 
     /** 上次检查（含失败）的时间戳，用于「同一天不重复问」的节流。 */

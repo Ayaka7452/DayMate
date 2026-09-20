@@ -510,6 +510,8 @@
     <string name="db_red_bin_stale">ゴミ箱に 30 日以上ある項目</string>
     <string name="festival_badge_off">休</string>
     <string name="festival_badge_work">出勤</string>
+    <string name="settings_makeup_hint">明日の振替出勤のお知らせ</string>
+    <string name="settings_makeup_hint_desc">振替出勤の前日にホーム画面とウィジェットで表示します</string>
     <string name="festival_banner_makeup">今日は%1$sの振替出勤日です</string>
     <string name="festival_banner_makeup_tomorrow">明日は%1$sの振替出勤日です</string>
     <string name="festival_ui_no_data">祝日データが未ダウンロード</string>

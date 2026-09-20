@@ -173,8 +173,11 @@ object WidgetRenderer {
         val festival = runCatching {
             container.festivalRepository.todayInfo(LocalDate.now())
         }.getOrNull()
-        // 明日补班预告：仅当今天不是节日、明天是调休上班日时非空（绿底「班」角标）
-        val tomorrowMakeup = if (festival == null) runCatching {
+        // 明日补班预告：仅当今天不是节日、明天是调休上班日、且开关开启时非空（绿底「班」角标）
+        val makeupHint = runCatching {
+            container.settingsRepository.makeupHintEnabled.first()
+        }.getOrDefault(true)
+        val tomorrowMakeup = if (festival == null && makeupHint) runCatching {
             container.festivalRepository.todayInfo(LocalDate.now().plusDays(1))
                 ?.takeIf { !it.isOffDay }
         }.getOrNull() else null

@@ -121,14 +121,16 @@ fun FolderScreen(
     }
     // 与主页同一处理：跟着节日数据版本号重读，换源/下载完成后横幅即时跟着换
     val festivalVersion by container.festivalRepository.version.collectAsState()
-    LaunchedEffect(festivalVersion) {
+    // 明日补班预告开关（默认开）：与主页同口径，关掉后不预告
+    val makeupHint by container.settingsRepository.makeupHintEnabled.collectAsState(initial = true)
+    LaunchedEffect(festivalVersion, makeupHint) {
         val t = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             container.festivalRepository.todayInfo(java.time.LocalDate.now())
         }
         todayFestival = t
         tomorrowMakeup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
-            if (container.festivalRepository.todayInfo(today) == null) {
+            if (makeupHint && container.festivalRepository.todayInfo(today) == null) {
                 container.festivalRepository.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
             } else null
         }

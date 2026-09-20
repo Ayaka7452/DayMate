@@ -194,7 +194,9 @@ fun HomeScreen(
     // 以「节日数据版本号」为 key 重读，而不是 Unit：换数据源或下载完成后数据变了，
     // 卡片必须跟着变——早先只在首次组合时读一次，用户得重启 App 才看得到新国家的节日。
     val festivalVersion by festivalRepo.version.collectAsState()
-    LaunchedEffect(festivalVersion) {
+    // 明日补班预告开关（默认开）：设置里可关，关掉后横幅/角标不再预告
+    val makeupHint by container.settingsRepository.makeupHintEnabled.collectAsState(initial = true)
+    LaunchedEffect(festivalVersion, makeupHint) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
             Triple(festivalRepo.hasData(), festivalRepo.todayInfo(today), festivalRepo.nextOffDay(today))
@@ -205,8 +207,8 @@ fun HomeScreen(
         }
         tomorrowMakeup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
-            // 今日本身是节日（无论休/班）就不预告明天，避免横幅叠报
-            if (festivalRepo.todayInfo(today) == null) {
+            // 今日本身是节日（无论休/班）就不预告明天，避免横幅叠报；开关关闭同样不预告
+            if (makeupHint && festivalRepo.todayInfo(today) == null) {
                 festivalRepo.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
             } else null
         }

@@ -510,6 +510,8 @@
     <string name="db_red_bin_stale">휴지통에 30일 넘게 있는 항목</string>
     <string name="festival_badge_off">휴무</string>
     <string name="festival_badge_work">출근</string>
+    <string name="settings_makeup_hint">내일 대체 근무일 알림</string>
+    <string name="settings_makeup_hint_desc">대체 근무일 전날 홈 화면과 위젯에 미리 표시합니다</string>
     <string name="festival_banner_makeup">오늘은 %1$s 대체 근무일입니다</string>
     <string name="festival_banner_makeup_tomorrow">내일은 %1$s 대체 근무일입니다</string>
     <string name="festival_ui_no_data">공휴일 데이터가 없습니다</string>

@@ -510,6 +510,8 @@
     <string name="db_red_bin_stale">回收站中超过 30 天的条目</string>
     <string name="festival_badge_off">休</string>
     <string name="festival_badge_work">班</string>
+    <string name="settings_makeup_hint">明日补班提醒</string>
+    <string name="settings_makeup_hint_desc">补班前一天在主页与小组件提前预告</string>
     <string name="festival_banner_makeup">今日%1$s调休补班</string>
     <string name="festival_banner_makeup_tomorrow">明日%1$s调休补班</string>
     <string name="festival_ui_no_data">节假日数据未下载</string>
