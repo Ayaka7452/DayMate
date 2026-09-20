@@ -66,7 +66,6 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
           ASSET="DayMate-v${VERSION}-signed.apk"
@@ -81,7 +80,13 @@ jobs:
           # 同版本重跑：删掉同名 Release 后重建（幂等）
           gh release delete "v${VERSION}" --yes 2>/dev/null || true
 
-          printf 'DayMate v%s\n\n%s\n' "$VERSION" "${COMMIT_MSG:-DayMate v${VERSION}}" > release_notes.md
+          # Release 说明面向用户：优先读仓库根的 RELEASE_NOTES.md（发版时同步更新的功能描述），
+          # 缺失时退回通用文案——绝不直接贴 commit message
+          if [ -f RELEASE_NOTES.md ]; then
+            cp RELEASE_NOTES.md release_notes.md
+          else
+            printf 'DayMate v%s\n' "$VERSION" > release_notes.md
+          fi
           gh release create "v${VERSION}" "${ASSET}#${ASSET}" \
             --title "v${VERSION}" --notes-file release_notes.md
 
