@@ -9,6 +9,9 @@ concurrency:
   group: android-release
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -57,3 +60,31 @@ jobs:
           name: daymate-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      # 自动发布：读版本号 → 资产改名 → 清旧 Release（只留 v1.0.0 与最新）→ 建 Release（tag 不存在则自动在 HEAD 创建）
+      # 同版本重跑是幂等的：先删同名 Release（tag 留仓）再重建。
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          ASSET="DayMate-v${VERSION}-signed.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$ASSET"
+
+          # 清旧：除 v1.0.0 和当前版本外全部删除（只删 Release，tag 全留）
+          gh release list --json tagName -q '.[].tagName' | while read -r t; do
+            if [ -n "$t" ] && [ "$t" != "v${VERSION}" ] && [ "$t" != "v1.0.0" ]; then
+              gh release delete "$t" --yes || true
+            fi
+          done
+          # 同版本重跑：删掉同名 Release 后重建（幂等）
+          gh release delete "v${VERSION}" --yes 2>/dev/null || true
+
+          printf 'DayMate v%s\n\n%s\n' "$VERSION" "${COMMIT_MSG:-DayMate v${VERSION}}" > release_notes.md
+          gh release create "v${VERSION}" "${ASSET}#${ASSET}" \
+            --title "v${VERSION}" --notes-file release_notes.md
+
+          # 发布后自检：资产 name 与 size 必须正确（label 会骗人，name 才是下载文件名）
+          gh release view "v${VERSION}" --json tagName,assets \
+            -q '"tag=\(.tagName)", (.assets[] | "asset=\(.name) size=\(.size)")'
