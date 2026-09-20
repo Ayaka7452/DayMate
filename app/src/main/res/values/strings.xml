@@ -592,7 +592,7 @@
     <string name="event_title_hint">e.g. Next birthday</string>
     <string name="event_note_label">Description (optional)</string>
     <string name="event_note_hint">Add details like location or notes</string>
-    <string name="event_root_space">Main space (root)</string>
+    <string name="event_root_space">Root</string>
     <string name="event_no_folder_hint">No folders yet. Events are saved in the main space. Create a folder on the home screen to move them in bulk.</string>
     <string name="event_target_date">Target date: %1$s</string>
     <string name="event_reset_today">Reset to today</string>

@@ -592,7 +592,7 @@
     <string name="event_title_hint">例如：下次生日</string>
     <string name="event_note_label">简述（可选）</string>
     <string name="event_note_hint">补充说明，例如地点、注意事项</string>
-    <string name="event_root_space">主空间（根目录）</string>
+    <string name="event_root_space">根目录</string>
     <string name="event_no_folder_hint">尚无文件夹。事件将保存在主空间，可在主页创建文件夹后批量移入。</string>
     <string name="event_target_date">目标日期：%1$s</string>
     <string name="event_reset_today">重置为今天</string>

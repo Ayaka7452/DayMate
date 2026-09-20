@@ -308,7 +308,12 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
-            Text(stringResource(R.string.settings_theme_section), style = MaterialTheme.typography.titleMedium)
+            // 与「默认排序」「主页顶部卡片」等分区保持同一节奏：分割线后标题留 16dp
+            Text(
+                stringResource(R.string.settings_theme_section),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
             themeOptions.forEach { (value, label) ->
                 Row(
                     modifier = Modifier

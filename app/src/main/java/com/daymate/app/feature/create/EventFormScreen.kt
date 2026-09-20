@@ -167,7 +167,8 @@ fun EventFormScreen(
             Spacer(Modifier.height(6.dp))
             TextButton(onClick = { showFolderPicker = true }) {
                 val currentFolder = folders.firstOrNull { it.id == folderIdSel }
-                Text("📂  ${currentFolder?.name ?: Tr.s(R.string.event_root_space)}")
+                // 用文件夹自己的 emoji（与主页/文件夹列表一致）；根目录回落到默认文件夹图标
+                Text("${currentFolder?.icon ?: "📁"}  ${currentFolder?.name ?: Tr.s(R.string.event_root_space)}")
             }
             if (folders.isEmpty()) {
                 Text(

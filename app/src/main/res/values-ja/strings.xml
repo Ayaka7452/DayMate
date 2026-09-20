@@ -592,7 +592,7 @@
     <string name="event_title_hint">例：次の誕生日</string>
     <string name="event_note_label">簡単な説明（任意）</string>
     <string name="event_note_hint">場所や注意事項などを補足</string>
-    <string name="event_root_space">メインスペース（ルート）</string>
+    <string name="event_root_space">ルート</string>
     <string name="event_no_folder_hint">フォルダがありません。イベントはメインスペースに保存されます。ホーム画面でフォルダを作成すると一括で移動できます。</string>
     <string name="event_target_date">目標日：%1$s</string>
     <string name="event_reset_today">今日にリセット</string>

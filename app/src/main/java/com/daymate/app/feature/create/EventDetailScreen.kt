@@ -91,8 +91,11 @@ fun EventDetailScreen(
     ) { padding ->
         val e = event
         when {
-            e != null -> DetailContent(e, folders.firstOrNull { it.id == e.folderId }?.name,
-                Modifier.padding(padding))
+            e != null -> {
+                // 用文件夹自己的 emoji（与主页/文件夹列表一致），缺省回落到默认文件夹图标
+                val f = folders.firstOrNull { it.id == e.folderId }
+                DetailContent(e, f?.let { "${it.icon ?: "📁"} ${it.name}" }, Modifier.padding(padding))
+            }
             exists == false -> Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -112,7 +115,8 @@ fun EventDetailScreen(
 }
 
 @Composable
-private fun DetailContent(e: EventEntity, folderName: String?, modifier: Modifier = Modifier) {
+// folderLabel 已带文件夹自己的 emoji（调用方拼好），此处不再补硬编码图标
+private fun DetailContent(e: EventEntity, folderLabel: String?, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -191,7 +195,7 @@ private fun DetailContent(e: EventEntity, folderName: String?, modifier: Modifie
         if (e.refDays != null && e.refDays > 0) {
             InfoRow(Tr.s(R.string.detail_ref_value), "${e.refDays} ${refUnitLabel(e.displayUnit)}")
         }
-        if (folderName != null) InfoRow(Tr.s(R.string.detail_folder), "📂 $folderName")
+        if (folderLabel != null) InfoRow(Tr.s(R.string.detail_folder), folderLabel)
         if (e.isPinned) InfoRow(Tr.s(R.string.detail_pinned), Tr.s(R.string.detail_pinned_yes))
         Spacer(Modifier.height(16.dp))
     }

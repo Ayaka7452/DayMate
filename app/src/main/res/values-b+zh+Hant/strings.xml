@@ -592,7 +592,7 @@
     <string name="event_title_hint">例如：下次生日</string>
     <string name="event_note_label">簡述（可選）</string>
     <string name="event_note_hint">補充說明，例如地點、注意事項</string>
-    <string name="event_root_space">主空間（根目錄）</string>
+    <string name="event_root_space">根目錄</string>
     <string name="event_no_folder_hint">尚無資料夾。事件將儲存在主空間，可在主頁建立資料夾後批次移入。</string>
     <string name="event_target_date">目標日期：%1$s</string>
     <string name="event_reset_today">重設為今天</string>

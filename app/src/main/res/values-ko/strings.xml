@@ -592,7 +592,7 @@
     <string name="event_title_hint">예: 다음 생일</string>
     <string name="event_note_label">설명 (선택)</string>
     <string name="event_note_hint">장소, 주의사항 등 추가 설명</string>
-    <string name="event_root_space">메인 공간 (루트)</string>
+    <string name="event_root_space">루트</string>
     <string name="event_no_folder_hint">폴더가 없습니다. 이벤트는 메인 공간에 저장됩니다. 홈 화면에서 폴더를 만들면 한 번에 옮길 수 있습니다.</string>
     <string name="event_target_date">목표일: %1$s</string>
     <string name="event_reset_today">오늘로 초기화</string>
