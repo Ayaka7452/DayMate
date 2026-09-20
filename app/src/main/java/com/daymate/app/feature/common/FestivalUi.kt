@@ -53,7 +53,7 @@ fun FestivalBadge(isOffDay: Boolean, modifier: Modifier = Modifier) {
 
 /**
  * 今日节日横幅：今天恰逢法定节假日或调休上班日时，在列表顶部显示。
- * 例：「今天 · 春节 · 休」「今天 · 调休上班（春节）· 班」。
+ * 例：「今天 · 春节 · 休」「今日国庆节调休补班 · 班」。
  */
 @Composable
 fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier) {
@@ -67,15 +67,24 @@ fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(Tr.s(R.string.common_today), style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                // 走 HolidayNames 而不是 day.name：数据源给的名字是源国语言的，
-                // 中文用户切到日本节日时得看到「成人の日 → 成人节」而不是日文原名
-                HolidayNames.display(day),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
+            if (day.isOffDay) {
+                Text(Tr.s(R.string.common_today), style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    // 走 HolidayNames 而不是 day.name：数据源给的名字是源国语言的，
+                    // 中文用户切到日本节日时得看到「成人の日 → 成人节」而不是日文原名
+                    HolidayNames.display(day),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                // 调休补班日：单独句式点明「为哪个节日补班」，避免「国庆节（班）」读成「过国庆节的班」
+                Text(
+                    Tr.s(R.string.festival_banner_makeup, HolidayNames.display(day)),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             FestivalBadge(day.isOffDay)
         }
     }

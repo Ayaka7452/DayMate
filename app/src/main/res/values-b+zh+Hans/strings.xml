@@ -510,6 +510,7 @@
     <string name="db_red_bin_stale">回收站中超过 30 天的条目</string>
     <string name="festival_badge_off">休</string>
     <string name="festival_badge_work">班</string>
+    <string name="festival_banner_makeup">今日%1$s调休补班</string>
     <string name="festival_ui_no_data">节假日数据未下载</string>
     <string name="festival_ui_go_download">前往「设置 → 节假日数据」下载</string>
     <string name="festival_ui_all_finished">已缓存的法定节假日已全部结束，可在设置中更新</string>
