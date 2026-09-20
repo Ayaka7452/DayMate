@@ -34,11 +34,11 @@ import java.time.format.DateTimeFormatter
 private val FESTIVAL_OFF_GREEN = Color(0xFF1E8E3E)
 private val FESTIVAL_WORK_ORANGE = Color(0xFFE8710A)
 
-/** 「休 / 班」小圆角角标：绿色=放假，橙色=调休上班。 */
+/** 「休 / 班」小圆角角标：绿色=放假，橙色=调休上班；明天要补班时「班」也走绿色以作区分。 */
 @Composable
-fun FestivalBadge(isOffDay: Boolean, modifier: Modifier = Modifier) {
+fun FestivalBadge(isOffDay: Boolean, modifier: Modifier = Modifier, tomorrowMakeup: Boolean = false) {
     Surface(
-        color = if (isOffDay) FESTIVAL_OFF_GREEN else FESTIVAL_WORK_ORANGE,
+        color = if (isOffDay || tomorrowMakeup) FESTIVAL_OFF_GREEN else FESTIVAL_WORK_ORANGE,
         contentColor = Color.White,
         shape = RoundedCornerShape(6.dp),
         modifier = modifier
@@ -52,11 +52,12 @@ fun FestivalBadge(isOffDay: Boolean, modifier: Modifier = Modifier) {
 }
 
 /**
- * 今日节日横幅：今天恰逢法定节假日或调休上班日时，在列表顶部显示。
- * 例：「今天 · 春节 · 休」「今日国庆节调休补班 · 班」。
+ * 今日节日横幅：今天恰逢法定节假日或调休上班日时，在列表顶部显示；
+ * [tomorrow]=true 表示今天不是节日、但明天是调休补班日——提前一天预告（绿底「班」角标）。
+ * 例：「今天 · 春节 · 休」「今日国庆节调休补班 · 班」「明日国庆节调休补班 · 班(绿)」。
  */
 @Composable
-fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier) {
+fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier, tomorrow: Boolean = false) {
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -67,25 +68,34 @@ fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (day.isOffDay) {
-                Text(Tr.s(R.string.common_today), style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    // 走 HolidayNames 而不是 day.name：数据源给的名字是源国语言的，
-                    // 中文用户切到日本节日时得看到「成人の日 → 成人节」而不是日文原名
-                    HolidayNames.display(day),
+            when {
+                // 明日补班预告：单独句式 + 绿底班角标，与「今日补班」的橙色区分开
+                tomorrow -> Text(
+                    Tr.s(R.string.festival_banner_makeup_tomorrow, HolidayNames.display(day)),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f)
                 )
-            } else {
-                // 调休补班日：单独句式点明「为哪个节日补班」，避免「国庆节（班）」读成「过国庆节的班」
-                Text(
-                    Tr.s(R.string.festival_banner_makeup, HolidayNames.display(day)),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f)
-                )
+                day.isOffDay -> {
+                    Text(Tr.s(R.string.common_today), style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        // 走 HolidayNames 而不是 day.name：数据源给的名字是源国语言的，
+                        // 中文用户切到日本节日时得看到「成人の日 → 成人节」而不是日文原名
+                        HolidayNames.display(day),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                else -> {
+                    // 调休补班日：单独句式点明「为哪个节日补班」，避免「国庆节（班）」读成「过国庆节的班」
+                    Text(
+                        Tr.s(R.string.festival_banner_makeup, HolidayNames.display(day)),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
-            FestivalBadge(day.isOffDay)
+            FestivalBadge(day.isOffDay, tomorrowMakeup = tomorrow)
         }
     }
 }

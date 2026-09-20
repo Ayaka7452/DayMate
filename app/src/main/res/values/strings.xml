@@ -511,6 +511,7 @@
     <string name="festival_badge_off">Off</string>
     <string name="festival_badge_work">Work</string>
     <string name="festival_banner_makeup">Today is a makeup workday for %1$s</string>
+    <string name="festival_banner_makeup_tomorrow">Tomorrow is a makeup workday for %1$s</string>
     <string name="festival_ui_no_data">Holiday data not downloaded</string>
     <string name="festival_ui_go_download">Download it in Settings → Holiday data</string>
     <string name="festival_ui_all_finished">All cached holidays have passed. You can update them in Settings.</string>

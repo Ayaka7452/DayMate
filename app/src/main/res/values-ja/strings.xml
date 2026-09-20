@@ -511,6 +511,7 @@
     <string name="festival_badge_off">休</string>
     <string name="festival_badge_work">出勤</string>
     <string name="festival_banner_makeup">今日は%1$sの振替出勤日です</string>
+    <string name="festival_banner_makeup_tomorrow">明日は%1$sの振替出勤日です</string>
     <string name="festival_ui_no_data">祝日データが未ダウンロード</string>
     <string name="festival_ui_go_download">「設定 → 祝日データ」からダウンロード</string>
     <string name="festival_ui_all_finished">キャッシュ済みの祝日はすべて終了しました。設定で更新できます。</string>

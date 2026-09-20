@@ -115,6 +115,10 @@ fun FolderScreen(
     var todayFestival by remember {
         mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null)
     }
+    // 明日补班预告：与主页同口径——今天不是节日且明天是调休上班日时非空
+    var tomorrowMakeup by remember {
+        mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null)
+    }
     // 与主页同一处理：跟着节日数据版本号重读，换源/下载完成后横幅即时跟着换
     val festivalVersion by container.festivalRepository.version.collectAsState()
     LaunchedEffect(festivalVersion) {
@@ -122,6 +126,12 @@ fun FolderScreen(
             container.festivalRepository.todayInfo(java.time.LocalDate.now())
         }
         todayFestival = t
+        tomorrowMakeup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val today = java.time.LocalDate.now()
+            if (container.festivalRepository.todayInfo(today) == null) {
+                container.festivalRepository.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
+            } else null
+        }
     }
 
     // 排序模式：manual 才允许手动调整顺序
@@ -328,11 +338,12 @@ fun FolderScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                // 今日节日/调休横幅（数据未下载时不在文件夹页引导，主页卡片负责提示）
-                todayFestival?.let { tf ->
+                // 今日节日/调休横幅（数据未下载时不在文件夹页引导，主页卡片负责提示）；明日补班同主页口径
+                (todayFestival ?: tomorrowMakeup)?.let { tf ->
                     item(key = "festival_today") {
                         com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
                             day = tf,
+                            tomorrow = todayFestival == null,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }

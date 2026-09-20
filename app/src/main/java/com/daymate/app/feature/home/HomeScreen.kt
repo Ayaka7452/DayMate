@@ -188,6 +188,8 @@ fun HomeScreen(
     val festivalRepo = remember { container.festivalRepository }
     var festivalHasData by remember { mutableStateOf(false) }
     var todayFestival by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
+    // 明日补班预告：仅当今天不是节日、明天是调休上班日时非空（横幅换绿底「班」+「明日」句式）
+    var tomorrowMakeup by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
     var nextFestival by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
     // 以「节日数据版本号」为 key 重读，而不是 Unit：换数据源或下载完成后数据变了，
     // 卡片必须跟着变——早先只在首次组合时读一次，用户得重启 App 才看得到新国家的节日。
@@ -200,6 +202,13 @@ fun HomeScreen(
             festivalHasData = has
             todayFestival = todayF
             nextFestival = nextF
+        }
+        tomorrowMakeup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val today = java.time.LocalDate.now()
+            // 今日本身是节日（无论休/班）就不预告明天，避免横幅叠报
+            if (festivalRepo.todayInfo(today) == null) {
+                festivalRepo.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
+            } else null
         }
     }
 
@@ -606,11 +615,12 @@ fun HomeScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                // 今日节日/调休横幅 + 下一节日倒数卡片（未下载数据时引导去设置）
-                todayFestival?.let { tf ->
+                // 今日节日/调休横幅；今日本身不是节日但明天要补班时，横幅换成「明日」预告（绿底班角标）
+                (todayFestival ?: tomorrowMakeup)?.let { tf ->
                     item(key = "festival_today") {
                         com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
                             day = tf,
+                            tomorrow = todayFestival == null,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
