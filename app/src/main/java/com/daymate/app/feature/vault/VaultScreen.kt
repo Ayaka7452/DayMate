@@ -284,9 +284,10 @@ private fun VaultUnlockScreen(
                 .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
             BiometricManager.BIOMETRIC_SUCCESS
     }
-    // 必须已托管会话密钥，指纹解锁才有意义（否则解开后拿不到密钥，内容会显示成密文）
-    val biometricReady =
-        biometricAvailable && biometricEnabled && BiometricKeyStore.hasWrappedKey(context)
+    // 指纹解锁还要求托管密钥**当前能解封**：Keystore 密钥硬件绑定，刷机/换机恢复后必丢，
+    // 只查 hasWrappedKey 会被恢复回来的「死档」骗过（按钮在、扫完指纹才报过期，且永远无法自愈）
+    val biometricReady = biometricAvailable && biometricEnabled &&
+        remember(biometricEnabled) { BiometricKeyStore.canUnwrap(context) }
 
     fun authenticateWithBiometric() {
         val act = activity ?: return
@@ -353,8 +354,11 @@ private fun VaultUnlockScreen(
                         return@launch
                     }
                     VaultSession.unlock(key)
-                    // 兼容旧版本：此前指纹解锁未托管密钥，这里补一次，之后指纹即可正常解密
-                    if (biometricEnabled && !BiometricKeyStore.hasWrappedKey(context)) {
+                    // 重新托管会话密钥：既兼容旧版本未托管的情况，也修复刷机/换机恢复后
+                    // Keystore 密钥丢失导致的「指纹过期」——旧条件 !hasWrappedKey 会被
+                    // 恢复回来的死档挡住，密码解锁永远不会重建托管，指纹从此修不好。
+                    // wrap 每次生成新 IV 覆盖旧记录，开销可忽略。
+                    if (biometricEnabled) {
                         withContext(Dispatchers.IO) { BiometricKeyStore.wrap(context, key.encoded) }
                     }
                     onUnlocked()
@@ -376,6 +380,15 @@ private fun VaultUnlockScreen(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.vault_use_fingerprint))
             }
+        } else if (biometricAvailable && biometricEnabled) {
+            // 开了指纹但托管密钥解不开（刷机/恢复后 Keystore 密钥丢失）：与其扫完才报
+            // 「过期」，不如直接说明原因和恢复办法——用密码解锁一次即自动重新托管
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.vault_biometric_stale_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
         }
     }
 }

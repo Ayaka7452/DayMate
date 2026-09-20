@@ -41,6 +41,14 @@ object BiometricKeyStore {
         return KeystoreWrap.unwrap(ALIAS, stored)
     }
 
+    /**
+     * 托管密钥当前能否解封。Keystore 密钥硬件绑定、不随应用数据备份/恢复迁移
+     * （刷机、换机用第三方备份恢复后必丢），残留的托管记录会变成「死档」：
+     * 记录还在、但永远解不开。此时指纹按钮应隐藏并提示「用密码解锁一次恢复」，
+     * 而不是等用户扫完指纹才报错。
+     */
+    fun canUnwrap(ctx: Context): Boolean = unwrap(ctx) != null
+
     /** 清除托管的密钥（关闭指纹、重置密码时调用）。 */
     fun clear(ctx: Context) {
         KeystoreWrap.deleteKey(ALIAS)

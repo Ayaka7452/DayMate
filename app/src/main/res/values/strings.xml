@@ -340,6 +340,7 @@
     <string name="vault_unlock_vault">Unlock Vault</string>
     <string name="vault_enter_password_unlock">Enter password to unlock Vault</string>
     <string name="vault_fingerprint_invalid">Fingerprint credential is no longer valid. Please unlock with your password.</string>
+    <string name="vault_biometric_stale_hint">Fingerprint unlock is unavailable (the device security key was lost). Unlock with your password once to restore it.</string>
     <string name="vault_enter_password_prompt">Please enter your password</string>
     <string name="vault_password_wrong">Incorrect password</string>
     <string name="vault_unlock">Unlock</string>

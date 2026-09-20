@@ -340,6 +340,7 @@
     <string name="vault_unlock_vault">Vault 잠금 해제</string>
     <string name="vault_enter_password_unlock">비밀번호를 입력하여 Vault 잠금 해제</string>
     <string name="vault_fingerprint_invalid">지문 자격 증명이 무효화되었습니다. 비밀번호로 잠금 해제하세요.</string>
+    <string name="vault_biometric_stale_hint">지문 잠금 해제를 사용할 수 없습니다(기기 보안 키가 손실됨). 비밀번호로 한 번 잠금 해제하면 복구됩니다.</string>
     <string name="vault_enter_password_prompt">비밀번호를 입력하세요</string>
     <string name="vault_password_wrong">비밀번호가 틀렸습니다</string>
     <string name="vault_unlock">잠금 해제</string>

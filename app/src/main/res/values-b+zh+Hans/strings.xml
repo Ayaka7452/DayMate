@@ -340,6 +340,7 @@
     <string name="vault_unlock_vault">解锁 Vault</string>
     <string name="vault_enter_password_unlock">输入密码来解锁 Vault</string>
     <string name="vault_fingerprint_invalid">指纹凭据已失效，请使用密码解锁</string>
+    <string name="vault_biometric_stale_hint">指纹解锁暂不可用（设备安全密钥丢失）。用密码解锁一次即可恢复</string>
     <string name="vault_enter_password_prompt">请输入密码</string>
     <string name="vault_password_wrong">密码错误</string>
     <string name="vault_unlock">解锁</string>

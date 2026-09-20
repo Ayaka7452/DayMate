@@ -107,6 +107,7 @@ import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.i18n.LocaleWrap
 import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.core.security.BiometricKeyStore
 import com.ayaka7452.daymate.core.security.VaultCrypto
 import com.ayaka7452.daymate.core.util.CycleCalculator
 import com.ayaka7452.daymate.core.util.NoteCatalog
@@ -1553,6 +1554,10 @@ private fun CycleUnlockGate(
                 .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
             BiometricManager.BIOMETRIC_SUCCESS
     }
+    // 指纹就绪还需托管密钥**当前能解封**：Keystore 密钥硬件绑定，刷机/换机恢复后必丢，
+    // 残留托管记录变成死档。与 Vault 解锁页同一判定，避免「管家指纹能进、Vault 报过期」的
+    // 不一致体感——此时隐藏指纹按钮并提示用密码解锁恢复。
+    val biometricCanUnwrap = remember(biometricEnabled) { BiometricKeyStore.canUnwrap(context) }
 
     fun authenticateWithBiometric() {
         val act = activity ?: return
@@ -1619,7 +1624,17 @@ private fun CycleUnlockGate(
                         return@Button
                     }
                     val ok = try {
-                        VaultCrypto.hash(password, s) == h
+                        // deriveAll 与原 hash 同一次 PBKDF2 派生，成本不变；
+                        // 拿到密钥才能在密码正确时重新托管，修复指纹过期
+                        val (computed, key) = VaultCrypto.deriveAll(password, s)
+                        if (computed == h) {
+                            // 密码正确即重新托管会话密钥（与 Vault 解锁页同一自愈逻辑）：
+                            // 修复刷机/换机恢复后 Keystore 密钥丢失导致的「指纹过期」
+                            if (biometricEnabled) BiometricKeyStore.wrap(context, key.encoded)
+                            true
+                        } else {
+                            false
+                        }
                     } catch (e: Exception) {
                         false
                     }
@@ -1631,13 +1646,22 @@ private fun CycleUnlockGate(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.cycle_unlock))
             }
-            if (biometricAvailable && biometricEnabled) {
+            if (biometricAvailable && biometricEnabled && biometricCanUnwrap) {
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = { authenticateWithBiometric() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Lock, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.cycle_use_fingerprint))
                 }
+            } else if (biometricAvailable && biometricEnabled) {
+                // 托管密钥解不开（刷机/恢复后 Keystore 密钥丢失）：隐藏指纹按钮，
+                // 说明原因与恢复办法——密码解锁一次即自动重新托管（见上方解锁逻辑）
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.vault_biometric_stale_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
             }
         }
     }

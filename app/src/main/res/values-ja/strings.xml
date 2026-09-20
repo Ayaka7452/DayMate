@@ -340,6 +340,7 @@
     <string name="vault_unlock_vault">Vault のロック解除</string>
     <string name="vault_enter_password_unlock">パスワードを入力して Vault のロックを解除</string>
     <string name="vault_fingerprint_invalid">指紋の資格情報が無効になりました。パスワードでロック解除してください。</string>
+    <string name="vault_biometric_stale_hint">指紋解錠は利用できません（端末のセキュリティキーが失われました）。パスワードで一度解錠すると復元されます。</string>
     <string name="vault_enter_password_prompt">パスワードを入力してください</string>
     <string name="vault_password_wrong">パスワードが違います</string>
     <string name="vault_unlock">ロック解除</string>
