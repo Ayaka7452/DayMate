@@ -87,7 +87,7 @@
     <string name="reorder_bottom">맨 아래로 이동</string>
     <string name="dlg_name">이름</string>
     <string name="dlg_icon">아이콘</string>
-    <string name="dlg_root_folder">📂  루트（폴더에서 이동）</string>
+    <string name="dlg_root_folder">📂  루트</string>
     <string name="dlg_new_folder_and_move">+ 새 폴더 만들고 이동</string>
     <string name="emoji_more">더 많은 이모지</string>
     <string name="settings_data_backup">데이터 백업</string>

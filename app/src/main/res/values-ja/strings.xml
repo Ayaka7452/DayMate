@@ -87,7 +87,7 @@
     <string name="reorder_bottom">一番下に移動</string>
     <string name="dlg_name">名前</string>
     <string name="dlg_icon">アイコン</string>
-    <string name="dlg_root_folder">📂  ルート（フォルダから移動）</string>
+    <string name="dlg_root_folder">📂  ルート</string>
     <string name="dlg_new_folder_and_move">+ 新規フォルダを作成して移動</string>
     <string name="emoji_more">さらに絵文字</string>
     <string name="settings_data_backup">データのバックアップ</string>

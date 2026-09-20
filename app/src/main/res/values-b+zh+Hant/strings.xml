@@ -87,7 +87,7 @@
     <string name="reorder_bottom">移到底部</string>
     <string name="dlg_name">名稱</string>
     <string name="dlg_icon">圖示</string>
-    <string name="dlg_root_folder">📂  根目錄（移出資料夾）</string>
+    <string name="dlg_root_folder">📂  根目錄</string>
     <string name="dlg_new_folder_and_move">+ 新增資料夾並移入</string>
     <string name="emoji_more">更多 emoji</string>
     <string name="settings_data_backup">資料備份</string>

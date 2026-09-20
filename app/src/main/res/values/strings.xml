@@ -87,7 +87,7 @@
     <string name="reorder_bottom">Move to bottom</string>
     <string name="dlg_name">Name</string>
     <string name="dlg_icon">Icon</string>
-    <string name="dlg_root_folder">📂  Root (move out of folder)</string>
+    <string name="dlg_root_folder">📂  Root</string>
     <string name="dlg_new_folder_and_move">+ New folder and move in</string>
     <string name="emoji_more">More emoji</string>
     <string name="settings_data_backup">Data Backup</string>
