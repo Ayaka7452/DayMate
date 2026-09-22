@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -679,80 +678,85 @@ fun HomeScreen(
                         .padding(padding)
                 )
             }
-            else -> Crossfade(
-                targetState = homeViewMode,
-                label = "home_view"
-            ) { mode ->
-                when (mode) {
-                SettingsRepository.VIEW_MODE_LIST -> {
-                LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = padding,
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                // 今日节日/调休横幅；今日本身不是节日但明天要补班时，横幅换成「明日」预告（绿底班角标）
-                (todayFestival ?: tomorrowMakeup)?.let { tf ->
-                    item(key = "festival_today") {
-                        com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
-                            day = tf,
-                            tomorrow = todayFestival == null,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）
-                when (homeTopCard) {
-                    "festival" -> item(key = "festival_card") {
-                        com.ayaka7452.daymate.feature.common.FestivalCountdownCard(
-                            hasData = festivalHasData,
-                            festival = nextFestival,
-                            onClick = {
-                                if (!festivalHasData) {
-                                    onNavigate(Routes.SETTINGS)
-                                } else if (nextFestival != null) {
-                                    val f = nextFestival!!
-                                    onNavigate(
-                                        "event_form?festivalName=" +
-                                            android.net.Uri.encode(f.name) +
-                                            "&festivalEpochDay=" + f.date.toEpochDay()
+            else -> Column(Modifier.fillMaxSize()) {
+                // 顶部横幅与倒数卡片：两种视图共用一份、不参与切换动画；宽度统一为列表口径（水平 8dp），
+                // 整个顶部区域一次性让开顶栏（Scaffold 顶内边距），下方内容区不再重复计算
+                val hasHeader = (todayFestival ?: tomorrowMakeup) != null || homeTopCard != "off"
+                if (hasHeader) {
+                    Column(Modifier.padding(top = padding.calculateTopPadding())) {
+                        // 今日节日/调休横幅；今日本身不是节日但明天要补班时，横幅换成「明日」预告（绿底班角标）
+                        (todayFestival ?: tomorrowMakeup)?.let { tf ->
+                            com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
+                                day = tf,
+                                tomorrow = todayFestival == null,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）
+                        when (homeTopCard) {
+                            "festival" -> com.ayaka7452.daymate.feature.common.FestivalCountdownCard(
+                                hasData = festivalHasData,
+                                festival = nextFestival,
+                                onClick = {
+                                    if (!festivalHasData) {
+                                        onNavigate(Routes.SETTINGS)
+                                    } else if (nextFestival != null) {
+                                        val f = nextFestival!!
+                                        onNavigate(
+                                            "event_form?festivalName=" +
+                                                android.net.Uri.encode(f.name) +
+                                                "&festivalEpochDay=" + f.date.toEpochDay()
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                badgeEmoji = homeBadgeEmoji
+                            )
+                            "event" -> {
+                                // 最近倒数日：优先取剩余天数最少的未过期事件；全部已过期则取最近过期的
+                                val today = java.time.LocalDate.now().toEpochDay()
+                                val nearest = allEvents
+                                    .filter { it.targetDateEpochDay >= today }
+                                    .minByOrNull { it.targetDateEpochDay }
+                                val pastNearest = allEvents
+                                    .filter { it.targetDateEpochDay < today }
+                                    .maxByOrNull { it.targetDateEpochDay }
+                                val show = nearest ?: pastNearest
+                                val isPast = nearest == null
+                                if (show != null) {
+                                    val dateStr = java.time.LocalDate.ofEpochDay(show.targetDateEpochDay)
+                                        .format(java.time.format.DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md)))
+                                    com.ayaka7452.daymate.feature.common.EventCountdownCard(
+                                        title = show.title,
+                                        dateStr = dateStr,
+                                        days = kotlin.math.abs(show.targetDateEpochDay - today).toInt(),
+                                        past = isPast,
+                                        onClick = {
+                                            if (show.specialType == "cycle") onNavigate("cycle")
+                                            else onNavigate("event_detail?eventId=${show.id}")
+                                        },
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
-                            },
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            badgeEmoji = homeBadgeEmoji
-                        )
-                    }
-                    "event" -> {
-                        // 最近倒数日：优先取剩余天数最少的未过期事件；全部已过期则取最近过期的
-                        val today = java.time.LocalDate.now().toEpochDay()
-                        val nearest = allEvents
-                            .filter { it.targetDateEpochDay >= today }
-                            .minByOrNull { it.targetDateEpochDay }
-                        val pastNearest = allEvents
-                            .filter { it.targetDateEpochDay < today }
-                            .maxByOrNull { it.targetDateEpochDay }
-                        val show = nearest ?: pastNearest
-                        val isPast = nearest == null
-                        if (show != null) {
-                            item(key = "event_card") {
-                                val dateStr = java.time.LocalDate.ofEpochDay(show.targetDateEpochDay)
-                                    .format(java.time.format.DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md)))
-                                com.ayaka7452.daymate.feature.common.EventCountdownCard(
-                                    title = show.title,
-                                    dateStr = dateStr,
-                                    days = kotlin.math.abs(show.targetDateEpochDay - today).toInt(),
-                                    past = isPast,
-                                    onClick = {
-                                    if (show.specialType == "cycle") onNavigate("cycle")
-                                    else onNavigate("event_detail?eventId=${show.id}")
-                                },
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
                             }
                         }
                     }
                 }
+                Crossfade(
+                    targetState = homeViewMode,
+                    label = "home_view"
+                ) { mode ->
+                    when (mode) {
+                    SettingsRepository.VIEW_MODE_LIST -> {
+                    LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = if (hasHeader) 0.dp else padding.calculateTopPadding(),
+                        bottom = padding.calculateBottomPadding()
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
                         val handle = if (selectionMode && manualSort) {
@@ -838,71 +842,12 @@ fun HomeScreen(
                     contentPadding = PaddingValues(
                         start = 12.dp,
                         end = 12.dp,
-                        top = padding.calculateTopPadding() + 4.dp,
+                        top = (if (hasHeader) 0.dp else padding.calculateTopPadding()) + 4.dp,
                         bottom = padding.calculateBottomPadding() + 80.dp
                     ),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    (todayFestival ?: tomorrowMakeup)?.let { tf ->
-                        item(key = "festival_today", span = { GridItemSpan(maxLineSpan) }) {
-                            com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
-                                day = tf,
-                                tomorrow = todayFestival == null,
-                                modifier = Modifier.padding(horizontal = 0.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                    when (homeTopCard) {
-                        "festival" -> item(key = "festival_card", span = { GridItemSpan(maxLineSpan) }) {
-                            com.ayaka7452.daymate.feature.common.FestivalCountdownCard(
-                                hasData = festivalHasData,
-                                festival = nextFestival,
-                                onClick = {
-                                    if (!festivalHasData) {
-                                        onNavigate(Routes.SETTINGS)
-                                    } else if (nextFestival != null) {
-                                        val f = nextFestival!!
-                                        onNavigate(
-                                            "event_form?festivalName=" +
-                                                android.net.Uri.encode(f.name) +
-                                                "&festivalEpochDay=" + f.date.toEpochDay()
-                                        )
-                                    }
-                                },
-                                modifier = Modifier.padding(horizontal = 0.dp, vertical = 2.dp),
-                                badgeEmoji = homeBadgeEmoji
-                            )
-                        }
-                        "event" -> {
-                            val today = java.time.LocalDate.now().toEpochDay()
-                            val nearest = allEvents
-                                .filter { it.targetDateEpochDay >= today }
-                                .minByOrNull { it.targetDateEpochDay }
-                            val pastNearest = allEvents
-                                .filter { it.targetDateEpochDay < today }
-                                .maxByOrNull { it.targetDateEpochDay }
-                            val show = nearest ?: pastNearest
-                            val isPast = nearest == null
-                            if (show != null) {
-                                item(key = "event_card", span = { GridItemSpan(maxLineSpan) }) {
-                                    val dateStr = java.time.LocalDate.ofEpochDay(show.targetDateEpochDay)
-                                        .format(java.time.format.DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md)))
-                                    com.ayaka7452.daymate.feature.common.EventCountdownCard(
-                                        title = show.title,
-                                        dateStr = dateStr,
-                                        days = kotlin.math.abs(show.targetDateEpochDay - today).toInt(),
-                                        past = isPast,
-                                        onClick = {
-                                            if (show.specialType == "cycle") onNavigate("cycle")
-                                            else onNavigate("event_detail?eventId=${show.id}")
-                                        },
-                                        modifier = Modifier.padding(horizontal = 0.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
                     items(folderList, key = { "f${it.id}" }) { folder ->
                         val count = allEvents.count { it.folderId == folder.id }
                         FolderGridItem(
@@ -956,6 +901,7 @@ fun HomeScreen(
                 }
                 }
                 }
+            }
             }
         }
 
