@@ -3,6 +3,7 @@
 package com.ayaka7452.daymate.feature.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -12,7 +13,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,15 +41,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.Search
@@ -430,57 +428,6 @@ fun HomeScreen(
                 TopAppBar(
                     title = { Text("DayMate", fontFamily = FontFamily.Cursive) },
                     actions = {
-                        var viewMenuExpanded by remember { mutableStateOf(false) }
-                        val viewModeDesc = stringResource(R.string.home_view_mode)
-                        Box {
-                            IconButton(onClick = { viewMenuExpanded = true }) {
-                                ViewModeIcon(
-                                    mode = homeViewMode,
-                                    modifier = Modifier.padding(2.dp)
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = viewMenuExpanded,
-                                onDismissRequest = { viewMenuExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.home_view_list)) },
-                                    trailingIcon = {
-                                        if (homeViewMode == SettingsRepository.VIEW_MODE_LIST) {
-                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
-                                        }
-                                    },
-                                    onClick = {
-                                        viewMenuExpanded = false
-                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_LIST) }
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.home_view_medium)) },
-                                    trailingIcon = {
-                                        if (homeViewMode == SettingsRepository.VIEW_MODE_MEDIUM) {
-                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
-                                        }
-                                    },
-                                    onClick = {
-                                        viewMenuExpanded = false
-                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_MEDIUM) }
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.home_view_large)) },
-                                    trailingIcon = {
-                                        if (homeViewMode == SettingsRepository.VIEW_MODE_LARGE) {
-                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
-                                        }
-                                    },
-                                    onClick = {
-                                        viewMenuExpanded = false
-                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_LARGE) }
-                                    }
-                                )
-                            }
-                        }
                         IconButton(onClick = { searchActive = true }) {
                             Icon(Icons.Default.Search, contentDescription = stringResource(R.string.common_search))
                         }
@@ -491,6 +438,7 @@ fun HomeScreen(
                             }
                         }
                         var menuExpanded by remember { mutableStateOf(false) }
+                        var viewSubmenuExpanded by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { menuExpanded = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.home_menu))
@@ -502,6 +450,16 @@ fun HomeScreen(
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.home_batch_manage)) },
                                     onClick = { menuExpanded = false; enterSelection() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_view_mode)) },
+                                    trailingIcon = {
+                                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        viewSubmenuExpanded = true
+                                    }
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.home_cycle_tracker)) },
@@ -536,6 +494,49 @@ fun HomeScreen(
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.RECYCLE_BIN)
+                                    }
+                                )
+                            }
+                            // 视图模式子菜单：主菜单点「视图模式」后关主菜单、开本菜单，
+                            // 两个菜单锚在同一个 MoreVert 按钮上，视觉上就是二级子菜单
+                            DropdownMenu(
+                                expanded = viewSubmenuExpanded,
+                                onDismissRequest = { viewSubmenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_view_list)) },
+                                    trailingIcon = {
+                                        if (homeViewMode == SettingsRepository.VIEW_MODE_LIST) {
+                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
+                                        }
+                                    },
+                                    onClick = {
+                                        viewSubmenuExpanded = false
+                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_LIST) }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_view_medium)) },
+                                    trailingIcon = {
+                                        if (homeViewMode == SettingsRepository.VIEW_MODE_MEDIUM) {
+                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
+                                        }
+                                    },
+                                    onClick = {
+                                        viewSubmenuExpanded = false
+                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_MEDIUM) }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_view_large)) },
+                                    trailingIcon = {
+                                        if (homeViewMode == SettingsRepository.VIEW_MODE_LARGE) {
+                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
+                                        }
+                                    },
+                                    onClick = {
+                                        viewSubmenuExpanded = false
+                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_LARGE) }
                                     }
                                 )
                             }
@@ -678,7 +679,12 @@ fun HomeScreen(
                         .padding(padding)
                 )
             }
-            homeViewMode == SettingsRepository.VIEW_MODE_LIST -> {
+            else -> Crossfade(
+                targetState = homeViewMode,
+                label = "home_view"
+            ) { mode ->
+                when (mode) {
+                SettingsRepository.VIEW_MODE_LIST -> {
                 LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -822,8 +828,8 @@ fun HomeScreen(
                 }
                 }
             }
-            else -> {
-                val isLarge = homeViewMode == SettingsRepository.VIEW_MODE_LARGE
+                else -> {
+                val isLarge = mode == SettingsRepository.VIEW_MODE_LARGE
                 val columns = if (isLarge) GridCells.Fixed(2) else GridCells.Fixed(3)
                 LazyVerticalGrid(
                     columns = columns,
@@ -947,6 +953,8 @@ fun HomeScreen(
                             folderBadge = event.folderId?.let { folderNameById[it] }
                         )
                     }
+                }
+                }
                 }
             }
         }
@@ -1626,66 +1634,7 @@ private fun CloudBackupSheet(
     }
 }
 
-// ===== 视图模式切换与网格卡片 =====
-
-/**
- * 顶栏视图切换图标（Canvas 矢量自绘，不依赖外部图标库）：
- *  - list   3 条横线与 3 个小圆点
- *  - medium 3×3 中等图标方阵
- *  - large  2×2 大图标方阵
- */
-@Composable
-fun ViewModeIcon(
-    mode: String,
-    modifier: Modifier = Modifier,
-    contentDescription: String? = stringResource(R.string.home_view_mode),
-    tint: Color = MaterialTheme.colorScheme.onSurface
-) {
-    Canvas(modifier = modifier.size(20.dp)) {
-        val w = size.width
-        val h = size.height
-        when (mode) {
-            SettingsRepository.VIEW_MODE_LARGE -> {
-                val gap = w * 0.16f
-                val cellW = (w - gap) / 2f
-                val cellH = (h - gap) / 2f
-                val cr = CornerRadius(cellW * 0.25f, cellW * 0.25f)
-                drawRoundRect(tint, Offset(0f, 0f), Size(cellW, cellH), cr)
-                drawRoundRect(tint, Offset(cellW + gap, 0f), Size(cellW, cellH), cr)
-                drawRoundRect(tint, Offset(0f, cellH + gap), Size(cellW, cellH), cr)
-                drawRoundRect(tint, Offset(cellW + gap, cellH + gap), Size(cellW, cellH), cr)
-            }
-            SettingsRepository.VIEW_MODE_MEDIUM -> {
-                val gap = w * 0.12f
-                val cellW = (w - gap * 2) / 3f
-                val cellH = (h - gap * 2) / 3f
-                val cr = CornerRadius(cellW * 0.3f, cellW * 0.3f)
-                for (r in 0..2) {
-                    for (c in 0..2) {
-                        drawRoundRect(
-                            tint,
-                            Offset(c * (cellW + gap), r * (cellH + gap)),
-                            Size(cellW, cellH),
-                            cr
-                        )
-                    }
-                }
-            }
-            else -> {
-                val dotR = w * 0.08f
-                val lineH = h * 0.14f
-                val lineX = w * 0.32f
-                val lineW = w * 0.68f
-                val cr = CornerRadius(lineH * 0.5f, lineH * 0.5f)
-                for (i in 0..2) {
-                    val y = i * (h / 2f - lineH / 2f)
-                    drawCircle(tint, dotR, Offset(dotR + 1f, y + lineH / 2f))
-                    drawRoundRect(tint, Offset(lineX, y), Size(lineW, lineH), cr)
-                }
-            }
-        }
-    }
-}
+// ===== 网格卡片 =====
 
 /**
  * 文件夹网格项：自适应支持中图标（3 列居中）与大图标（2 列卡片）。
