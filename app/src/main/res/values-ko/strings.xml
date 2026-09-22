@@ -51,6 +51,10 @@
     <string name="home_search_placeholder">이벤트 제목 또는 메모 검색</string>
     <string name="home_exit_search">검색 종료</string>
     <string name="home_menu">메뉴</string>
+    <string name="home_view_mode">보기 모드</string>
+    <string name="home_view_list">목록</string>
+    <string name="home_view_medium">보통 아이콘</string>
+    <string name="home_view_large">큰 아이콘</string>
     <string name="home_batch_manage">일괄 관리</string>
     <string name="home_cycle_tracker">사이클 관리</string>
     <string name="home_vault">Vault</string>

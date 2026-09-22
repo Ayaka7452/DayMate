@@ -42,6 +42,12 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val MAKEUP_HINT = booleanPreferencesKey("makeup_tomorrow_hint_enabled")      // 明日补班预告（默认开）
         private val UPDATE_LAST_CHECK = longPreferencesKey("update_last_check")              // 上次检查时间戳（节流用）
         private val UPDATE_SKIPPED = stringPreferencesKey("update_skipped_version")          // 用户点过「稍后」的版本
+        private val HOME_VIEW_MODE = stringPreferencesKey("home_view_mode")                  // 主页视图：list(列表) / medium(中图标) / large(大图标)
+
+        /** 主页视图模式取值：列表 / 中图标(3列) / 大图标(2列)。 */
+        const val VIEW_MODE_LIST = "list"
+        const val VIEW_MODE_MEDIUM = "medium"
+        const val VIEW_MODE_LARGE = "large"
 
         /** 备份位置取值：仅本地 SAF 文件夹 / 本地 + WebDAV 云端 / 仅 WebDAV 云端。 */
         const val BACKUP_TARGET_LOCAL = "local"
@@ -90,6 +96,13 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     /** 主页顶部卡片内容：festival=下一个节假日（默认）/ event=最近的倒数日 / off=关闭。 */
     val homeTopCard: Flow<String> = dataStore.data.map { it[HOME_TOP_CARD] ?: "festival" }
+
+    /** 主页视图模式：list(列表，默认) / medium(中图标，3列) / large(大图标，2列)。 */
+    val homeViewMode: Flow<String> = dataStore.data.map { it[HOME_VIEW_MODE] ?: VIEW_MODE_LIST }
+
+    suspend fun setHomeViewMode(mode: String) {
+        dataStore.edit { it[HOME_VIEW_MODE] = mode }
+    }
 
     /** 节日卡片右侧角标 emoji（默认 ☀️；卡片只显示放假节日，不需要「休/班」）。 */
     val homeBadgeEmoji: Flow<String> = dataStore.data.map { it[HOME_BADGE_EMOJI] ?: "☀️" }

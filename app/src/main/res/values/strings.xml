@@ -51,6 +51,10 @@
     <string name="home_search_placeholder">Search event title or note</string>
     <string name="home_exit_search">Exit search</string>
     <string name="home_menu">Menu</string>
+    <string name="home_view_mode">View mode</string>
+    <string name="home_view_list">List</string>
+    <string name="home_view_medium">Medium icons</string>
+    <string name="home_view_large">Large icons</string>
     <string name="home_batch_manage">Batch manage</string>
     <string name="home_cycle_tracker">Cycle Tracker</string>
     <string name="home_vault">Vault</string>

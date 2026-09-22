@@ -51,6 +51,10 @@
     <string name="home_search_placeholder">搜尋事件標題或備註</string>
     <string name="home_exit_search">退出搜尋</string>
     <string name="home_menu">菜單</string>
+    <string name="home_view_mode">檢視模式</string>
+    <string name="home_view_list">清單</string>
+    <string name="home_view_medium">中圖示</string>
+    <string name="home_view_large">大圖示</string>
     <string name="home_batch_manage">批量管理</string>
     <string name="home_cycle_tracker">週期管家</string>
     <string name="home_vault">Vault</string>

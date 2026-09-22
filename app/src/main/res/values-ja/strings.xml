@@ -51,6 +51,10 @@
     <string name="home_search_placeholder">イベントのタイトルまたはメモを検索</string>
     <string name="home_exit_search">検索を終了</string>
     <string name="home_menu">メニュー</string>
+    <string name="home_view_mode">表示モード</string>
+    <string name="home_view_list">リスト</string>
+    <string name="home_view_medium">中アイコン</string>
+    <string name="home_view_large">大アイコン</string>
     <string name="home_batch_manage">一括管理</string>
     <string name="home_cycle_tracker">サイクル管理</string>
     <string name="home_vault">Vault</string>

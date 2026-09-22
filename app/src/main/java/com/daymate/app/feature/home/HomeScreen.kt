@@ -12,6 +12,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +22,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,10 +32,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -81,13 +91,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ayaka7452.daymate.Routes
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.CloudBackupState
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
+import com.ayaka7452.daymate.data.repo.SettingsRepository
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import com.ayaka7452.daymate.feature.common.ReorderMenuItems
@@ -258,7 +271,11 @@ fun HomeScreen(
         else folders.filter { it.name.lowercase().contains(searchQuery.trim().lowercase()) }
     }
 
+    val homeViewMode by container.settingsRepository.homeViewMode
+        .collectAsState(initial = SettingsRepository.VIEW_MODE_LIST)
+
     val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
         val fk = from.key.toString()
         val tk = to.key.toString()
@@ -413,6 +430,57 @@ fun HomeScreen(
                 TopAppBar(
                     title = { Text("DayMate", fontFamily = FontFamily.Cursive) },
                     actions = {
+                        var viewMenuExpanded by remember { mutableStateOf(false) }
+                        val viewModeDesc = stringResource(R.string.home_view_mode)
+                        Box {
+                            IconButton(onClick = { viewMenuExpanded = true }) {
+                                ViewModeIcon(
+                                    mode = homeViewMode,
+                                    modifier = Modifier.padding(2.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = viewMenuExpanded,
+                                onDismissRequest = { viewMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_view_list)) },
+                                    trailingIcon = {
+                                        if (homeViewMode == SettingsRepository.VIEW_MODE_LIST) {
+                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
+                                        }
+                                    },
+                                    onClick = {
+                                        viewMenuExpanded = false
+                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_LIST) }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_view_medium)) },
+                                    trailingIcon = {
+                                        if (homeViewMode == SettingsRepository.VIEW_MODE_MEDIUM) {
+                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
+                                        }
+                                    },
+                                    onClick = {
+                                        viewMenuExpanded = false
+                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_MEDIUM) }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_view_large)) },
+                                    trailingIcon = {
+                                        if (homeViewMode == SettingsRepository.VIEW_MODE_LARGE) {
+                                            Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp))
+                                        }
+                                    },
+                                    onClick = {
+                                        viewMenuExpanded = false
+                                        scope.launch { container.settingsRepository.setHomeViewMode(SettingsRepository.VIEW_MODE_LARGE) }
+                                    }
+                                )
+                            }
+                        }
                         IconButton(onClick = { searchActive = true }) {
                             Icon(Icons.Default.Search, contentDescription = stringResource(R.string.common_search))
                         }
@@ -610,7 +678,7 @@ fun HomeScreen(
                         .padding(padding)
                 )
             }
-            else -> {
+            homeViewMode == SettingsRepository.VIEW_MODE_LIST -> {
                 LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -752,6 +820,133 @@ fun HomeScreen(
                     }
                     ListItemDivider()
                 }
+                }
+            }
+            else -> {
+                val isLarge = homeViewMode == SettingsRepository.VIEW_MODE_LARGE
+                val columns = if (isLarge) GridCells.Fixed(2) else GridCells.Fixed(3)
+                LazyVerticalGrid(
+                    columns = columns,
+                    state = gridState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = padding.calculateTopPadding() + 4.dp,
+                        bottom = padding.calculateBottomPadding() + 80.dp
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    (todayFestival ?: tomorrowMakeup)?.let { tf ->
+                        item(key = "festival_today", span = { GridItemSpan(maxLineSpan) }) {
+                            com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
+                                day = tf,
+                                tomorrow = todayFestival == null,
+                                modifier = Modifier.padding(horizontal = 0.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    when (homeTopCard) {
+                        "festival" -> item(key = "festival_card", span = { GridItemSpan(maxLineSpan) }) {
+                            com.ayaka7452.daymate.feature.common.FestivalCountdownCard(
+                                hasData = festivalHasData,
+                                festival = nextFestival,
+                                onClick = {
+                                    if (!festivalHasData) {
+                                        onNavigate(Routes.SETTINGS)
+                                    } else if (nextFestival != null) {
+                                        val f = nextFestival!!
+                                        onNavigate(
+                                            "event_form?festivalName=" +
+                                                android.net.Uri.encode(f.name) +
+                                                "&festivalEpochDay=" + f.date.toEpochDay()
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.padding(horizontal = 0.dp, vertical = 2.dp),
+                                badgeEmoji = homeBadgeEmoji
+                            )
+                        }
+                        "event" -> {
+                            val today = java.time.LocalDate.now().toEpochDay()
+                            val nearest = allEvents
+                                .filter { it.targetDateEpochDay >= today }
+                                .minByOrNull { it.targetDateEpochDay }
+                            val pastNearest = allEvents
+                                .filter { it.targetDateEpochDay < today }
+                                .maxByOrNull { it.targetDateEpochDay }
+                            val show = nearest ?: pastNearest
+                            val isPast = nearest == null
+                            if (show != null) {
+                                item(key = "event_card", span = { GridItemSpan(maxLineSpan) }) {
+                                    val dateStr = java.time.LocalDate.ofEpochDay(show.targetDateEpochDay)
+                                        .format(java.time.format.DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md)))
+                                    com.ayaka7452.daymate.feature.common.EventCountdownCard(
+                                        title = show.title,
+                                        dateStr = dateStr,
+                                        days = kotlin.math.abs(show.targetDateEpochDay - today).toInt(),
+                                        past = isPast,
+                                        onClick = {
+                                            if (show.specialType == "cycle") onNavigate("cycle")
+                                            else onNavigate("event_detail?eventId=${show.id}")
+                                        },
+                                        modifier = Modifier.padding(horizontal = 0.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    items(folderList, key = { "f${it.id}" }) { folder ->
+                        val count = allEvents.count { it.folderId == folder.id }
+                        FolderGridItem(
+                            folder = folder,
+                            itemCount = count,
+                            isLarge = isLarge,
+                            selectionMode = selectionMode,
+                            selected = folder.id in selectedFolderIds,
+                            onClick = {
+                                if (selectionMode) toggleFolder(folder.id)
+                                else onNavigate("folder/${folder.id}")
+                            },
+                            onLongClick = {
+                                if (!selectionMode) {
+                                    folderDialogTarget = folder
+                                    showFolderDialog = true
+                                }
+                            },
+                            onMoveToRecycleBin = {
+                                folderToDelete = folder
+                                showFolderDeleteConfirm = true
+                            }
+                        )
+                    }
+                    items(displayEvents, key = { "e${it.id}" }) { event ->
+                        EventGridItem(
+                            event = event,
+                            isLarge = isLarge,
+                            selectionMode = selectionMode,
+                            selected = event.id in selectedEventIds,
+                            onClick = {
+                                if (selectionMode) toggleEvent(event.id)
+                                else if (event.specialType == "cycle") onNavigate("cycle")
+                                else onNavigate("event_detail?eventId=${event.id}")
+                            },
+                            onMoveToVault = {
+                                if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
+                            },
+                            onMoveToFolder = { singleMoveEventId = event.id },
+                            onMoveToRecycleBin = {
+                                scope.launch {
+                                    container.eventRepository.softDeleteByIds(
+                                        listOf(event.id),
+                                        System.currentTimeMillis()
+                                    )
+                                }
+                            },
+                            folderBadge = event.folderId?.let { folderNameById[it] }
+                        )
+                    }
                 }
             }
         }
@@ -1427,6 +1622,369 @@ private fun CloudBackupSheet(
             ) {
                 Text(stringResource(R.string.home_backup_now))
             }
+        }
+    }
+}
+
+// ===== 视图模式切换与网格卡片 =====
+
+/**
+ * 顶栏视图切换图标（Canvas 矢量自绘，不依赖外部图标库）：
+ *  - list   3 条横线与 3 个小圆点
+ *  - medium 3×3 中等图标方阵
+ *  - large  2×2 大图标方阵
+ */
+@Composable
+fun ViewModeIcon(
+    mode: String,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = stringResource(R.string.home_view_mode),
+    tint: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Canvas(modifier = modifier.size(20.dp)) {
+        val w = size.width
+        val h = size.height
+        when (mode) {
+            SettingsRepository.VIEW_MODE_LARGE -> {
+                val gap = w * 0.16f
+                val cellW = (w - gap) / 2f
+                val cellH = (h - gap) / 2f
+                val cr = CornerRadius(cellW * 0.25f, cellW * 0.25f)
+                drawRoundRect(tint, Offset(0f, 0f), Size(cellW, cellH), cr)
+                drawRoundRect(tint, Offset(cellW + gap, 0f), Size(cellW, cellH), cr)
+                drawRoundRect(tint, Offset(0f, cellH + gap), Size(cellW, cellH), cr)
+                drawRoundRect(tint, Offset(cellW + gap, cellH + gap), Size(cellW, cellH), cr)
+            }
+            SettingsRepository.VIEW_MODE_MEDIUM -> {
+                val gap = w * 0.12f
+                val cellW = (w - gap * 2) / 3f
+                val cellH = (h - gap * 2) / 3f
+                val cr = CornerRadius(cellW * 0.3f, cellW * 0.3f)
+                for (r in 0..2) {
+                    for (c in 0..2) {
+                        drawRoundRect(
+                            tint,
+                            Offset(c * (cellW + gap), r * (cellH + gap)),
+                            Size(cellW, cellH),
+                            cr
+                        )
+                    }
+                }
+            }
+            else -> {
+                val dotR = w * 0.08f
+                val lineH = h * 0.14f
+                val lineX = w * 0.32f
+                val lineW = w * 0.68f
+                val cr = CornerRadius(lineH * 0.5f, lineH * 0.5f)
+                for (i in 0..2) {
+                    val y = i * (h / 2f - lineH / 2f)
+                    drawCircle(tint, dotR, Offset(dotR + 1f, y + lineH / 2f))
+                    drawRoundRect(tint, Offset(lineX, y), Size(lineW, lineH), cr)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 文件夹网格项：自适应支持中图标（3 列居中）与大图标（2 列卡片）。
+ * 沿用文件夹自带 emoji，不额外找外置图标。
+ */
+@Composable
+fun FolderGridItem(
+    folder: FolderEntity,
+    itemCount: Int,
+    isLarge: Boolean,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onClick: () -> Unit = {},
+    onLongClick: () -> Unit = {},
+    onMoveToRecycleBin: (() -> Unit)? = null
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(if (isLarge) 14.dp else 12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .border(
+                0.5.dp,
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                RoundedCornerShape(if (isLarge) 14.dp else 12.dp)
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    if (selectionMode) {
+                        onClick()
+                    } else if (onMoveToRecycleBin != null) {
+                        menuExpanded = true
+                    } else {
+                        onLongClick()
+                    }
+                }
+            )
+            .padding(if (isLarge) 12.dp else 10.dp)
+    ) {
+        if (isLarge) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = folder.icon ?: "📁",
+                        fontSize = 32.sp,
+                        lineHeight = 32.sp
+                    )
+                    if (selectionMode) {
+                        SelectionDot(selected = selected)
+                    } else if (itemCount > 0) {
+                        Text(
+                            text = Tr.s(R.string.settings_unit_items, itemCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                if (selectionMode) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                        SelectionDot(selected = selected)
+                    }
+                }
+                Text(
+                    text = folder.icon ?: "📁",
+                    fontSize = 32.sp,
+                    lineHeight = 32.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (itemCount > 0) {
+                    Text(
+                        text = Tr.s(R.string.settings_unit_items, itemCount),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1
+                    )
+                } else {
+                    Spacer(Modifier.height(14.dp))
+                }
+            }
+        }
+
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.home_edit_folder)) },
+                onClick = {
+                    menuExpanded = false
+                    onLongClick()
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.home_move_to_trash)) },
+                onClick = {
+                    menuExpanded = false
+                    onMoveToRecycleBin?.invoke()
+                }
+            )
+        }
+    }
+}
+
+/**
+ * 事件网格项：自适应支持中图标（3 列经典居中，天数徽章）与大图标（2 列大字号天数卡片）。
+ */
+@Composable
+fun EventGridItem(
+    event: EventEntity,
+    isLarge: Boolean,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onClick: () -> Unit = {},
+    onMoveToVault: (() -> Unit)? = null,
+    onMoveToFolder: (() -> Unit)? = null,
+    onMoveToRecycleBin: (() -> Unit)? = null,
+    folderBadge: String? = null
+) {
+    val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
+    val isFuture = days >= 0
+    val text = CountdownCalculator.formatCountdown(
+        event.targetDateEpochDay,
+        event.displayUnit,
+        event.refDays
+    )
+    val eventColor = event.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
+    val statusColor = if (isFuture) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(if (isLarge) 14.dp else 12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .border(
+                0.5.dp,
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                RoundedCornerShape(if (isLarge) 14.dp else 12.dp)
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    if (selectionMode) onClick()
+                    else if (onMoveToVault != null) menuExpanded = true
+                }
+            )
+            .padding(if (isLarge) 12.dp else 10.dp)
+    ) {
+        if (isLarge) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(eventColor)
+                    )
+                    if (selectionMode) {
+                        SelectionDot(selected = selected)
+                    } else if (folderBadge != null) {
+                        Text(
+                            text = folderBadge,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = statusColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = event.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                if (selectionMode) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                        SelectionDot(selected = selected)
+                    }
+                }
+                val absDays = kotlin.math.abs(days)
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(eventColor.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (absDays > 999) "999+" else absDays.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = eventColor
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = event.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false }
+        ) {
+            if (onMoveToFolder != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_move_to_folder_ellipsis)) },
+                    onClick = {
+                        menuExpanded = false
+                        onMoveToFolder()
+                    }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.home_move_to_vault)) },
+                onClick = {
+                    menuExpanded = false
+                    onMoveToVault?.invoke()
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.home_move_to_trash)) },
+                onClick = {
+                    menuExpanded = false
+                    onMoveToRecycleBin?.invoke()
+                }
+            )
         }
     }
 }
