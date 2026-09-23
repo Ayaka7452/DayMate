@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -265,14 +266,17 @@ fun FolderScreen(
                                 onDismissRequest = { menuExpanded = false }
                             ) {
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(Tr.s(R.string.folder_batch)) },
                                     onClick = { menuExpanded = false; enterSelection() }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(Tr.s(R.string.common_rename)) },
                                     onClick = { menuExpanded = false; showFolderDialog = true }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(Tr.s(R.string.folder_move_bin)) },
                                     onClick = {
                                         menuExpanded = false

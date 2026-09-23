@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -268,8 +269,10 @@ fun HomeScreen(
         else folders.filter { it.name.lowercase().contains(searchQuery.trim().lowercase()) }
     }
 
+    // 注意 initial 必须为 null：DataStore 异步读盘，若用列表当初始值，设置了网格视图的
+    // 冷启动会先渲染一帧列表再闪切成网格。null 期间内容区渲染空白帧（见下方 when 分支）。
     val homeViewMode by container.settingsRepository.homeViewMode
-        .collectAsState(initial = SettingsRepository.VIEW_MODE_LIST)
+        .collectAsState(initial = null)
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -447,10 +450,12 @@ fun HomeScreen(
                                 onDismissRequest = { menuExpanded = false }
                             ) {
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_batch_manage)) },
                                     onClick = { menuExpanded = false; enterSelection() }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_view_mode)) },
                                     trailingIcon = {
                                         Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
@@ -461,6 +466,7 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_cycle_tracker)) },
                                     onClick = {
                                         menuExpanded = false
@@ -468,6 +474,7 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_vault)) },
                                     onClick = {
                                         menuExpanded = false
@@ -475,6 +482,7 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.common_settings)) },
                                     onClick = {
                                         menuExpanded = false
@@ -482,6 +490,7 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_about)) },
                                     onClick = {
                                         menuExpanded = false
@@ -489,6 +498,7 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_trash)) },
                                     onClick = {
                                         menuExpanded = false
@@ -503,6 +513,7 @@ fun HomeScreen(
                                 onDismissRequest = { viewSubmenuExpanded = false }
                             ) {
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_view_list)) },
                                     trailingIcon = {
                                         if (homeViewMode == SettingsRepository.VIEW_MODE_LIST) {
@@ -515,6 +526,7 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_view_medium)) },
                                     trailingIcon = {
                                         if (homeViewMode == SettingsRepository.VIEW_MODE_MEDIUM) {
@@ -527,6 +539,7 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    modifier = Modifier.heightIn(min = 56.dp),
                                     text = { Text(stringResource(R.string.home_view_large)) },
                                     trailingIcon = {
                                         if (homeViewMode == SettingsRepository.VIEW_MODE_LARGE) {
@@ -677,6 +690,11 @@ fun HomeScreen(
                         .fillMaxSize()
                         .padding(padding)
                 )
+            }
+            homeViewMode == null -> {
+                // DataStore 视图偏好尚未读出：先渲染空白一帧，避免冷启动先用列表
+                // 渲染、读到网格设置后再闪切（列表模式无感、网格模式必闪的根因）
+                Spacer(Modifier.fillMaxSize())
             }
             else -> Column(Modifier.fillMaxSize()) {
                 // 顶部横幅与倒数卡片：两种视图共用一份、不参与切换动画；宽度统一为列表口径（水平 8dp），
@@ -1260,6 +1278,7 @@ fun EventRow(
                     }
                     if (onMoveToFolder != null) {
                         DropdownMenuItem(
+                            modifier = Modifier.heightIn(min = 56.dp),
                             text = { Text(stringResource(R.string.home_move_to_folder_ellipsis)) },
                             onClick = {
                                 menuExpanded = false
@@ -1268,6 +1287,7 @@ fun EventRow(
                         )
                     }
                     DropdownMenuItem(
+                        modifier = Modifier.heightIn(min = 56.dp),
                         text = { Text(stringResource(R.string.home_move_to_vault)) },
                         onClick = {
                             menuExpanded = false
@@ -1275,6 +1295,7 @@ fun EventRow(
                         }
                     )
                     DropdownMenuItem(
+                        modifier = Modifier.heightIn(min = 56.dp),
                         text = { Text(stringResource(R.string.home_move_to_trash)) },
                         onClick = {
                             menuExpanded = false
@@ -1345,6 +1366,7 @@ fun FolderRow(
                         ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     DropdownMenuItem(
+                        modifier = Modifier.heightIn(min = 56.dp),
                         text = { Text(stringResource(R.string.home_move_to_trash)) },
                         onClick = {
                             menuExpanded = false
@@ -1701,6 +1723,7 @@ fun FolderGridItem(
             onDismissRequest = { menuExpanded = false }
         ) {
             DropdownMenuItem(
+                modifier = Modifier.heightIn(min = 56.dp),
                 text = { Text(stringResource(R.string.home_edit_folder)) },
                 onClick = {
                     menuExpanded = false
@@ -1708,6 +1731,7 @@ fun FolderGridItem(
                 }
             )
             DropdownMenuItem(
+                modifier = Modifier.heightIn(min = 56.dp),
                 text = { Text(stringResource(R.string.home_move_to_trash)) },
                 onClick = {
                     menuExpanded = false
@@ -1859,6 +1883,7 @@ fun EventGridItem(
         ) {
             if (onMoveToFolder != null) {
                 DropdownMenuItem(
+                    modifier = Modifier.heightIn(min = 56.dp),
                     text = { Text(stringResource(R.string.home_move_to_folder_ellipsis)) },
                     onClick = {
                         menuExpanded = false
@@ -1867,6 +1892,7 @@ fun EventGridItem(
                 )
             }
             DropdownMenuItem(
+                modifier = Modifier.heightIn(min = 56.dp),
                 text = { Text(stringResource(R.string.home_move_to_vault)) },
                 onClick = {
                     menuExpanded = false
@@ -1874,6 +1900,7 @@ fun EventGridItem(
                 }
             )
             DropdownMenuItem(
+                modifier = Modifier.heightIn(min = 56.dp),
                 text = { Text(stringResource(R.string.home_move_to_trash)) },
                 onClick = {
                     menuExpanded = false

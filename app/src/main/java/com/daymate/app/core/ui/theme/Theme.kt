@@ -30,7 +30,17 @@ private val LightColors = lightColorScheme(
     background = PaperLight,
     surface = PaperLight,
     onBackground = Color(0xFF1C1C1C),
-    onSurface = Color(0xFF1C1C1C)
+    onSurface = Color(0xFF1C1C1C),
+    // surface 系列槽位必须显式定义：M3 默认基线是紫粉调（surfaceVariant #E7E2EC /
+    // surfaceContainer #F3EDF7），在纸白底上观感发红。此处统一改为与主色同族的浅青蓝。
+    surfaceVariant = Color(0xFFC9E2EE),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFE9F2F7),
+    surfaceContainer = Color(0xFFDCEBF3),
+    surfaceContainerHigh = Color(0xFFD2E4EF),
+    surfaceContainerHighest = Color(0xFFC8DEEA),
+    outline = Color(0xFF6B7E88),
+    outlineVariant = Color(0xFFB0C8D4)
 )
 
 private val DarkColors = darkColorScheme(
@@ -103,6 +113,29 @@ private val LightBgTint: Map<String, Long> = mapOf(
     "purple" to 0xFFF8F4FD
 )
 
+/**
+ * 各配色浅色的 surface 分层（与主色同族的容器色，取代 M3 紫粉基线）。
+ * 顺序：[surfaceVariant, surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest, outlineVariant]
+ * 默认主题的这套值直接写在 LightColors 里；「default」项供兜底（mode 不在表内时复用）。
+ */
+private val LightSurfaces: Map<String, List<Long>> = mapOf(
+    "default" to listOf(
+        0xFFC9E2EE, 0xFFE9F2F7, 0xFFDCEBF3, 0xFFD2E4EF, 0xFFC8DEEA, 0xFFB0C8D4
+    ),
+    "blue" to listOf(
+        0xFFC7DBF0, 0xFFE7EFF8, 0xFFDBE7F5, 0xFFD0E0F1, 0xFFC4D8ED, 0xFFA9C1DC
+    ),
+    "green" to listOf(
+        0xFFC6E2C4, 0xFFE6F1E4, 0xFFD8EAD6, 0xFFCDE2CB, 0xFFC1DBBF, 0xFFA4C2A2
+    ),
+    "orange" to listOf(
+        0xFFF0D9C2, 0xFFFAF0E6, 0xFFF6E6D4, 0xFFF1DEC7, 0xFFECD6BB, 0xFFDCC3A6
+    ),
+    "purple" to listOf(
+        0xFFE0D3EE, 0xFFF3EDF9, 0xFFEAE1F5, 0xFFE3D7F0, 0xFFDBCCED, 0xFFC9B7DC
+    )
+)
+
 private fun accentScheme(mode: String, darkTheme: Boolean): ColorScheme {
     val tones = (if (darkTheme) DarkAccents[mode] else LightAccents[mode])
         ?: return if (darkTheme) DarkColors else LightColors
@@ -116,12 +149,19 @@ private fun accentScheme(mode: String, darkTheme: Boolean): ColorScheme {
         )
     } else {
         val bg = LightBgTint[mode]?.let { Color(it) } ?: PaperLight
+        val s = (LightSurfaces[mode] ?: LightSurfaces["default"]!!).map { Color(it) }
         LightColors.copy(
             primary = c[0], onPrimary = c[1],
             primaryContainer = c[2], onPrimaryContainer = c[3],
             secondary = c[4], onSecondary = c[5],
             secondaryContainer = c[6], onSecondaryContainer = c[7],
             background = bg, surface = bg,
+            surfaceVariant = s[0],
+            surfaceContainerLow = s[1],
+            surfaceContainer = s[2],
+            surfaceContainerHigh = s[3],
+            surfaceContainerHighest = s[4],
+            outlineVariant = s[5],
             onBackground = Color(0xFF1C1C1C), onSurface = Color(0xFF1C1C1C)
         )
     }
