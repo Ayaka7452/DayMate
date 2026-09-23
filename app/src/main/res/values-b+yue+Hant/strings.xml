@@ -158,12 +158,12 @@
     <string name="settings_repair_done">修復完成，已經同步到備份</string>
     <string name="settings_repair_failed">修復失敗：%1$s</string>
     <string name="settings_maintenance_section">資料維護</string>
-    <string name="settings_maintenance_desc">檢查資料庫完整性同冗餘資料。只會報告，唔會修改現有內容。</string>
+    <string name="settings_maintenance_desc">檢查資料庫完整性同冗餘資料。</string>
     <string name="settings_check_ok">檢查完成，未發現問題</string>
     <string name="settings_scanning">正在檢查…</string>
     <string name="settings_repairing">正在修復…</string>
     <string name="settings_check_db">檢查資料庫</string>
-    <string name="settings_check_desc">檢查完整性、碎片、欄位使用同冗餘資料，唔會修改任何內容</string>
+    <string name="settings_check_desc">檢查完整性、碎片、欄位使用同冗餘資料，唔會修改任何內容。如果有錯誤，系統會提供修復方案</string>
     <string name="settings_issues_fixable">發現可以修復嘅問題</string>
     <string name="settings_issues_anomaly">發現異常資料</string>
     <string name="settings_not_fixed">以下項目唔會被修復：</string>

@@ -158,12 +158,12 @@
     <string name="settings_repair_done">복원 완료, 백업에 동기화됨</string>
     <string name="settings_repair_failed">복원 실패: %1$s</string>
     <string name="settings_maintenance_section">데이터 유지 관리</string>
-    <string name="settings_maintenance_desc">데이터베이스 무결성과 중복 데이터를 확인합니다. 보고만 하며 기존 내용을 수정하지 않습니다.</string>
+    <string name="settings_maintenance_desc">데이터베이스 무결성과 중복 데이터를 확인합니다.</string>
     <string name="settings_check_ok">확인 완료, 문제 없음</string>
     <string name="settings_scanning">확인 중…</string>
     <string name="settings_repairing">복원 중…</string>
     <string name="settings_check_db">데이터베이스 확인</string>
-    <string name="settings_check_desc">무결성, 단편화, 필드 사용 현황, 중복 데이터를 확인하며 아무것도 수정하지 않습니다</string>
+    <string name="settings_check_desc">무결성, 단편화, 필드 사용 현황, 중복 데이터를 확인하며 아무것도 수정하지 않습니다. 오류가 있으면 시스템이 복구 방법을 제안합니다</string>
     <string name="settings_issues_fixable">수정 가능한 문제 발견</string>
     <string name="settings_issues_anomaly">비정상 데이터 발견</string>
     <string name="settings_not_fixed">다음 항목은 수정되지 않습니다:</string>

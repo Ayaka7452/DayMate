@@ -158,12 +158,12 @@
     <string name="settings_repair_done">修復完了、バックアップに同期しました</string>
     <string name="settings_repair_failed">修復失敗: %1$s</string>
     <string name="settings_maintenance_section">データメンテナンス</string>
-    <string name="settings_maintenance_desc">データベースの整合性と冗長データを確認します。報告のみで、既存の内容は変更しません。</string>
+    <string name="settings_maintenance_desc">データベースの整合性と冗長データを確認します。</string>
     <string name="settings_check_ok">確認完了、問題は見つかりませんでした</string>
     <string name="settings_scanning">確認中…</string>
     <string name="settings_repairing">修復中…</string>
     <string name="settings_check_db">データベースを確認</string>
-    <string name="settings_check_desc">整合性、断片化、フィールドの使用状況、冗長データを確認し、何も変更しません</string>
+    <string name="settings_check_desc">整合性、断片化、フィールドの使用状況、冗長データを確認し、何も変更しません。問題がある場合は、システムが修復方法を提示します</string>
     <string name="settings_issues_fixable">修復可能な問題が見つかりました</string>
     <string name="settings_issues_anomaly">異常なデータが見つかりました</string>
     <string name="settings_not_fixed">以下は修復されません：</string>

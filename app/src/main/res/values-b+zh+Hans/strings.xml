@@ -158,12 +158,12 @@
     <string name="settings_repair_done">修复完成，已同步到备份</string>
     <string name="settings_repair_failed">修复失败：%1$s</string>
     <string name="settings_maintenance_section">数据维护</string>
-    <string name="settings_maintenance_desc">检查数据库完整性与冗余数据。仅报告，不修改现有内容。</string>
+    <string name="settings_maintenance_desc">检查数据库完整性与冗余数据。</string>
     <string name="settings_check_ok">检查完成，未发现问题</string>
     <string name="settings_scanning">正在检查…</string>
     <string name="settings_repairing">正在修复…</string>
     <string name="settings_check_db">检查数据库</string>
-    <string name="settings_check_desc">检查完整性、碎片、字段使用与冗余数据，不修改任何内容</string>
+    <string name="settings_check_desc">检查完整性、碎片、字段使用与冗余数据，不修改任何内容。若存在错误，系统提供修复方案</string>
     <string name="settings_issues_fixable">发现可修复的问题</string>
     <string name="settings_issues_anomaly">发现异常数据</string>
     <string name="settings_not_fixed">以下项目不会被修复：</string>

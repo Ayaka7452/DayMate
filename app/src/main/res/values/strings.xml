@@ -158,12 +158,12 @@
     <string name="settings_repair_done">Repair complete, synced to backup</string>
     <string name="settings_repair_failed">Repair failed: %1$s</string>
     <string name="settings_maintenance_section">Data Maintenance</string>
-    <string name="settings_maintenance_desc">Checks database integrity and redundant data. Reports only, does not modify existing content.</string>
+    <string name="settings_maintenance_desc">Checks database integrity and redundant data.</string>
     <string name="settings_check_ok">Check complete, no issues found</string>
     <string name="settings_scanning">Checking…</string>
     <string name="settings_repairing">Repairing…</string>
     <string name="settings_check_db">Check Database</string>
-    <string name="settings_check_desc">Checks integrity, fragmentation, field usage, and redundant data, does not modify anything</string>
+    <string name="settings_check_desc">Checks integrity, fragmentation, field usage, and redundant data, does not modify anything. If any issues are found, the system will offer a repair plan</string>
     <string name="settings_issues_fixable">Fixable issues found</string>
     <string name="settings_issues_anomaly">Anomalous data found</string>
     <string name="settings_not_fixed">The following will not be fixed:</string>
