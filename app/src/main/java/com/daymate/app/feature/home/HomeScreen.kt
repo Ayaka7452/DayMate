@@ -118,6 +118,7 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
 import android.widget.Toast
+import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -131,9 +132,17 @@ fun HomeScreen(
     // 用 remember 固定 Flow 实例，避免每次重组都新建 Flow 导致 collectAsState 底层的
     // LaunchedEffect 反复取消/重建观察者，从而在从其它 Activity 返回时漏掉 Room 的变更通知。
     val eventsFlow = remember { container.eventRepository.observeRoot() }
-    val events by eventsFlow.collectAsState(initial = emptyList())
     val foldersFlow = remember { container.folderRepository.observeAll() }
-    val folders by foldersFlow.collectAsState(initial = emptyList())
+    // 冷启动就近同步预载：Room 首个快照在首帧前同步读一次，首帧直接渲染真实列表，
+    // 消除「空白一帧 → 文件夹/事件突然出现」的闪动（Flow 首次发射慢于首帧组合）。
+    // 与 v1.12.9 的区别：不做大而全的 runBlocking 快照，只对这两个列表就近读。
+    val listSeed = remember(eventsFlow, foldersFlow) {
+        runCatching {
+            kotlinx.coroutines.runBlocking { eventsFlow.first() to foldersFlow.first() }
+        }.getOrDefault(emptyList<EventEntity>() to emptyList<FolderEntity>())
+    }
+    val events by eventsFlow.collectAsState(initial = listSeed.first)
+    val folders by foldersFlow.collectAsState(initial = listSeed.second)
     val vaultSet by container.settingsRepository.vaultPasswordSet
         .collectAsState(initial = false)
     // 主页顶部卡片模式：festival（默认）/ event / off
@@ -244,10 +253,15 @@ fun HomeScreen(
         .collectAsState(initial = SortModes.REMAINING_ASC)
     val manualSort = defaultSort == SortModes.MANUAL
 
-    // 拖拽排序用的可变镜像列表：Flow 更新时同步（拖拽中不同步，避免跳动）
+    // 拖拽排序用的可变镜像列表：Flow 更新时同步（拖拽中不同步，避免跳动）。
+    // 用预载值播种：首帧渲染时 LaunchedEffect 还没跑，不播种的话列表会先空一帧。
     var isDragging by remember { mutableStateOf(false) }
-    val folderList = remember { mutableStateListOf<FolderEntity>() }
-    val eventList = remember { mutableStateListOf<EventEntity>() }
+    val folderList = remember {
+        mutableStateListOf<FolderEntity>().apply { addAll(folders) }
+    }
+    val eventList = remember {
+        mutableStateListOf<EventEntity>().apply { addAll(events) }
+    }
     LaunchedEffect(folders) {
         if (!isDragging) {
             folderList.clear()
@@ -283,10 +297,19 @@ fun HomeScreen(
         else folders.filter { it.name.lowercase().contains(searchQuery.trim().lowercase()) }
     }
 
-    // 注意 initial 必须为 null：DataStore 异步读盘，若用列表当初始值，设置了网格视图的
-    // 冷启动会先渲染一帧列表再闪切成网格。null 期间内容区渲染空白帧（见下方 when 分支）。
+    // 视图模式就近同步预载：DataStore 异步读盘期间首帧会渲染空白帧（列表/网格用户都闪），
+    // 这里同步读一次真实偏好作 initial，首帧即按用户选定的视图渲染，无中间态；
+    // 同时保住网格用户「先列表再闪切网格」的修复（initial 不再是列表假值）。
+    // 与 v1.12.9 的区别：只读这一个 key，不做大而全的 runBlocking 快照。
+    val homeViewModeInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.homeViewMode.first()
+            }
+        }.getOrDefault(SettingsRepository.VIEW_MODE_LIST)
+    }
     val homeViewMode by container.settingsRepository.homeViewMode
-        .collectAsState(initial = null)
+        .collectAsState(initial = homeViewModeInit)
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -696,11 +719,6 @@ fun HomeScreen(
                         .fillMaxSize()
                         .padding(padding)
                 )
-            }
-            homeViewMode == null -> {
-                // DataStore 视图偏好尚未读出：先渲染空白一帧，避免冷启动先用列表
-                // 渲染、读到网格设置后再闪切（列表模式无感、网格模式必闪的根因）
-                Spacer(Modifier.fillMaxSize())
             }
             else -> Column(Modifier.fillMaxSize()) {
                 // 顶部横幅与倒数卡片：两种视图共用一份、不参与切换动画；宽度统一为列表口径（水平 8dp），
