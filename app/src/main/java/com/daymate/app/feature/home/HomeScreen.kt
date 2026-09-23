@@ -755,10 +755,12 @@ fun HomeScreen(
             else -> Column(Modifier.fillMaxSize()) {
                 // 顶部倒数卡片：两种视图共用一份、不参与切换动画；整个顶部区域一次性让开顶栏
                 // （Scaffold 顶内边距），下方内容区不再重复计算。
-                // 水平边距跟随视图模式对齐项目：列表行内容边 16dp、网格块外边 12dp
+                // 水平边距固定 12dp：卡片宽度在列表/图标模式间保持一致——跟随视图模式
+                // 对齐项目（v1.15.0 的 16/12 双值）会让切视图时卡片宽度跟着变，列表模式
+                // 还比原来窄一圈，观感更差；统一宽度优先于逐模式对齐。
                 val hasHeader = homeTopCard != "off"
                 if (hasHeader) {
-                    val headerHpad = if (homeViewMode == SettingsRepository.VIEW_MODE_LIST) 16.dp else 12.dp
+                    val headerHpad = 12.dp
                     Column(Modifier.padding(top = padding.calculateTopPadding())) {
                         // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）。
                         // 原独立「班/休」横幅已并入节日卡片底部状态条（today/tomorrowMakeup/spanDays）。
