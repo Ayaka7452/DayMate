@@ -112,9 +112,15 @@ fun FolderScreen(
     val context = LocalContext.current
     val totalSelected = selectedEventIds.size
 
-    // 今日节日/调休横幅（数据未下载时为 null，不显示；主页倒数卡片负责引导下载）
+    // 今日节日/调休横幅（数据未下载时为 null，不显示；主页倒数卡片负责引导下载）。
+    // 冷启动同步预载：缓存查询只读本地小 JSON，同步读一次让首帧横幅就位，
+    // 避免横幅晚一拍出现把下方内容顶下去的闪动（与主页同款修法）。
     var todayFestival by remember {
-        mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null)
+        mutableStateOf(
+            runCatching {
+                container.festivalRepository.todayInfo(java.time.LocalDate.now())
+            }.getOrNull()
+        )
     }
     // 明日补班预告：与主页同口径——今天不是节日且明天是调休上班日时非空
     var tomorrowMakeup by remember {

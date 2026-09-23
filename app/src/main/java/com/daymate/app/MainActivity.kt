@@ -17,16 +17,8 @@ import com.ayaka7452.daymate.feature.home.HomeScreen
 class MainActivity : ComposeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 冷启动同步预载主页首帧所需的一切（DataStore 设置 + Room 首个快照）：
-        // 系统启动页会显示到首帧绘制为止，读盘耗时被启动页盖住；
-        // 换来的是第一帧即完整内容，消除「空白帧/文件夹晚一拍」的竞态闪烁。
-        val snapshot = com.ayaka7452.daymate.feature.home.HomeSnapshot.load(container)
         setDayMateContent {
-            HomeScreen(
-                container = container,
-                snapshot = snapshot,
-                onNavigate = { this@MainActivity.route(it) }
-            )
+            HomeScreen(container = container, onNavigate = { this@MainActivity.route(it) })
         }
         handleWidgetDeepLink(intent)
     }
