@@ -63,7 +63,7 @@ jobs:
 
       # 自动发布（有门槛）：仅当 commit message 含 [release] 或手动 workflow_dispatch 触发时执行，
       # 普通 push 只构建产物不上架——发版必须经用户确认后再放行。
-      # 读版本号 → 资产改名 → 清旧 Release（只留 v1.0.0 与最新）→ 建 Release（tag 不存在则自动在 HEAD 创建）
+      # 读版本号 → 资产改名 → 清旧 Release（留 v1.0.0、v1.16.1（1.x 最终稳定版）与最新）→ 建 Release（tag 不存在则自动在 HEAD 创建）
       # 同版本重跑是幂等的：先删同名 Release（tag 留仓）再重建。
       - name: Publish GitHub Release
         if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]')
@@ -74,9 +74,9 @@ jobs:
           ASSET="DayMate-v${VERSION}-signed.apk"
           cp app/build/outputs/apk/release/app-release.apk "$ASSET"
 
-          # 清旧：除 v1.0.0 和当前版本外全部删除（只删 Release，tag 全留）
+          # 清旧：除 v1.0.0、v1.16.1（1.x 最终稳定版，永不删除）和当前版本外全部删除（只删 Release，tag 全留）
           gh release list --json tagName -q '.[].tagName' | while read -r t; do
-            if [ -n "$t" ] && [ "$t" != "v${VERSION}" ] && [ "$t" != "v1.0.0" ]; then
+            if [ -n "$t" ] && [ "$t" != "v${VERSION}" ] && [ "$t" != "v1.0.0" ] && [ "$t" != "v1.16.1" ]; then
               gh release delete "$t" --yes || true
             fi
           done
