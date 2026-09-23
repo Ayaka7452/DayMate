@@ -33,22 +33,22 @@ object ReorderActions {
 @Composable
 fun ReorderMenuItems(onReorder: (String) -> Unit, dismissMenu: () -> Unit) {
     DropdownMenuItem(
-        modifier = Modifier.heightIn(min = 56.dp),
+        modifier = Modifier.heightIn(min = 64.dp),
         text = { Text(stringResource(R.string.reorder_up)) },
         onClick = { dismissMenu(); onReorder(ReorderActions.UP) }
     )
     DropdownMenuItem(
-        modifier = Modifier.heightIn(min = 56.dp),
+        modifier = Modifier.heightIn(min = 64.dp),
         text = { Text(stringResource(R.string.reorder_down)) },
         onClick = { dismissMenu(); onReorder(ReorderActions.DOWN) }
     )
     DropdownMenuItem(
-        modifier = Modifier.heightIn(min = 56.dp),
+        modifier = Modifier.heightIn(min = 64.dp),
         text = { Text(stringResource(R.string.reorder_top)) },
         onClick = { dismissMenu(); onReorder(ReorderActions.TOP) }
     )
     DropdownMenuItem(
-        modifier = Modifier.heightIn(min = 56.dp),
+        modifier = Modifier.heightIn(min = 64.dp),
         text = { Text(stringResource(R.string.reorder_bottom)) },
         onClick = { dismissMenu(); onReorder(ReorderActions.BOTTOM) }
     )

@@ -558,12 +558,12 @@ private fun VaultListScreen(
         onDelete = { showDeleteConfirm = true },
         menuItems = {
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 56.dp),
+                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.vault_batch_manage)) },
                 onClick = { enterSelection() }
             )
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 56.dp),
+                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.vault_reset_password)) },
                 onClick = { showResetConfirm = true }
             )
@@ -1009,12 +1009,12 @@ fun VaultFolderScreen(
         onDelete = { showDeleteConfirm = true },
         menuItems = {
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 56.dp),
+                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.vault_batch_manage)) },
                 onClick = { enterSelection() }
             )
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 56.dp),
+                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.common_rename)) },
                 onClick = {
                     folderTarget = folder
@@ -1022,7 +1022,7 @@ fun VaultFolderScreen(
                 }
             )
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 56.dp),
+                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.vault_delete_folder)) },
                 onClick = { showFolderDeleteConfirm = true }
             )
@@ -1528,7 +1528,7 @@ private fun VaultEventRow(
                         ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     DropdownMenuItem(
-                        modifier = Modifier.heightIn(min = 56.dp),
+                        modifier = Modifier.heightIn(min = 64.dp),
                         text = { Text(stringResource(R.string.vault_move_out_main)) },
                         onClick = {
                             menuExpanded = false

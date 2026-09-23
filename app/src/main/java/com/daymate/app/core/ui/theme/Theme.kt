@@ -32,15 +32,16 @@ private val LightColors = lightColorScheme(
     onBackground = Color(0xFF1C1C1C),
     onSurface = Color(0xFF1C1C1C),
     // surface 系列槽位必须显式定义：M3 默认基线是紫粉调（surfaceVariant #E7E2EC /
-    // surfaceContainer #F3EDF7），在纸白底上观感发红。此处统一改为与主色同族的浅青蓝。
-    surfaceVariant = Color(0xFFC9E2EE),
+    // surfaceContainer #F3EDF7），在纸白底上观感发红。此处统一为低饱和的浅青灰——
+    // v1.12.7 首版 #C9E2EE 被用户反馈「太蓝」，v1.12.8 降饱和提亮度。
+    surfaceVariant = Color(0xFFE2EBEF),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFE9F2F7),
-    surfaceContainer = Color(0xFFDCEBF3),
-    surfaceContainerHigh = Color(0xFFD2E4EF),
-    surfaceContainerHighest = Color(0xFFC8DEEA),
+    surfaceContainerLow = Color(0xFFF0F5F8),
+    surfaceContainer = Color(0xFFE4EDF2),
+    surfaceContainerHigh = Color(0xFFDAE5EB),
+    surfaceContainerHighest = Color(0xFFD0DDE4),
     outline = Color(0xFF6B7E88),
-    outlineVariant = Color(0xFFB0C8D4)
+    outlineVariant = Color(0xFFBCCDD6)
 )
 
 private val DarkColors = darkColorScheme(
@@ -120,7 +121,7 @@ private val LightBgTint: Map<String, Long> = mapOf(
  */
 private val LightSurfaces: Map<String, List<Long>> = mapOf(
     "default" to listOf(
-        0xFFC9E2EE, 0xFFE9F2F7, 0xFFDCEBF3, 0xFFD2E4EF, 0xFFC8DEEA, 0xFFB0C8D4
+        0xFFE2EBEF, 0xFFF0F5F8, 0xFFE4EDF2, 0xFFDAE5EB, 0xFFD0DDE4, 0xFFBCCDD6
     ),
     "blue" to listOf(
         0xFFC7DBF0, 0xFFE7EFF8, 0xFFDBE7F5, 0xFFD0E0F1, 0xFFC4D8ED, 0xFFA9C1DC

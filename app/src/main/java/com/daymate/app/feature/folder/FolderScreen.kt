@@ -266,17 +266,17 @@ fun FolderScreen(
                                 onDismissRequest = { menuExpanded = false }
                             ) {
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 56.dp),
+                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(Tr.s(R.string.folder_batch)) },
                                     onClick = { menuExpanded = false; enterSelection() }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 56.dp),
+                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(Tr.s(R.string.common_rename)) },
                                     onClick = { menuExpanded = false; showFolderDialog = true }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 56.dp),
+                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(Tr.s(R.string.folder_move_bin)) },
                                     onClick = {
                                         menuExpanded = false
