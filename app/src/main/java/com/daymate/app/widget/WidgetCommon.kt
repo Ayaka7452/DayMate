@@ -169,26 +169,20 @@ object WidgetRenderer {
         style: Style
     ): Pair<RemoteViews, Boolean> {
         val events = runCatching { container.eventRepository.observeAll().first() }.getOrDefault(emptyList())
-        // 今日节假日信息（来自已下载的节假日缓存；未下载时为 null，角标隐藏）
+        // 今日节假日信息（来自已下载的节假日缓存；未下载时为 null，角标隐藏）。
+        // widget 只显示当天实况角标；「明天起」的预告只在 App 内节日卡片状态条展示
+        // （小组件没有文案，单凭角标容易误解为今天就开始休息/补班）
         val festival = runCatching {
             container.festivalRepository.todayInfo(LocalDate.now())
         }.getOrNull()
-        // 明日补班预告：仅当今天不是节日、明天是调休上班日、且开关开启时非空（绿底「班」角标）
-        val makeupHint = runCatching {
-            container.settingsRepository.makeupHintEnabled.first()
-        }.getOrDefault(true)
-        val tomorrowMakeup = if (festival == null && makeupHint) runCatching {
-            container.festivalRepository.todayInfo(LocalDate.now().plusDays(1))
-                ?.takeIf { !it.isOffDay }
-        }.getOrNull() else null
         // 是否处于「固定事件」模式：该组件在配置页绑定了具体事件
         val bound = WidgetPrefs.eventForWidget(context, appWidgetId) != 0L
         if (style == Style.SQUARE && !bound) {
-            return buildListViews(context, appWidgetId, festival, tomorrowMakeup) to true
+            return buildListViews(context, appWidgetId, festival) to true
         }
         val picked = pickEvent(events, context, appWidgetId)
         val model = picked?.let { buildModel(it) }
-        return buildViews(context, appWidgetId, model, style, picked?.id, festival, tomorrowMakeup) to false
+        return buildViews(context, appWidgetId, model, style, picked?.id, festival) to false
     }
 
     /** 事件选取优先级：该小组件绑定的事件 > 自动（最近未到期，否则最近已过）。 */
@@ -261,8 +255,7 @@ object WidgetRenderer {
     private fun buildListViews(
         context: Context,
         appWidgetId: Int,
-        festival: com.ayaka7452.daymate.data.festival.FestivalDay?,
-        tomorrowMakeup: com.ayaka7452.daymate.data.festival.FestivalDay? = null
+        festival: com.ayaka7452.daymate.data.festival.FestivalDay?
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_countdown_list)
         val dark = isDarkTheme(context)
@@ -275,36 +268,30 @@ object WidgetRenderer {
         views.setEmptyView(R.id.widget_list, R.id.widget_empty)
         // 行点击：模板 PendingIntent + 工厂里的 FillInIntent（各行携带自己的 eventId）
         views.setPendingIntentTemplate(R.id.widget_list, openEventPendingIntent(context, null))
-        applyFestivalBadge(views, festival, tomorrowMakeup)
+        applyFestivalBadge(views, festival)
         return views
     }
 
     /**
-     * 节日角标：今天恰逢法定节假日显示绿色「休」，调休上班日显示橙色「班」；
-     * 今日本身不是节日但明天要补班 → 绿色「班」预告。无数据隐藏。
+     * 节日角标：今天恰逢法定节假日显示绿色「休」，调休上班日显示橙色「班」。无数据隐藏。
+     * 「明天起」的预告一律不上小组件——角标没有文案配合，容易被当成当天实况。
      */
     private fun applyFestivalBadge(
         views: RemoteViews,
-        festival: com.ayaka7452.daymate.data.festival.FestivalDay?,
-        tomorrowMakeup: com.ayaka7452.daymate.data.festival.FestivalDay? = null
+        festival: com.ayaka7452.daymate.data.festival.FestivalDay?
     ) {
-        val day = festival ?: tomorrowMakeup
-        if (day == null) {
+        if (festival == null) {
             views.setViewVisibility(R.id.widget_festival_badge, android.view.View.GONE)
             return
         }
         views.setViewVisibility(R.id.widget_festival_badge, android.view.View.VISIBLE)
         views.setTextViewText(
             R.id.widget_festival_badge,
-            if (festival?.isOffDay == true) Tr.s(R.string.festival_badge_off) else Tr.s(R.string.festival_badge_work)
+            if (festival.isOffDay) Tr.s(R.string.festival_badge_off) else Tr.s(R.string.festival_badge_work)
         )
         views.setInt(
             R.id.widget_festival_badge, "setBackgroundResource",
-            when {
-                festival?.isOffDay == true -> R.drawable.widget_badge_off
-                tomorrowMakeup != null -> R.drawable.widget_badge_work_tomorrow
-                else -> R.drawable.widget_badge_work
-            }
+            if (festival.isOffDay) R.drawable.widget_badge_off else R.drawable.widget_badge_work
         )
     }
 
@@ -314,8 +301,7 @@ object WidgetRenderer {
         model: WidgetModel?,
         style: Style,
         eventId: Long? = null,
-        festival: com.ayaka7452.daymate.data.festival.FestivalDay? = null,
-        tomorrowMakeup: com.ayaka7452.daymate.data.festival.FestivalDay? = null
+        festival: com.ayaka7452.daymate.data.festival.FestivalDay? = null
     ): RemoteViews {
         val layout = when (style) {
             Style.WIDE -> R.layout.widget_countdown
@@ -353,7 +339,7 @@ object WidgetRenderer {
 
         // 整卡点击直达当前显示事件的详情页
         views.setOnClickPendingIntent(R.id.widget_root, openEventPendingIntent(context, eventId))
-        applyFestivalBadge(views, festival, tomorrowMakeup)
+        applyFestivalBadge(views, festival)
         return views
     }
 }

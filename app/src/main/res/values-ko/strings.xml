@@ -516,15 +516,15 @@
     <string name="festival_badge_off">휴무</string>
     <string name="festival_badge_work">출근</string>
     <string name="settings_makeup_hint">휴일 및 대체 근무일 표시</string>
-    <string name="settings_makeup_hint_desc">홈 화면 공휴일 카드와 위젯에 휴일·대체 근무 현황을 표시합니다</string>
+    <string name="settings_makeup_hint_desc">홈 화면 공휴일 카드에 휴일·대체 근무 현황을 표시합니다</string>
     <string name="festival_banner_makeup">오늘은 %1$s 대체 근무일입니다</string>
     <string name="festival_banner_makeup_tomorrow">내일은 %1$s 대체 근무일입니다</string>
     <string name="festival_ui_no_data">공휴일 데이터가 없습니다</string>
     <string name="festival_ui_go_download">설정 → 공휴일 데이터에서 다운로드</string>
     <string name="festival_ui_all_finished">저장된 공휴일이 모두 지났습니다. 설정에서 업데이트할 수 있습니다.</string>
     <string name="festival_ui_next">다음 공휴일</string>
-    <string name="festival_ui_today_is">오늘은 %1$s</string>
-    <string name="festival_ui_span_days">연휴 %1$d일</string>
+    <string name="festival_ui_today_is">오늘은 %1$s</string><string name="festival_ui_span_days">%1$d일 휴일</string>
+    <string name="festival_ui_span_tomorrow">내일부터 %1$d일 휴일</string>
     <string name="festival_ui_create_event">카운트다운 만들기</string>
     <string name="unit_days">일</string>
     <string name="unit_months">개월</string>

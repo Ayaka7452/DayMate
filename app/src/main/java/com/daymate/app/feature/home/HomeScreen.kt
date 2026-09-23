@@ -741,10 +741,12 @@ fun HomeScreen(
                 )
             }
             else -> Column(Modifier.fillMaxSize()) {
-                // 顶部倒数卡片：两种视图共用一份、不参与切换动画；宽度统一为列表口径（水平 8dp），
-                // 整个顶部区域一次性让开顶栏（Scaffold 顶内边距），下方内容区不再重复计算
+                // 顶部倒数卡片：两种视图共用一份、不参与切换动画；整个顶部区域一次性让开顶栏
+                // （Scaffold 顶内边距），下方内容区不再重复计算。
+                // 水平边距跟随视图模式对齐项目：列表行内容边 16dp、网格块外边 12dp
                 val hasHeader = homeTopCard != "off"
                 if (hasHeader) {
+                    val headerHpad = if (homeViewMode == SettingsRepository.VIEW_MODE_LIST) 16.dp else 12.dp
                     Column(Modifier.padding(top = padding.calculateTopPadding())) {
                         // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）。
                         // 原独立「班/休」横幅已并入节日卡片底部状态条（today/tomorrowMakeup/spanDays）。
@@ -764,7 +766,7 @@ fun HomeScreen(
                                         )
                                     }
                                 },
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = headerHpad, vertical = 4.dp),
                                 badgeEmoji = homeBadgeEmoji,
                                 today = todayFestival,
                                 tomorrowMakeup = tomorrowMakeup,
@@ -793,7 +795,7 @@ fun HomeScreen(
                                             if (show.specialType == "cycle") onNavigate("cycle")
                                             else onNavigate("event_detail?eventId=${show.id}")
                                         },
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        modifier = Modifier.padding(horizontal = headerHpad, vertical = 4.dp)
                                     )
                                 }
                             }

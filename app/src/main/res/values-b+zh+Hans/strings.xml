@@ -516,15 +516,15 @@
     <string name="festival_badge_off">休</string>
     <string name="festival_badge_work">班</string>
     <string name="settings_makeup_hint">休息及补班提醒</string>
-    <string name="settings_makeup_hint_desc">主页节日卡片与小组件显示休息及补班提示</string>
+    <string name="settings_makeup_hint_desc">主页节日卡片显示休息及补班提示</string>
     <string name="festival_banner_makeup">今日%1$s调休补班</string>
     <string name="festival_banner_makeup_tomorrow">明日需补班：%1$s调休</string>
     <string name="festival_ui_no_data">节假日数据未下载</string>
     <string name="festival_ui_go_download">前往「设置 → 节假日数据」下载</string>
     <string name="festival_ui_all_finished">已缓存的法定节假日已全部结束，可在设置中更新</string>
     <string name="festival_ui_next">下一个节日</string>
-    <string name="festival_ui_today_is">今天就是 %1$s</string>
-    <string name="festival_ui_span_days">连休 %1$d 天</string>
+    <string name="festival_ui_today_is">今天就是 %1$s</string><string name="festival_ui_span_days">休息 %1$d 天</string>
+    <string name="festival_ui_span_tomorrow">明天起休息 %1$d 天</string>
     <string name="festival_ui_create_event">创建倒数事件</string>
     <string name="unit_days">天</string>
     <string name="unit_months">个月</string>

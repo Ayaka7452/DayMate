@@ -61,9 +61,12 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      # 自动发布：读版本号 → 资产改名 → 清旧 Release（只留 v1.0.0 与最新）→ 建 Release（tag 不存在则自动在 HEAD 创建）
+      # 自动发布（有门槛）：仅当 commit message 含 [release] 或手动 workflow_dispatch 触发时执行，
+      # 普通 push 只构建产物不上架——发版必须经用户确认后再放行。
+      # 读版本号 → 资产改名 → 清旧 Release（只留 v1.0.0 与最新）→ 建 Release（tag 不存在则自动在 HEAD 创建）
       # 同版本重跑是幂等的：先删同名 Release（tag 留仓）再重建。
       - name: Publish GitHub Release
+        if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

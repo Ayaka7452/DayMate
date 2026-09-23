@@ -35,11 +35,19 @@ import java.time.format.DateTimeFormatter
 private val FESTIVAL_OFF_GREEN = Color(0xFF1E8E3E)
 private val FESTIVAL_WORK_ORANGE = Color(0xFFE8710A)
 
-/** 「休 / 班」小圆角角标：绿色=放假，橙色=调休上班；明天要补班时「班」也走绿色以作区分。 */
+/** 预告专用淡蓝：只用于「明天起」的预告角标，与当天实况（绿=休 / 橙=班）明显区分。 */
+private val FESTIVAL_PREVIEW_BLUE = Color(0xFF5C9CE6)
+
+/**
+ * 「休 / 班」小圆角角标：当天实况 绿=放假、橙=调休上班。
+ * [preview]=true 表示这是「预告」（明天起的状态）而非当天实况——统一淡蓝底，
+ * 且状态条文案会带「明天起/明日」字样，避免误读为今天已经开始休息/补班。
+ */
 @Composable
-fun FestivalBadge(isOffDay: Boolean, modifier: Modifier = Modifier, tomorrowMakeup: Boolean = false) {
+fun FestivalBadge(isOffDay: Boolean, modifier: Modifier = Modifier, preview: Boolean = false) {
     Surface(
-        color = if (isOffDay || tomorrowMakeup) FESTIVAL_OFF_GREEN else FESTIVAL_WORK_ORANGE,
+        color = if (preview) FESTIVAL_PREVIEW_BLUE
+        else if (isOffDay) FESTIVAL_OFF_GREEN else FESTIVAL_WORK_ORANGE,
         contentColor = Color.White,
         shape = RoundedCornerShape(6.dp),
         modifier = modifier
@@ -170,35 +178,40 @@ fun FestivalCountdownCard(
                             style = MaterialTheme.typography.titleLarge
                         )
                     }
-                    festivalStatusBar(today, tomorrowMakeup, festival, spanDays)?.let { st ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            FestivalBadge(st.isOffDay, tomorrowMakeup = st.tomorrow)
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                st.text,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-                            )
+                        festivalStatusBar(today, tomorrowMakeup, festival, spanDays)?.let { st ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                FestivalBadge(st.isOffDay, preview = st.preview)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    st.text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                                )
+                            }
                         }
-                    }
                 }
             }
         }
     }
 }
 
-/** 底部状态条内容：角标（休/班）+ 说明文字；无可展示内容时为 null（不画状态条）。 */
-private data class FestivalStatus(val isOffDay: Boolean, val tomorrow: Boolean, val text: String)
+/** 底部状态条内容：角标（休/班，预告为淡蓝）+ 说明文字；无可展示内容时为 null（不画状态条）。 */
+private data class FestivalStatus(val isOffDay: Boolean, val preview: Boolean, val text: String)
 
 /**
- * 状态条取值优先级：今日节日（休/班）→ 明日补班预告 → 即将到来的节日的连休天数。
- * 连休不足 2 天时不算「连休」，今日放假但无连休则以「今天 · 节日名」呈现。
+ * 状态条取值（优先级从高到低）：
+ *  1. 今天在假期里 → 绿「休」+「休息 X 天」（当天实况）；
+ *  2. 今天是调休上班日 → 橙「班」+「今日XX调休补班」（当天实况）；
+ *  3. 明天要补班 → 淡蓝「班」+「明日需补班：XX调休」（预告，提前一天）；
+ *  4. 明天开始放假 → 淡蓝「休」+「明天起休息 X 天」（预告，提前一天）。
+ * 预告只在「明天」出现：不到日子不提前剧透，且淡蓝角标 + 「明天起/明日」文案
+ * 与当天实况（绿/橙）双重区分。连休的「连」字不用——统一说「休息 X 天」。
  */
 private fun festivalStatusBar(
     today: FestivalDay?,
@@ -207,9 +220,7 @@ private fun festivalStatusBar(
     spanDays: Int
 ): FestivalStatus? = when {
     today != null && today.isOffDay -> FestivalStatus(
-        true, false,
-        if (spanDays > 1) Tr.s(R.string.festival_ui_span_days, spanDays)
-        else Tr.s(R.string.common_today) + " · " + HolidayNames.display(today)
+        true, false, Tr.s(R.string.festival_ui_span_days, spanDays)
     )
     today != null -> FestivalStatus(
         false, false, Tr.s(R.string.festival_banner_makeup, HolidayNames.display(today))
@@ -217,7 +228,9 @@ private fun festivalStatusBar(
     tomorrowMakeup != null -> FestivalStatus(
         false, true, Tr.s(R.string.festival_banner_makeup_tomorrow, HolidayNames.display(tomorrowMakeup))
     )
-    spanDays > 1 -> FestivalStatus(true, false, Tr.s(R.string.festival_ui_span_days, spanDays))
+    festival.date == LocalDate.now().plusDays(1) && festival.isOffDay -> FestivalStatus(
+        true, true, Tr.s(R.string.festival_ui_span_tomorrow, spanDays)
+    )
     else -> null
 }
 
