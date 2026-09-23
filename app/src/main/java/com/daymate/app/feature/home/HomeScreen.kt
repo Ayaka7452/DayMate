@@ -1491,8 +1491,8 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("📝", style = MaterialTheme.typography.displayMedium)
-        Spacer(Modifier.height(12.dp))
+        // 空状态只留文字提示：emoji 属于 UI 装饰，各机型渲染差异大，不再体现
+        //（节日卡片、文件夹图标等用户自选内容的 emoji 不受影响）
         Text(
             stringResource(R.string.home_empty_hint),
             style = MaterialTheme.typography.bodyLarge,

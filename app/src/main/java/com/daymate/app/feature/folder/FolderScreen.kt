@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -320,8 +319,7 @@ fun FolderScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text("📂", style = MaterialTheme.typography.displayMedium)
-                    Spacer(Modifier.height(8.dp))
+                    // 空状态只留文字提示：emoji 属于 UI 装饰，各机型渲染差异大，不再体现
                     Text(
                         Tr.s(R.string.folder_empty),
                         style = MaterialTheme.typography.bodyLarge,

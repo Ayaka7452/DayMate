@@ -4,10 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -109,8 +107,7 @@ fun RecycleBinScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("🗑️", style = MaterialTheme.typography.displayMedium)
-                Spacer(Modifier.height(8.dp))
+                // 空状态只留文字提示：emoji 属于 UI 装饰，各机型渲染差异大，不再体现
                 Text(
                     Tr.s(R.string.bin_empty),
                     style = MaterialTheme.typography.bodyLarge,
