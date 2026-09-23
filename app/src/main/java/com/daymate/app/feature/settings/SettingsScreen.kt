@@ -109,6 +109,9 @@ fun SettingsScreen(
     // 明日补班预告开关（默认开）：只关「预告」，当天补班横幅不受影响
     val makeupHintEnabled by container.settingsRepository.makeupHintEnabled
         .collectAsState(initial = true)
+    // 假期天数口径开关：开=假期中段显示「总长 · 还剩 N 天」；关=只显示剩余（默认）
+    val holidaySpanTotal by container.settingsRepository.holidaySpanTotal
+        .collectAsState(initial = false)
 
     // 节假日数据：不内置离线数据，由应用从可配置的数据源下载并缓存
     val festivalRepo = container.festivalRepository
@@ -728,12 +731,36 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
+                Switch(
+                    checked = makeupHintEnabled,
+                    onCheckedChange = { enabled ->
+                        scope.launch { container.settingsRepository.setMakeupHintEnabled(enabled) }
+                        // 立即刷新小组件：关掉时角标当天就消失，不用等下次重建
+                        WidgetRenderer.refreshAll(ctx)
+                    }
+                )
+                }
+                // 假期天数口径：假期中段「只显示剩余」（默认）或「总长 · 还剩 N 天」。
+                // 与补班开关同组显隐：数据源没有逐日条目时天数口径无从谈起
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.settings_span_total_mode), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            stringResource(R.string.settings_span_total_mode_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                     Switch(
-                        checked = makeupHintEnabled,
+                        checked = holidaySpanTotal,
                         onCheckedChange = { enabled ->
-                            scope.launch { container.settingsRepository.setMakeupHintEnabled(enabled) }
-                            // 立即刷新小组件：关掉时角标当天就消失，不用等下次重建
-                            WidgetRenderer.refreshAll(ctx)
+                            scope.launch { container.settingsRepository.setHolidaySpanTotal(enabled) }
                         }
                     )
                 }

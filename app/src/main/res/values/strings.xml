@@ -774,4 +774,13 @@
     <string name="update_download_failed">Download failed, please try again later</string>
     <string name="update_install_permission">Allow installing unknown apps to finish the update</string>
 
+    <string name="festival_ui_span_last">Last day of the holiday</string>
+
+    <string name="festival_ui_span_left">%1$d days of holiday left</string>
+
+    <string name="festival_ui_span_total_left">%1$d days off · %2$d days left</string>
+
+    <string name="settings_span_total_mode">Show total holiday length</string>
+
+    <string name="settings_span_total_mode_desc">During a holiday, show both the total length and days remaining; off shows remaining days only</string>
 </resources>

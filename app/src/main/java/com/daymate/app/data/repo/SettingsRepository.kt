@@ -40,6 +40,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val ALLOW_SCREENSHOT_VAULT = booleanPreferencesKey("allow_screenshot_vault") // 保险箱允许截屏（默认关＝阻止）
         private val UPDATE_CHECK = booleanPreferencesKey("update_check_enabled")             // 启动时检查新版本（默认开）
         private val MAKEUP_HINT = booleanPreferencesKey("makeup_tomorrow_hint_enabled")      // 明日补班预告（默认开）
+        private val HOLIDAY_SPAN_TOTAL = booleanPreferencesKey("holiday_span_show_total")    // 假期天数显示：false=只显示剩余（默认）/ true=总长+剩余
         private val UPDATE_LAST_CHECK = longPreferencesKey("update_last_check")              // 上次检查时间戳（节流用）
         private val UPDATE_SKIPPED = stringPreferencesKey("update_skipped_version")          // 用户点过「稍后」的版本
         private val HOME_VIEW_MODE = stringPreferencesKey("home_view_mode")                  // 主页视图：list(列表) / medium(中图标) / large(大图标)
@@ -250,6 +251,13 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setMakeupHintEnabled(enabled: Boolean) {
         dataStore.edit { it[MAKEUP_HINT] = enabled }
+    }
+
+    /** 假期天数口径：false=假期中段只显示剩余（默认）/ true=显示「总长 · 还剩 N 天」。 */
+    val holidaySpanTotal: Flow<Boolean> = dataStore.data.map { it[HOLIDAY_SPAN_TOTAL] ?: false }
+
+    suspend fun setHolidaySpanTotal(enabled: Boolean) {
+        dataStore.edit { it[HOLIDAY_SPAN_TOTAL] = enabled }
     }
 
     /** 上次检查（含失败）的时间戳，用于「同一天不重复问」的节流。 */

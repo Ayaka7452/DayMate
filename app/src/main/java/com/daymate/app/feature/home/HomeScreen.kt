@@ -123,12 +123,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** 节日卡片首帧预载/重读的统一载体：有数据、今日条目、下一个节日、所在假期连休天数。 */
+/** 节日卡片首帧预载/重读的统一载体：有数据、今日条目、下一个节日、所在假期总长与剩余天数。 */
 private data class FestivalInit(
     val hasData: Boolean,
     val today: com.ayaka7452.daymate.data.festival.FestivalDay?,
     val next: com.ayaka7452.daymate.data.festival.FestivalDay?,
-    val spanDays: Int
+    val spanDays: Int,
+    val spanRemaining: Int
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -223,19 +224,24 @@ fun HomeScreen(
             val today = java.time.LocalDate.now()
             val todayF = festivalRepo.todayInfo(today)
             val nextF = festivalRepo.nextOffDay(today)
-            // 连休天数：今日放假取今日所在假期段，否则取下一个节日所在假期段
+            // 假期总长与剩余：今日放假取今日所在假期段，否则取下一个节日所在假期段；
+            // 剩余只对「今日放假」有意义（预告分支用总长）
+            val todayOff = todayF?.isOffDay == true
             val span = when {
-                todayF?.isOffDay == true -> festivalRepo.offDaySpanLength(today)
+                todayOff -> festivalRepo.offDaySpanLength(today)
                 nextF != null -> festivalRepo.offDaySpanLength(nextF.date)
                 else -> 0
             }
-            FestivalInit(festivalRepo.hasData(), todayF, nextF, span)
-        }.getOrDefault(FestivalInit(false, null, null, 0))
+            val remaining = if (todayOff) festivalRepo.offDayRemainingLength(today) else span
+            FestivalInit(festivalRepo.hasData(), todayF, nextF, span, remaining)
+        }.getOrDefault(FestivalInit(false, null, null, 0, 0))
     }
     var festivalHasData by remember { mutableStateOf(festivalInit.hasData) }
     var todayFestival by remember { mutableStateOf(festivalInit.today) }
     var nextFestival by remember { mutableStateOf(festivalInit.next) }
     var festivalSpanDays by remember { mutableStateOf(festivalInit.spanDays) }
+    // 假期剩余天数（含今天）：假期中段「还剩 X 天」/ 最后一天「假期余额不足」用
+    var festivalSpanRemaining by remember { mutableStateOf(festivalInit.spanRemaining) }
     // 明日补班预告：仅当今天不是节日、明天是调休上班日时非空（卡片状态条「班」+「明日」句式）
     var tomorrowMakeup by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
     // 以「节日数据版本号」为 key 重读，而不是 Unit：换数据源或下载完成后数据变了，
@@ -243,22 +249,28 @@ fun HomeScreen(
     val festivalVersion by festivalRepo.version.collectAsState()
     // 休息及补班提醒开关（默认开）：设置里可关（非补班数据源整组隐藏），关掉后状态条不再预告
     val makeupHint by container.settingsRepository.makeupHintEnabled.collectAsState(initial = true)
+    // 假期天数口径：false=假期中段只显示剩余（默认）/ true=「总长 · 还剩 N 天」
+    val holidaySpanTotal by container.settingsRepository.holidaySpanTotal
+        .collectAsState(initial = false)
     LaunchedEffect(festivalVersion, makeupHint) {
         val fresh = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
             val todayF = festivalRepo.todayInfo(today)
             val nextF = festivalRepo.nextOffDay(today)
+            val todayOff = todayF?.isOffDay == true
             val span = when {
-                todayF?.isOffDay == true -> festivalRepo.offDaySpanLength(today)
+                todayOff -> festivalRepo.offDaySpanLength(today)
                 nextF != null -> festivalRepo.offDaySpanLength(nextF.date)
                 else -> 0
             }
-            FestivalInit(festivalRepo.hasData(), todayF, nextF, span)
+            val remaining = if (todayOff) festivalRepo.offDayRemainingLength(today) else span
+            FestivalInit(festivalRepo.hasData(), todayF, nextF, span, remaining)
         }
         festivalHasData = fresh.hasData
         todayFestival = fresh.today
         nextFestival = fresh.next
         festivalSpanDays = fresh.spanDays
+        festivalSpanRemaining = fresh.spanRemaining
         tomorrowMakeup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
             // 今日本身是节日（无论休/班）就不预告明天，避免状态条叠报；开关关闭同样不预告
@@ -770,7 +782,9 @@ fun HomeScreen(
                                 badgeEmoji = homeBadgeEmoji,
                                 today = todayFestival,
                                 tomorrowMakeup = tomorrowMakeup,
-                                spanDays = festivalSpanDays
+                                spanDays = festivalSpanDays,
+                                spanRemaining = festivalSpanRemaining,
+                                showSpanTotal = holidaySpanTotal
                             )
                             "event" -> {
                                 // 最近倒数日：优先取剩余天数最少的未过期事件；全部已过期则取最近过期的

@@ -77,7 +77,9 @@ fun FestivalCountdownCard(
     badgeEmoji: String = "☀️",
     today: FestivalDay? = null,
     tomorrowMakeup: FestivalDay? = null,
-    spanDays: Int = 0
+    spanDays: Int = 0,
+    spanRemaining: Int = 0,
+    showSpanTotal: Boolean = false
 ) {
     Card(
         onClick = onClick,
@@ -178,7 +180,9 @@ fun FestivalCountdownCard(
                             style = MaterialTheme.typography.titleLarge
                         )
                     }
-                        festivalStatusBar(today, tomorrowMakeup, festival, spanDays)?.let { st ->
+                        festivalStatusBar(
+                            today, tomorrowMakeup, festival, spanDays, spanRemaining, showSpanTotal
+                        )?.let { st ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -206,10 +210,13 @@ private data class FestivalStatus(val isOffDay: Boolean, val preview: Boolean, v
 
 /**
  * 状态条取值（优先级从高到低）：
- *  1. 今天在假期里 → 绿「休」+「休息 X 天」（当天实况）；
+ *  1. 今天在假期里 → 绿「休」+ 天数口径（当天实况）：
+ *     - 假期最后一天 → 「剩余 1 天，假期余额不足」；
+ *     - 假期中段 → 只显示剩余「还剩 X 天」，或（开关开启时）「休息 X 天 · 还剩 Y 天」；
+ *     - 假期第一天（剩余=总长）→ 「休息 X 天」。
  *  2. 今天是调休上班日 → 橙「班」+「今日XX调休补班」（当天实况）；
  *  3. 明天要补班 → 淡蓝「班」+「明日需补班：XX调休」（预告，提前一天）；
- *  4. 明天开始放假 → 淡蓝「休」+「明天起休息 X 天」（预告，提前一天）。
+ *  4. 明天开始放假 → 淡蓝「休」+「明天起休息 X 天」（预告，提前一天，总长口径）。
  * 预告只在「明天」出现：不到日子不提前剧透，且淡蓝角标 + 「明天起/明日」文案
  * 与当天实况（绿/橙）双重区分。连休的「连」字不用——统一说「休息 X 天」。
  */
@@ -217,10 +224,20 @@ private fun festivalStatusBar(
     today: FestivalDay?,
     tomorrowMakeup: FestivalDay?,
     festival: FestivalDay,
-    spanDays: Int
+    spanDays: Int,
+    spanRemaining: Int,
+    showSpanTotal: Boolean
 ): FestivalStatus? = when {
     today != null && today.isOffDay -> FestivalStatus(
-        true, false, Tr.s(R.string.festival_ui_span_days, spanDays)
+        true, false,
+        when {
+            spanDays > 1 && spanRemaining <= 1 -> Tr.s(R.string.festival_ui_span_last)
+            spanDays > 1 && spanRemaining < spanDays && showSpanTotal ->
+                Tr.s(R.string.festival_ui_span_total_left, spanDays, spanRemaining)
+            spanDays > 1 && spanRemaining < spanDays ->
+                Tr.s(R.string.festival_ui_span_left, spanRemaining)
+            else -> Tr.s(R.string.festival_ui_span_days, spanDays)
+        }
     )
     today != null -> FestivalStatus(
         false, false, Tr.s(R.string.festival_banner_makeup, HolidayNames.display(today))

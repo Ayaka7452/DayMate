@@ -774,4 +774,13 @@
     <string name="update_download_failed">下載失敗，請稍後重試</string>
     <string name="update_install_permission">需要允許「安裝未知應用程式」才能完成更新</string>
 
+    <string name="festival_ui_span_last">剩餘 1 天，假期餘額不足</string>
+
+    <string name="festival_ui_span_left">還剩 %1$d 天</string>
+
+    <string name="festival_ui_span_total_left">休息 %1$d 天 · 還剩 %2$d 天</string>
+
+    <string name="settings_span_total_mode">假期顯示總長</string>
+
+    <string name="settings_span_total_mode_desc">假期中段同時顯示假期總長與剩餘天數；關閉後只顯示剩餘天數</string>
 </resources>

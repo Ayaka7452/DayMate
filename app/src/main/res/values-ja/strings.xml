@@ -774,4 +774,13 @@
     <string name="update_download_failed">ダウンロードに失敗しました。後でもう一度お試しください</string>
     <string name="update_install_permission">更新を完了するには「提供元不明のアプリ」のインストールを許可してください</string>
 
+    <string name="festival_ui_span_last">残り 1 日、休暇残高わずか</string>
+
+    <string name="festival_ui_span_left">あと %1$d 日</string>
+
+    <string name="festival_ui_span_total_left">休み %1$d 日 · あと %2$d 日</string>
+
+    <string name="settings_span_total_mode">休暇の総日数を表示</string>
+
+    <string name="settings_span_total_mode_desc">休暇中は総日数と残り日数の両方を表示します。オフにすると残り日数のみ表示します</string>
 </resources>

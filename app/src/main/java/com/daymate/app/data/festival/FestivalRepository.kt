@@ -387,6 +387,19 @@ class FestivalRepository(private val appContext: Context) {
         return len
     }
 
+    /**
+     * 从 [date] 起到本假期段结束的剩余放假日数（含当天）。
+     * 假期中段显示「还剩 X 天」用：10 月 5 日在 10.1–10.7 假期里返回 3。
+     * date 不是放假日时返回 0；假期最后一天返回 1。
+     */
+    fun offDayRemainingLength(date: LocalDate): Int {
+        if (!isOffDay(date)) return 0
+        var len = 1
+        var d = date.plusDays(1)
+        while (isOffDay(d)) { len++; d = d.plusDays(1) }
+        return len
+    }
+
     /** 单日是否为放假日：数据源有该日条目时以 isOffDay 为准（调休补班的周六日不算休），否则按普通周末。 */
     private fun isOffDay(date: LocalDate): Boolean {
         val entry = loadYear(date.year).firstOrNull { it.date == date }
