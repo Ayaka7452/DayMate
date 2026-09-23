@@ -19,9 +19,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -558,12 +558,10 @@ private fun VaultListScreen(
         onDelete = { showDeleteConfirm = true },
         menuItems = {
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.vault_batch_manage)) },
                 onClick = { enterSelection() }
             )
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.vault_reset_password)) },
                 onClick = { showResetConfirm = true }
             )
@@ -1009,12 +1007,10 @@ fun VaultFolderScreen(
         onDelete = { showDeleteConfirm = true },
         menuItems = {
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.vault_batch_manage)) },
                 onClick = { enterSelection() }
             )
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.common_rename)) },
                 onClick = {
                     folderTarget = folder
@@ -1022,7 +1018,6 @@ fun VaultFolderScreen(
                 }
             )
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.vault_delete_folder)) },
                 onClick = { showFolderDeleteConfirm = true }
             )
@@ -1521,6 +1516,7 @@ private fun VaultEventRow(
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                 }
                 DropdownMenu(
+                    modifier = Modifier.widthIn(min = 200.dp),
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
@@ -1528,7 +1524,6 @@ private fun VaultEventRow(
                         ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     DropdownMenuItem(
-                        modifier = Modifier.heightIn(min = 64.dp),
                         text = { Text(stringResource(R.string.vault_move_out_main)) },
                         onClick = {
                             menuExpanded = false
@@ -1579,6 +1574,7 @@ private fun VaultFolderRow(
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                 }
                 DropdownMenu(
+                    modifier = Modifier.widthIn(min = 200.dp),
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
@@ -1672,6 +1668,7 @@ private fun VaultScaffold(
                                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.vault_menu))
                                 }
                                 DropdownMenu(
+                                    modifier = Modifier.widthIn(min = 200.dp),
                                     expanded = menuExpanded,
                                     onDismissRequest = { menuExpanded = false }
                                 ) { menuItems() }

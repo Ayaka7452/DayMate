@@ -28,10 +28,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -118,33 +118,84 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
 import android.widget.Toast
+import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+/**
+ * 主页首帧快照：MainActivity 冷启动时同步读一次 DataStore 设置 + Room 首个快照，
+ * 让 Compose 的第一帧就是完整内容——视图模式正确、文件夹/事件已在位、顶部卡片模式正确。
+ *
+ * 背景：主页有 9 个异步状态（视图模式/顶部卡片/角标/排序/文件夹/事件…）各自带占位
+ * initial，首帧画什么全看各 Flow 的 IO 快慢，出现「空白帧/文件夹晚一拍闪现」的随机
+ * 闪烁（有时会、有时不会 = 竞态）。预载后所有 collectAsState 的 initial 都是真实值，
+ * 首帧无任何中间态，闪烁从根上消除；Flow 随后的发射与快照同值，不触发多余重组。
+ */
+data class HomeSnapshot(
+    val viewMode: String,
+    val topCard: String,
+    val badgeEmoji: String,
+    val cycleEntry: Boolean,
+    val vaultSet: Boolean,
+    val sortMode: String,
+    val makeupHint: Boolean,
+    val events: List<EventEntity>,
+    val folders: List<FolderEntity>
+) {
+    companion object {
+        /** 在主线程 runBlocking 调用（系统启动页会在首帧绘制前一直显示，读盘耗时被启动页盖住）。 */
+        fun load(container: AppContainer): HomeSnapshot = kotlinx.coroutines.runBlocking {
+            val s = container.settingsRepository
+            HomeSnapshot(
+                viewMode = runCatching { s.homeViewMode.first() }
+                    .getOrDefault(SettingsRepository.VIEW_MODE_LIST),
+                topCard = runCatching { s.homeTopCard.first() }
+                    .getOrDefault("festival"),
+                badgeEmoji = runCatching { s.homeBadgeEmoji.first() }
+                    .getOrDefault("☀️"),
+                cycleEntry = runCatching { s.cycleEntryEnabled.first() }
+                    .getOrDefault(false),
+                vaultSet = runCatching { s.vaultPasswordSet.first() }
+                    .getOrDefault(false),
+                sortMode = runCatching { s.defaultSort.first() }
+                    .getOrDefault(SortModes.REMAINING_ASC),
+                makeupHint = runCatching { s.makeupHintEnabled.first() }
+                    .getOrDefault(true),
+                events = runCatching { container.eventRepository.observeRoot().first() }
+                    .getOrDefault(emptyList()),
+                folders = runCatching { container.folderRepository.observeAll().first() }
+                    .getOrDefault(emptyList())
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     container: AppContainer,
+    snapshot: HomeSnapshot,
     onNavigate: (String) -> Unit
 ) {
     // 用 remember 固定 Flow 实例，避免每次重组都新建 Flow 导致 collectAsState 底层的
     // LaunchedEffect 反复取消/重建观察者，从而在从其它 Activity 返回时漏掉 Room 的变更通知。
     val eventsFlow = remember { container.eventRepository.observeRoot() }
-    val events by eventsFlow.collectAsState(initial = emptyList())
+    // initial 用冷启动预载快照：首帧即真实数据，不再有「空列表帧 → 文件夹闪现」
+    val events by eventsFlow.collectAsState(initial = snapshot.events)
     val foldersFlow = remember { container.folderRepository.observeAll() }
-    val folders by foldersFlow.collectAsState(initial = emptyList())
+    val folders by foldersFlow.collectAsState(initial = snapshot.folders)
     val vaultSet by container.settingsRepository.vaultPasswordSet
-        .collectAsState(initial = false)
+        .collectAsState(initial = snapshot.vaultSet)
     // 主页顶部卡片模式：festival（默认）/ event / off
     val homeTopCard by container.settingsRepository.homeTopCard
-        .collectAsState(initial = "festival")
+        .collectAsState(initial = snapshot.topCard)
     // 节日卡片右侧角标 emoji（默认 ☀️）
     val homeBadgeEmoji by container.settingsRepository.homeBadgeEmoji
-        .collectAsState(initial = "☀️")
+        .collectAsState(initial = snapshot.badgeEmoji)
     // 周期管家入口按钮：默认关，需在「周期管家 → 设置 → 隐私与快捷事件」里开启
     val cycleEntryEnabled by container.settingsRepository.cycleEntryEnabled
-        .collectAsState(initial = false)
+        .collectAsState(initial = snapshot.cycleEntry)
 
     // 云备份指示器：备份位置含云端（both/cloud）且 WebDAV 配置完整时常驻显示
     val cloudEnabled by container.autoBackup.cloudEnabled.collectAsState(initial = false)
@@ -206,7 +257,7 @@ fun HomeScreen(
     // 卡片必须跟着变——早先只在首次组合时读一次，用户得重启 App 才看得到新国家的节日。
     val festivalVersion by festivalRepo.version.collectAsState()
     // 明日补班预告开关（默认开）：设置里可关，关掉后横幅/角标不再预告
-    val makeupHint by container.settingsRepository.makeupHintEnabled.collectAsState(initial = true)
+    val makeupHint by container.settingsRepository.makeupHintEnabled.collectAsState(initial = snapshot.makeupHint)
     LaunchedEffect(festivalVersion, makeupHint) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
@@ -227,13 +278,18 @@ fun HomeScreen(
 
     // 排序模式：remaining_asc/remaining_desc/manual（manual 才允许手动调整顺序）
     val defaultSort by container.settingsRepository.defaultSort
-        .collectAsState(initial = SortModes.REMAINING_ASC)
+        .collectAsState(initial = snapshot.sortMode)
     val manualSort = defaultSort == SortModes.MANUAL
 
-    // 拖拽排序用的可变镜像列表：Flow 更新时同步（拖拽中不同步，避免跳动）
+    // 拖拽排序用的可变镜像列表：Flow 更新时同步（拖拽中不同步，避免跳动）。
+    // 用快照种子初始化：首帧渲染时 LaunchedEffect 尚未跑过，不播种的话网格会先空一帧
     var isDragging by remember { mutableStateOf(false) }
-    val folderList = remember { mutableStateListOf<FolderEntity>() }
-    val eventList = remember { mutableStateListOf<EventEntity>() }
+    val folderList = remember {
+        mutableStateListOf<FolderEntity>().apply { addAll(snapshot.folders) }
+    }
+    val eventList = remember {
+        mutableStateListOf<EventEntity>().apply { addAll(snapshot.events) }
+    }
     LaunchedEffect(folders) {
         if (!isDragging) {
             folderList.clear()
@@ -269,10 +325,10 @@ fun HomeScreen(
         else folders.filter { it.name.lowercase().contains(searchQuery.trim().lowercase()) }
     }
 
-    // 注意 initial 必须为 null：DataStore 异步读盘，若用列表当初始值，设置了网格视图的
-    // 冷启动会先渲染一帧列表再闪切成网格。null 期间内容区渲染空白帧（见下方 when 分支）。
+    // 视图模式：initial 取冷启动预载快照（真实偏好），首帧直接按用户选定的视图渲染，
+    // 不再有中间态——此前 initial=列表 会闪切网格（v1.12.6），initial=null 会闪空白帧（v1.12.7/8）
     val homeViewMode by container.settingsRepository.homeViewMode
-        .collectAsState(initial = null)
+        .collectAsState(initial = snapshot.viewMode)
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -446,16 +502,15 @@ fun HomeScreen(
                                 Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.home_menu))
                             }
                             DropdownMenu(
+                                modifier = Modifier.widthIn(min = 200.dp),
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_batch_manage)) },
                                     onClick = { menuExpanded = false; enterSelection() }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_view_mode)) },
                                     trailingIcon = {
                                         Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
@@ -466,7 +521,6 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_cycle_tracker)) },
                                     onClick = {
                                         menuExpanded = false
@@ -474,7 +528,6 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_vault)) },
                                     onClick = {
                                         menuExpanded = false
@@ -482,7 +535,6 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.common_settings)) },
                                     onClick = {
                                         menuExpanded = false
@@ -490,7 +542,6 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_about)) },
                                     onClick = {
                                         menuExpanded = false
@@ -498,7 +549,6 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_trash)) },
                                     onClick = {
                                         menuExpanded = false
@@ -509,11 +559,11 @@ fun HomeScreen(
                             // 视图模式子菜单：主菜单点「视图模式」后关主菜单、开本菜单，
                             // 两个菜单锚在同一个 MoreVert 按钮上，视觉上就是二级子菜单
                             DropdownMenu(
+                                modifier = Modifier.widthIn(min = 200.dp),
                                 expanded = viewSubmenuExpanded,
                                 onDismissRequest = { viewSubmenuExpanded = false }
                             ) {
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_view_list)) },
                                     trailingIcon = {
                                         if (homeViewMode == SettingsRepository.VIEW_MODE_LIST) {
@@ -526,7 +576,6 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_view_medium)) },
                                     trailingIcon = {
                                         if (homeViewMode == SettingsRepository.VIEW_MODE_MEDIUM) {
@@ -539,7 +588,6 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    modifier = Modifier.heightIn(min = 64.dp),
                                     text = { Text(stringResource(R.string.home_view_large)) },
                                     trailingIcon = {
                                         if (homeViewMode == SettingsRepository.VIEW_MODE_LARGE) {
@@ -690,11 +738,6 @@ fun HomeScreen(
                         .fillMaxSize()
                         .padding(padding)
                 )
-            }
-            homeViewMode == null -> {
-                // DataStore 视图偏好尚未读出：先渲染空白一帧，避免冷启动先用列表
-                // 渲染、读到网格设置后再闪切（列表模式无感、网格模式必闪的根因）
-                Spacer(Modifier.fillMaxSize())
             }
             else -> Column(Modifier.fillMaxSize()) {
                 // 顶部横幅与倒数卡片：两种视图共用一份、不参与切换动画；宽度统一为列表口径（水平 8dp），
@@ -1270,6 +1313,7 @@ fun EventRow(
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                 }
                 DropdownMenu(
+                    modifier = Modifier.widthIn(min = 200.dp),
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
@@ -1278,7 +1322,6 @@ fun EventRow(
                     }
                     if (onMoveToFolder != null) {
                         DropdownMenuItem(
-                            modifier = Modifier.heightIn(min = 64.dp),
                             text = { Text(stringResource(R.string.home_move_to_folder_ellipsis)) },
                             onClick = {
                                 menuExpanded = false
@@ -1287,7 +1330,6 @@ fun EventRow(
                         )
                     }
                     DropdownMenuItem(
-                        modifier = Modifier.heightIn(min = 64.dp),
                         text = { Text(stringResource(R.string.home_move_to_vault)) },
                         onClick = {
                             menuExpanded = false
@@ -1295,7 +1337,6 @@ fun EventRow(
                         }
                     )
                     DropdownMenuItem(
-                        modifier = Modifier.heightIn(min = 64.dp),
                         text = { Text(stringResource(R.string.home_move_to_trash)) },
                         onClick = {
                             menuExpanded = false
@@ -1359,6 +1400,7 @@ fun FolderRow(
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                 }
                 DropdownMenu(
+                    modifier = Modifier.widthIn(min = 200.dp),
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
@@ -1366,7 +1408,6 @@ fun FolderRow(
                         ReorderMenuItems(onReorder) { menuExpanded = false }
                     }
                     DropdownMenuItem(
-                        modifier = Modifier.heightIn(min = 64.dp),
                         text = { Text(stringResource(R.string.home_move_to_trash)) },
                         onClick = {
                             menuExpanded = false
@@ -1719,11 +1760,11 @@ fun FolderGridItem(
         }
 
         DropdownMenu(
+            modifier = Modifier.widthIn(min = 200.dp),
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false }
         ) {
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.home_edit_folder)) },
                 onClick = {
                     menuExpanded = false
@@ -1731,7 +1772,6 @@ fun FolderGridItem(
                 }
             )
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.home_move_to_trash)) },
                 onClick = {
                     menuExpanded = false
@@ -1878,12 +1918,12 @@ fun EventGridItem(
         }
 
         DropdownMenu(
+            modifier = Modifier.widthIn(min = 200.dp),
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false }
         ) {
             if (onMoveToFolder != null) {
                 DropdownMenuItem(
-                    modifier = Modifier.heightIn(min = 64.dp),
                     text = { Text(stringResource(R.string.home_move_to_folder_ellipsis)) },
                     onClick = {
                         menuExpanded = false
@@ -1892,7 +1932,6 @@ fun EventGridItem(
                 )
             }
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.home_move_to_vault)) },
                 onClick = {
                     menuExpanded = false
@@ -1900,7 +1939,6 @@ fun EventGridItem(
                 }
             )
             DropdownMenuItem(
-                modifier = Modifier.heightIn(min = 64.dp),
                 text = { Text(stringResource(R.string.home_move_to_trash)) },
                 onClick = {
                     menuExpanded = false
