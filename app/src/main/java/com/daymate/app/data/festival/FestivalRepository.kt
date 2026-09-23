@@ -13,6 +13,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 /**
@@ -357,6 +358,41 @@ class FestivalRepository(private val appContext: Context) {
     /** 下一个放假的节日（>= from）。 */
     fun nextOffDay(from: LocalDate): FestivalDay? =
         allDays().firstOrNull { it.date >= from && it.isOffDay }
+
+    /**
+     * 当前数据源是否存在「调休上班日」（isOffDay=false）条目。
+     * 补班是中国的调休产物（其他国家撞周末只补休、不补班），据此决定：
+     *  - 设置页「休息及补班提醒」开关是否显示（非补班数据源整组隐藏）；
+     *  - 节日卡片 / 小组件是否可能出现「班」角标与补班预告。
+     * 按数据内容判断而非硬编码区域：中国源为 true；美日韩源为 false；
+     * 自定义源里如果是含补班数据的中文接口也自动为 true。
+     */
+    fun hasMakeupData(): Boolean = allDays().any { !it.isOffDay }
+
+    /**
+     * [date] 所在的连续假期段长度（含 [date] 当天）。
+     * 数据源里列出的放假日优先；数据源没列的周六/周日也按放假日计——
+     * 这样美日韩等「只列法定假日、不列普通周末」的数据源，也能正确算出
+     * 假日撞周末形成的连休（如周一假期 → 连休 3 天）；而中国调休日
+     * （周六/周日补班，isOffDay=false）在数据里显式存在，不会被误计为休。
+     * date 本身不是放假日时返回 0。
+     */
+    fun offDaySpanLength(date: LocalDate): Int {
+        if (!isOffDay(date)) return 0
+        var len = 1
+        var d = date.minusDays(1)
+        while (isOffDay(d)) { len++; d = d.minusDays(1) }
+        d = date.plusDays(1)
+        while (isOffDay(d)) { len++; d = d.plusDays(1) }
+        return len
+    }
+
+    /** 单日是否为放假日：数据源有该日条目时以 isOffDay 为准（调休补班的周六日不算休），否则按普通周末。 */
+    private fun isOffDay(date: LocalDate): Boolean {
+        val entry = loadYear(date.year).firstOrNull { it.date == date }
+        return entry?.isOffDay ?: (date.dayOfWeek == DayOfWeek.SATURDAY ||
+            date.dayOfWeek == DayOfWeek.SUNDAY)
+    }
 
     /**
      * 指定节日的下一次日期（date >= after）。

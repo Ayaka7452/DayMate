@@ -112,36 +112,6 @@ fun FolderScreen(
     val totalSelected = selectedEventIds.size
 
     // 今日节日/调休横幅（数据未下载时为 null，不显示；主页倒数卡片负责引导下载）。
-    // 冷启动同步预载：缓存查询只读本地小 JSON，同步读一次让首帧横幅就位，
-    // 避免横幅晚一拍出现把下方内容顶下去的闪动（与主页同款修法）。
-    var todayFestival by remember {
-        mutableStateOf(
-            runCatching {
-                container.festivalRepository.todayInfo(java.time.LocalDate.now())
-            }.getOrNull()
-        )
-    }
-    // 明日补班预告：与主页同口径——今天不是节日且明天是调休上班日时非空
-    var tomorrowMakeup by remember {
-        mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null)
-    }
-    // 与主页同一处理：跟着节日数据版本号重读，换源/下载完成后横幅即时跟着换
-    val festivalVersion by container.festivalRepository.version.collectAsState()
-    // 明日补班预告开关（默认开）：与主页同口径，关掉后不预告
-    val makeupHint by container.settingsRepository.makeupHintEnabled.collectAsState(initial = true)
-    LaunchedEffect(festivalVersion, makeupHint) {
-        val t = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            container.festivalRepository.todayInfo(java.time.LocalDate.now())
-        }
-        todayFestival = t
-        tomorrowMakeup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val today = java.time.LocalDate.now()
-            if (makeupHint && container.festivalRepository.todayInfo(today) == null) {
-                container.festivalRepository.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
-            } else null
-        }
-    }
-
     // 排序模式：manual 才允许手动调整顺序
     val defaultSort by container.settingsRepository.defaultSort
         .collectAsState(initial = SortModes.REMAINING_ASC)
@@ -346,16 +316,6 @@ fun FolderScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                // 今日节日/调休横幅（数据未下载时不在文件夹页引导，主页卡片负责提示）；明日补班同主页口径
-                (todayFestival ?: tomorrowMakeup)?.let { tf ->
-                    item(key = "festival_today") {
-                        com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
-                            day = tf,
-                            tomorrow = todayFestival == null,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
                 items(shownEvents, key = { "e${it.id}" }) { event ->
                     ReorderableItem(reorderableState, key = "e${event.id}") {
                         val handle = if (selectionMode && manualSort) {

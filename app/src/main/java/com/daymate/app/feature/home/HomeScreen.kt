@@ -123,6 +123,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** 节日卡片首帧预载/重读的统一载体：有数据、今日条目、下一个节日、所在假期连休天数。 */
+private data class FestivalInit(
+    val hasData: Boolean,
+    val today: com.ayaka7452.daymate.data.festival.FestivalDay?,
+    val next: com.ayaka7452.daymate.data.festival.FestivalDay?,
+    val spanDays: Int
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -204,44 +212,56 @@ fun HomeScreen(
     // 整条链路（弹窗 → 通知权限 → 下载服务）都收在 UpdateHost 里，这里只挂一行。
     UpdateHost(container)
 
-    // 节假日数据（在线下载 + 本地缓存）：主页顶部横幅 + 下一节日倒数卡片
+    // 节假日数据（在线下载 + 本地缓存）：主页顶部节日卡片 + 底部状态条
     val festivalRepo = remember { container.festivalRepository }
     // 冷启动同步预载节日状态：此前 hasData 占位为 false，首帧会先画一帧
     // 「节日数据未下载」提示、下一拍才换成正常卡片（用户看到的冷启动闪烁就是它）。
     // 缓存查询只是读本地小 JSON 文件，首次组合时同步读一次开销极小，
-    // 换来首帧直接是正确的节日卡片/横幅，无中间态。
+    // 换来首帧直接是正确的节日卡片，无中间态。
     val festivalInit = remember(festivalRepo) {
         runCatching {
             val today = java.time.LocalDate.now()
-            Triple(
-                festivalRepo.hasData(),
-                festivalRepo.todayInfo(today),
-                festivalRepo.nextOffDay(today)
-            )
-        }.getOrDefault(Triple(false, null, null))
+            val todayF = festivalRepo.todayInfo(today)
+            val nextF = festivalRepo.nextOffDay(today)
+            // 连休天数：今日放假取今日所在假期段，否则取下一个节日所在假期段
+            val span = when {
+                todayF?.isOffDay == true -> festivalRepo.offDaySpanLength(today)
+                nextF != null -> festivalRepo.offDaySpanLength(nextF.date)
+                else -> 0
+            }
+            FestivalInit(festivalRepo.hasData(), todayF, nextF, span)
+        }.getOrDefault(FestivalInit(false, null, null, 0))
     }
-    var festivalHasData by remember { mutableStateOf(festivalInit.first) }
-    var todayFestival by remember { mutableStateOf(festivalInit.second) }
-    var nextFestival by remember { mutableStateOf(festivalInit.third) }
-    // 明日补班预告：仅当今天不是节日、明天是调休上班日时非空（横幅换绿底「班」+「明日」句式）
+    var festivalHasData by remember { mutableStateOf(festivalInit.hasData) }
+    var todayFestival by remember { mutableStateOf(festivalInit.today) }
+    var nextFestival by remember { mutableStateOf(festivalInit.next) }
+    var festivalSpanDays by remember { mutableStateOf(festivalInit.spanDays) }
+    // 明日补班预告：仅当今天不是节日、明天是调休上班日时非空（卡片状态条「班」+「明日」句式）
     var tomorrowMakeup by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
     // 以「节日数据版本号」为 key 重读，而不是 Unit：换数据源或下载完成后数据变了，
     // 卡片必须跟着变——早先只在首次组合时读一次，用户得重启 App 才看得到新国家的节日。
     val festivalVersion by festivalRepo.version.collectAsState()
-    // 明日补班预告开关（默认开）：设置里可关，关掉后横幅/角标不再预告
+    // 休息及补班提醒开关（默认开）：设置里可关（非补班数据源整组隐藏），关掉后状态条不再预告
     val makeupHint by container.settingsRepository.makeupHintEnabled.collectAsState(initial = true)
     LaunchedEffect(festivalVersion, makeupHint) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val fresh = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
-            Triple(festivalRepo.hasData(), festivalRepo.todayInfo(today), festivalRepo.nextOffDay(today))
-        }?.let { (has, todayF, nextF) ->
-            festivalHasData = has
-            todayFestival = todayF
-            nextFestival = nextF
+            val todayF = festivalRepo.todayInfo(today)
+            val nextF = festivalRepo.nextOffDay(today)
+            val span = when {
+                todayF?.isOffDay == true -> festivalRepo.offDaySpanLength(today)
+                nextF != null -> festivalRepo.offDaySpanLength(nextF.date)
+                else -> 0
+            }
+            FestivalInit(festivalRepo.hasData(), todayF, nextF, span)
         }
+        festivalHasData = fresh.hasData
+        todayFestival = fresh.today
+        nextFestival = fresh.next
+        festivalSpanDays = fresh.spanDays
         tomorrowMakeup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
-            // 今日本身是节日（无论休/班）就不预告明天，避免横幅叠报；开关关闭同样不预告
+            // 今日本身是节日（无论休/班）就不预告明天，避免状态条叠报；开关关闭同样不预告
             if (makeupHint && festivalRepo.todayInfo(today) == null) {
                 festivalRepo.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
             } else null
@@ -721,20 +741,13 @@ fun HomeScreen(
                 )
             }
             else -> Column(Modifier.fillMaxSize()) {
-                // 顶部横幅与倒数卡片：两种视图共用一份、不参与切换动画；宽度统一为列表口径（水平 8dp），
+                // 顶部倒数卡片：两种视图共用一份、不参与切换动画；宽度统一为列表口径（水平 8dp），
                 // 整个顶部区域一次性让开顶栏（Scaffold 顶内边距），下方内容区不再重复计算
-                val hasHeader = (todayFestival ?: tomorrowMakeup) != null || homeTopCard != "off"
+                val hasHeader = homeTopCard != "off"
                 if (hasHeader) {
                     Column(Modifier.padding(top = padding.calculateTopPadding())) {
-                        // 今日节日/调休横幅；今日本身不是节日但明天要补班时，横幅换成「明日」预告（绿底班角标）
-                        (todayFestival ?: tomorrowMakeup)?.let { tf ->
-                            com.ayaka7452.daymate.feature.common.FestivalTodayBanner(
-                                day = tf,
-                                tomorrow = todayFestival == null,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                        // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）
+                        // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）。
+                        // 原独立「班/休」横幅已并入节日卡片底部状态条（today/tomorrowMakeup/spanDays）。
                         when (homeTopCard) {
                             "festival" -> com.ayaka7452.daymate.feature.common.FestivalCountdownCard(
                                 hasData = festivalHasData,
@@ -752,7 +765,10 @@ fun HomeScreen(
                                     }
                                 },
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                badgeEmoji = homeBadgeEmoji
+                                badgeEmoji = homeBadgeEmoji,
+                                today = todayFestival,
+                                tomorrowMakeup = tomorrowMakeup,
+                                spanDays = festivalSpanDays
                             )
                             "event" -> {
                                 // 最近倒数日：优先取剩余天数最少的未过期事件；全部已过期则取最近过期的

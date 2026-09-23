@@ -2,6 +2,7 @@
 
 package com.ayaka7452.daymate.feature.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,59 +53,12 @@ fun FestivalBadge(isOffDay: Boolean, modifier: Modifier = Modifier, tomorrowMake
 }
 
 /**
- * 今日节日横幅：今天恰逢法定节假日或调休上班日时，在列表顶部显示；
- * [tomorrow]=true 表示今天不是节日、但明天是调休补班日——提前一天预告（绿底「班」角标）。
- * 例：「今天 · 春节 · 休」「今日国庆节调休补班 · 班」「明日国庆节调休补班 · 班(绿)」。
- */
-@Composable
-fun FestivalTodayBanner(day: FestivalDay, modifier: Modifier = Modifier, tomorrow: Boolean = false) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shape = RoundedCornerShape(10.dp),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            when {
-                // 明日补班预告：单独句式 + 绿底班角标，与「今日补班」的橙色区分开
-                tomorrow -> Text(
-                    Tr.s(R.string.festival_banner_makeup_tomorrow, HolidayNames.display(day)),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f)
-                )
-                day.isOffDay -> {
-                    Text(Tr.s(R.string.common_today), style = MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        // 走 HolidayNames 而不是 day.name：数据源给的名字是源国语言的，
-                        // 中文用户切到日本节日时得看到「成人の日 → 成人节」而不是日文原名
-                        HolidayNames.display(day),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                else -> {
-                    // 调休补班日：单独句式点明「为哪个节日补班」，避免「国庆节（班）」读成「过国庆节的班」
-                    Text(
-                        Tr.s(R.string.festival_banner_makeup, HolidayNames.display(day)),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            FestivalBadge(day.isOffDay, tomorrowMakeup = tomorrow)
-        }
-    }
-}
-
-/**
- * 下一节日倒数卡片（列表顶部常驻）：
+ * 节日倒数卡片（列表顶部常驻）：
  *  - 未下载节假日数据 → 点击跳转设置下载（提示引导）；
+ *  - 节日就是今天 → 标题「今天就是 XXX」、右侧大字「今天」（不再显示 0 天）；
  *  - 有数据 → 显示下一个放假节日与剩余天数，点击快捷创建「跟随节日」的倒数事件。
- * 右侧角标为可配置 emoji（默认 ☀️）：卡片只展示放假节日，无需「休/班」标记。
+ * 底部状态条：今日休/班、明日补班预告或连休天数统一收在卡片内展示（原独立横幅已并入）。
+ * 右侧角标为可配置 emoji（默认 ☀️）。
  */
 @Composable
 fun FestivalCountdownCard(
@@ -112,7 +66,10 @@ fun FestivalCountdownCard(
     festival: FestivalDay?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    badgeEmoji: String = "☀️"
+    badgeEmoji: String = "☀️",
+    today: FestivalDay? = null,
+    tomorrowMakeup: FestivalDay? = null,
+    spanDays: Int = 0
 ) {
     Card(
         onClick = onClick,
@@ -143,50 +100,125 @@ fun FestivalCountdownCard(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
             )
-            else -> Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        Tr.s(R.string.festival_ui_next),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    val dateStr = festival.date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md)))
-                    Text(
-                        "${HolidayNames.display(festival)} · $dateStr",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        Tr.s(R.string.festival_ui_create_event),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+            else -> {
+                val isToday = festival.date == LocalDate.now()
+                Column {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            if (isToday) {
+                                Text(
+                                    Tr.s(R.string.festival_ui_today_is, HolidayNames.display(festival)),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Text(
+                                    festival.date.format(
+                                        DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md))
+                                    ),
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            } else {
+                                Text(
+                                    Tr.s(R.string.festival_ui_next),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                val dateStr = festival.date.format(
+                                    DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_md))
+                                )
+                                Text(
+                                    "${HolidayNames.display(festival)} · $dateStr",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+                            Text(
+                                Tr.s(R.string.festival_ui_create_event),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                        if (isToday) {
+                            // 今天就是节日：大字「今天」，不再显示 0 天
+                            Text(
+                                Tr.s(R.string.common_today),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            val days = festival.date.toEpochDay() - LocalDate.now().toEpochDay()
+                            Row(horizontalArrangement = Arrangement.End) {
+                                Text(
+                                    days.toString(),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.alignByBaseline()
+                                )
+                                Text(
+                                    Tr.s(R.string.unit_days),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.alignByBaseline()
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            badgeEmoji,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+                    festivalStatusBar(today, tomorrowMakeup, festival, spanDays)?.let { st ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FestivalBadge(st.isOffDay, tomorrowMakeup = st.tomorrow)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                st.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                            )
+                        }
+                    }
                 }
-                val days = festival.date.toEpochDay() - LocalDate.now().toEpochDay()
-                Row(horizontalArrangement = Arrangement.End) {
-                    Text(
-                        days.toString(),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.alignByBaseline()
-                    )
-                    Text(
-                        Tr.s(R.string.unit_days),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.alignByBaseline()
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    badgeEmoji,
-                    style = MaterialTheme.typography.titleLarge
-                )
             }
         }
     }
+}
+
+/** 底部状态条内容：角标（休/班）+ 说明文字；无可展示内容时为 null（不画状态条）。 */
+private data class FestivalStatus(val isOffDay: Boolean, val tomorrow: Boolean, val text: String)
+
+/**
+ * 状态条取值优先级：今日节日（休/班）→ 明日补班预告 → 即将到来的节日的连休天数。
+ * 连休不足 2 天时不算「连休」，今日放假但无连休则以「今天 · 节日名」呈现。
+ */
+private fun festivalStatusBar(
+    today: FestivalDay?,
+    tomorrowMakeup: FestivalDay?,
+    festival: FestivalDay,
+    spanDays: Int
+): FestivalStatus? = when {
+    today != null && today.isOffDay -> FestivalStatus(
+        true, false,
+        if (spanDays > 1) Tr.s(R.string.festival_ui_span_days, spanDays)
+        else Tr.s(R.string.common_today) + " · " + HolidayNames.display(today)
+    )
+    today != null -> FestivalStatus(
+        false, false, Tr.s(R.string.festival_banner_makeup, HolidayNames.display(today))
+    )
+    tomorrowMakeup != null -> FestivalStatus(
+        false, true, Tr.s(R.string.festival_banner_makeup_tomorrow, HolidayNames.display(tomorrowMakeup))
+    )
+    spanDays > 1 -> FestivalStatus(true, false, Tr.s(R.string.festival_ui_span_days, spanDays))
+    else -> null
 }
 
 /**

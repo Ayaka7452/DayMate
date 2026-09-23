@@ -707,29 +707,36 @@ fun SettingsScreen(
                     }
                 )
             }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_makeup_hint), style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        stringResource(R.string.settings_makeup_hint_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+            // 「休息及补班提醒」开关：补班是中国调休特有，数据源里没有「调休上班日」条目时
+            // （美日韩源 / 纯假日自定义源）整组隐藏。跟随节日数据版本号重算，换源/下载后即时生效。
+            val makeupSupported = remember(festivalVersion) {
+                runCatching { festivalRepo.hasMakeupData() }.getOrDefault(false)
+            }
+            if (makeupSupported) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.settings_makeup_hint), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            stringResource(R.string.settings_makeup_hint_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    Switch(
+                        checked = makeupHintEnabled,
+                        onCheckedChange = { enabled ->
+                            scope.launch { container.settingsRepository.setMakeupHintEnabled(enabled) }
+                            // 立即刷新小组件：关掉时角标当天就消失，不用等下次重建
+                            WidgetRenderer.refreshAll(ctx)
+                        }
                     )
                 }
-                Switch(
-                    checked = makeupHintEnabled,
-                    onCheckedChange = { enabled ->
-                        scope.launch { container.settingsRepository.setMakeupHintEnabled(enabled) }
-                        // 立即刷新小组件：关掉时角标当天就消失，不用等下次重建
-                        WidgetRenderer.refreshAll(ctx)
-                    }
-                )
             }
 
             Spacer(Modifier.padding(vertical = 8.dp))
