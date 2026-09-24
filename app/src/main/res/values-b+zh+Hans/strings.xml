@@ -601,7 +601,7 @@
     <string name="event_note_hint">补充说明，例如地点、注意事项</string>
     <string name="event_root_space">根目录</string>
     <string name="event_no_folder_hint">尚无文件夹。事件将保存在主空间，可在主页创建文件夹后批量移入。</string>
-    <string name="event_reset_today">重置为今天</string>
+    <string name="event_reset_today">重置</string>
     <string name="event_follow_festival_hint">已跟随「%1$s」。目标日期过后自动锚定到该节日的下一次日期，无需设置循环。</string>
     <string name="event_repeat_hint">目标日期过后自动锚定到下一周期：每周同一星期几、每月同一日、每年同月同日。</string>
     <string name="event_unfollow">取消跟随（%1$s）</string>
@@ -630,7 +630,7 @@
     <string name="form_ref_dialog_title">设置对照值</string>
     <string name="form_ref_clear">清除</string>
     <string name="form_unit_dialog_title">显示单位</string>
-    <string name="form_ref_info">目标日期过去后，卡片会显示「已过 X/N」，N 就是这里填的数值，单位跟随显示单位（天/月/年）。可不填。</string>
+    <string name="form_ref_info">目标日期过去后，卡片会显示「已过 X/N」，N 就是这里填的数值，单位跟随显示单位（天/月/年）。非必填项。</string>
     <string name="form_festival_info">跟随节日后，目标日期自动锚定到该节日的下一次日期（如春节每年不同）；节日过后自动跳到下一次，期间「重复」不生效。</string>
     <string name="form_festival_row">跟随节日</string>
     <string name="event_unnamed">未命名事件</string>

@@ -601,7 +601,7 @@
     <string name="event_note_hint">Add details like location or notes</string>
     <string name="event_root_space">Root</string>
     <string name="event_no_folder_hint">No folders yet. Events are saved in the main space. Create a folder on the home screen to move them in bulk.</string>
-    <string name="event_reset_today">Reset to today</string>
+    <string name="event_reset_today">Reset</string>
     <string name="event_follow_festival_hint">Following %1$s. After the target date passes, it automatically re-anchors to that holiday\'s next date — no repeat needed.</string>
     <string name="event_repeat_hint">After the target date passes, it re-anchors to the next cycle: same weekday, same day of month, or same date next year.</string>
     <string name="event_unfollow">Stop following (%1$s)</string>
@@ -630,7 +630,7 @@
     <string name="form_ref_dialog_title">Set reference value</string>
     <string name="form_ref_clear">Clear</string>
     <string name="form_unit_dialog_title">Countdown unit</string>
-    <string name="form_ref_info">If the target date has passed, the card shows \"elapsed X/N\", where N is the value entered here and the unit follows the countdown unit (days/months/years). Optional.</string>
+    <string name="form_ref_info">If the target date has passed, the card shows \"elapsed X/N\", where N is the value entered here and the unit follows the countdown unit (days/months/years). Not required.</string>
     <string name="form_festival_info">When following a holiday, the target date is pinned to that holiday\'s next occurrence (e.g. Lunar New Year changes every year). After it passes, it rolls to the next one automatically; repeat rules do not apply while following.</string>
     <string name="form_festival_row">Follow holiday</string>
     <string name="event_unnamed">Untitled event</string>
