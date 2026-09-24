@@ -1,7 +1,9 @@
 package com.ayaka7452.daymate.feature.create
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,12 +12,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -25,7 +31,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -38,8 +46,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
@@ -83,6 +95,9 @@ fun EventFormScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
     var showFestivalDialog by remember { mutableStateOf(false) }
+    var showByDaysDialog by remember { mutableStateOf(false) }
+    var showUnitDialog by remember { mutableStateOf(false) }
+    var showRefDialog by remember { mutableStateOf(false) }
     var festivalOptions by remember { mutableStateOf<List<com.ayaka7452.daymate.data.festival.FestivalDay>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
@@ -139,186 +154,234 @@ fun EventFormScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text(Tr.s(R.string.common_title)) },
-                placeholder = { Text(Tr.s(R.string.event_title_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = { Text(Tr.s(R.string.event_note_label)) },
-                placeholder = { Text(Tr.s(R.string.event_note_hint)) },
-                minLines = 2,
-                maxLines = 5,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            // ===== 所在文件夹：可随时切换根目录/任意文件夹 =====
-            Text(Tr.s(R.string.detail_folder), style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.height(6.dp))
-            TextButton(onClick = { showFolderPicker = true }) {
-                val currentFolder = folders.firstOrNull { it.id == folderIdSel }
-                // 用文件夹自己的 emoji（与主页/文件夹列表一致）；根目录回落到默认文件夹图标
-                Text("${currentFolder?.icon ?: "📁"}  ${currentFolder?.name ?: Tr.s(R.string.event_root_space)}")
-            }
-            if (folders.isEmpty()) {
+            // ===== 卡片 1：基本信息 =====
+            FormCard {
                 Text(
-                    Tr.s(R.string.event_no_folder_hint),
+                    Tr.s(R.string.form_section_basic),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(Tr.s(R.string.common_title)) },
+                    placeholder = { Text(Tr.s(R.string.event_title_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text(Tr.s(R.string.event_note_label)) },
+                    placeholder = { Text(Tr.s(R.string.event_note_hint)) },
+                    minLines = 2,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // ===== 卡片 2：时间 =====
+            FormCard {
+                Text(
+                    Tr.s(R.string.form_section_time),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(10.dp))
+
+                // ---- 目标日期块：日期大字 + 状态 + 选日期 / 按天数 / 重置今天 ----
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        val date = LocalDate.ofEpochDay(epochDay)
+                        Text(
+                            date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd))),
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        val diff = epochDay - LocalDate.now().toEpochDay()
+                        Text(
+                            when {
+                                diff > 0 -> Tr.s(R.string.unit_days_future, diff)
+                                diff == 0L -> Tr.s(R.string.common_today)
+                                else -> Tr.s(R.string.unit_days_past, -diff)
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { showDatePicker = true },
+                                modifier = Modifier.weight(1f)
+                            ) { Text(Tr.s(R.string.form_pick_date)) }
+                            TextButton(
+                                onClick = { showByDaysDialog = true },
+                                modifier = Modifier.weight(1f)
+                            ) { Text(Tr.s(R.string.form_by_days)) }
+                            TextButton(
+                                onClick = { showResetConfirm = true },
+                                modifier = Modifier.weight(1f)
+                            ) { Text(Tr.s(R.string.event_reset_today)) }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                // ---- 重复：跟随节日时不可选（节日每年日期不同，锚定优先） ----
+                Text(Tr.s(R.string.repeat_label), style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                val repeatEnabled = linkedFestival == null
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = repeatRule == null,
+                        enabled = repeatEnabled,
+                        onClick = { repeatRule = null },
+                        label = { Text(Tr.s(R.string.repeat_none)) }
+                    )
+                    FilterChip(
+                        selected = repeatRule == CountdownCalculator.REPEAT_WEEKLY,
+                        enabled = repeatEnabled,
+                        onClick = { repeatRule = CountdownCalculator.REPEAT_WEEKLY },
+                        label = { Text(Tr.s(R.string.repeat_weekly)) }
+                    )
+                    FilterChip(
+                        selected = repeatRule == CountdownCalculator.REPEAT_MONTHLY,
+                        enabled = repeatEnabled,
+                        onClick = { repeatRule = CountdownCalculator.REPEAT_MONTHLY },
+                        label = { Text(Tr.s(R.string.repeat_monthly)) }
+                    )
+                    FilterChip(
+                        selected = repeatRule == CountdownCalculator.REPEAT_YEARLY,
+                        enabled = repeatEnabled,
+                        onClick = { repeatRule = CountdownCalculator.REPEAT_YEARLY },
+                        label = { Text(Tr.s(R.string.repeat_yearly)) }
+                    )
+                }
+                Text(
+                    if (linkedFestival != null) {
+                        // 库里存的是锚定名（跟着数据源走，可能是中文也可能是英文），
+                        // 展示要过一道 HolidayNames，否则英文界面会出现「Following 春节」
+                        Tr.s(
+                            R.string.event_follow_festival_hint,
+                            com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linkedFestival.orEmpty())
+                        )
+                    } else {
+                        Tr.s(R.string.event_repeat_hint)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
-            }
 
-            Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                TextButton(onClick = { showDatePicker = true }) {
-                    val date = LocalDate.ofEpochDay(epochDay)
+                // ---- 跟随节日：行式入口，ⓘ 气泡解释功能含义 ----
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            // 打开弹窗时加载可快选的节日：跨年取各节日下一次日期，
+                            // 数据源还没发布新年份的（如明年春节）按「+1年」预估并标注「约」
+                            festivalOptions = container.festivalRepository.pickerFestivals(LocalDate.now())
+                            showFestivalDialog = true
+                        }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(Tr.s(R.string.form_festival_row), style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(4.dp))
+                    InfoHint(Tr.s(R.string.form_festival_info))
+                    Spacer(Modifier.weight(1f))
                     Text(
-                        Tr.s(
-                            R.string.event_target_date,
-                            date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd)))
-                        ),
-                        style = MaterialTheme.typography.bodyLarge
+                        linkedFestival?.let {
+                            com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(it)
+                        } ?: Tr.s(R.string.form_not_set),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (linkedFestival != null) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
+                    Spacer(Modifier.width(4.dp))
+                    Text("›", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
                 }
-                TextButton(onClick = { showResetConfirm = true }) {
-                    Text(Tr.s(R.string.event_reset_today))
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            Text(Tr.s(R.string.repeat_label), style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.height(6.dp))
-            // 跟随节日时循环不可选：节日每年日期不同（尤其农历），过期后由节假日数据自动锚定到该节日下一次
-            val repeatEnabled = linkedFestival == null
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = repeatRule == null,
-                    enabled = repeatEnabled,
-                    onClick = { repeatRule = null },
-                    label = { Text(Tr.s(R.string.repeat_none)) }
-                )
-                FilterChip(
-                    selected = repeatRule == CountdownCalculator.REPEAT_WEEKLY,
-                    enabled = repeatEnabled,
-                    onClick = { repeatRule = CountdownCalculator.REPEAT_WEEKLY },
-                    label = { Text(Tr.s(R.string.repeat_weekly)) }
-                )
-                FilterChip(
-                    selected = repeatRule == CountdownCalculator.REPEAT_MONTHLY,
-                    enabled = repeatEnabled,
-                    onClick = { repeatRule = CountdownCalculator.REPEAT_MONTHLY },
-                    label = { Text(Tr.s(R.string.repeat_monthly)) }
-                )
-                FilterChip(
-                    selected = repeatRule == CountdownCalculator.REPEAT_YEARLY,
-                    enabled = repeatEnabled,
-                    onClick = { repeatRule = CountdownCalculator.REPEAT_YEARLY },
-                    label = { Text(Tr.s(R.string.repeat_yearly)) }
-                )
-            }
-            Text(
                 if (linkedFestival != null) {
-                    // 库里存的是锚定名（跟着数据源走，可能是中文也可能是英文），
-                    // 展示要过一道 HolidayNames，否则英文界面会出现「Following 春节」
-                    Tr.s(
-                        R.string.event_follow_festival_hint,
-                        com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linkedFestival.orEmpty())
-                    )
-                } else {
-                    Tr.s(R.string.event_repeat_hint)
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            // ===== 跟随节日：目标日期自动锚定到节假日数据源中该节日的下一次日期 =====
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                TextButton(onClick = {
-                    // 打开弹窗时加载可快选的节日：跨年取各节日下一次日期，
-                    // 数据源还没发布新年份的（如明年春节）按「+1年」预估并标注「约」
-                    festivalOptions = container.festivalRepository.pickerFestivals(LocalDate.now())
-                    showFestivalDialog = true
-                }) { Text(Tr.s(R.string.event_follow_festival)) }
-                if (linkedFestival != null) {
-                    TextButton(onClick = { linkedFestival = null }) {
-                        Text(
-                            Tr.s(
-                                R.string.event_unfollow,
-                                com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linkedFestival.orEmpty())
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { linkedFestival = null }) {
+                            Text(
+                                Tr.s(
+                                    R.string.event_unfollow,
+                                    com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linkedFestival.orEmpty())
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
-            Text(
-                Tr.s(R.string.event_festival_pick_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
-            Text(Tr.s(R.string.event_display_unit), style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = displayUnit == CountdownCalculator.UNIT_DAY,
-                    onClick = { displayUnit = CountdownCalculator.UNIT_DAY },
-                    label = { Text(Tr.s(R.string.form_unit_days)) }
+            // ===== 卡片 3：更多设置（低频项收纳） =====
+            FormCard {
+                Text(
+                    Tr.s(R.string.form_section_more),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
                 )
-                FilterChip(
-                    selected = displayUnit == CountdownCalculator.UNIT_MONTH,
-                    onClick = { displayUnit = CountdownCalculator.UNIT_MONTH },
-                    label = { Text(Tr.s(R.string.form_unit_months)) }
+                Spacer(Modifier.height(4.dp))
+
+                // ---- 所在文件夹 ----
+                SettingRow(
+                    label = Tr.s(R.string.detail_folder),
+                    value = {
+                        val currentFolder = folders.firstOrNull { it.id == folderIdSel }
+                        Text(
+                            "${currentFolder?.icon ?: "📁"}  ${currentFolder?.name ?: Tr.s(R.string.event_root_space)}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    onClick = { showFolderPicker = true }
                 )
-                FilterChip(
-                    selected = displayUnit == CountdownCalculator.UNIT_YEAR,
-                    onClick = { displayUnit = CountdownCalculator.UNIT_YEAR },
-                    label = { Text(Tr.s(R.string.form_unit_years)) }
+                if (folders.isEmpty()) {
+                    Text(
+                        Tr.s(R.string.event_no_folder_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+
+                // ---- 倒计时显示单位 ----
+                SettingRow(
+                    label = Tr.s(R.string.event_display_unit),
+                    value = { Text(refUnitLabel, style = MaterialTheme.typography.bodyMedium) },
+                    onClick = { showUnitDialog = true }
+                )
+
+                // ---- 对照值（可选）：过期后卡片显示「已过 X/N」中的 N ----
+                SettingRow(
+                    label = Tr.s(R.string.form_ref_row),
+                    info = Tr.s(R.string.form_ref_info),
+                    value = {
+                        val refValue = refDaysText.toIntOrNull()?.takeIf { it > 0 }
+                        Text(
+                            if (refValue != null) "$refValue $refUnitLabel" else Tr.s(R.string.form_not_set),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (refValue != null) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    },
+                    onClick = { showRefDialog = true }
                 )
             }
-            Text(
-                Tr.s(R.string.event_display_unit_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = refDaysText,
-                onValueChange = { refDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
-                label = { Text(Tr.s(R.string.event_ref_label, refUnitLabel)) },
-                placeholder = { Text(Tr.s(R.string.event_ref_hint)) },
-                supportingText = { Text(Tr.s(R.string.event_ref_desc, refUnitLabel)) },
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                ),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
 
             Spacer(Modifier.height(24.dp))
 
@@ -388,6 +451,168 @@ fun EventFormScreen(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    // ---- 按天数设置：输 N 天 + 剩余(今天+N)/已过(今天-N)，默认剩余，实时预览 ----
+    if (showByDaysDialog) {
+        var byDaysText by remember { mutableStateOf("") }
+        var byElapsed by remember { mutableStateOf(false) }
+        val days = byDaysText.toIntOrNull()?.takeIf { it > 0 }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showByDaysDialog = false },
+            title = { Text(Tr.s(R.string.form_by_days_title)) },
+            text = {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = byDaysText,
+                            onValueChange = { byDaysText = it.filter { ch -> ch.isDigit() }.take(5) },
+                            label = { Text(Tr.s(R.string.form_days_label)) },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        FilterChip(
+                            selected = !byElapsed,
+                            onClick = { byElapsed = false },
+                            label = { Text(Tr.s(R.string.form_days_remaining)) }
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        FilterChip(
+                            selected = byElapsed,
+                            onClick = { byElapsed = true },
+                            label = { Text(Tr.s(R.string.form_days_elapsed)) }
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("7", "30", "100", "365").forEach { preset ->
+                            FilterChip(
+                                selected = byDaysText == preset,
+                                onClick = { byDaysText = preset },
+                                label = { Text(preset) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    if (days != null) {
+                        val target = LocalDate.now().plusDays(if (byElapsed) -days.toLong() else days.toLong())
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(Modifier.padding(10.dp)) {
+                                Text(
+                                    Tr.s(
+                                        R.string.form_days_preview,
+                                        target.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd)))
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    if (byElapsed) Tr.s(R.string.form_days_calc_minus, days)
+                                    else Tr.s(R.string.form_days_calc_plus, days),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = days != null,
+                    onClick = {
+                        days?.let { d ->
+                            epochDay = LocalDate.now().plusDays(if (byElapsed) -d.toLong() else d.toLong()).toEpochDay()
+                        }
+                        showByDaysDialog = false
+                    }
+                ) { Text(Tr.s(R.string.common_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showByDaysDialog = false }) { Text(Tr.s(R.string.common_cancel)) }
+            }
+        )
+    }
+
+    // ---- 显示单位：单选对话框 ----
+    if (showUnitDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showUnitDialog = false },
+            title = { Text(Tr.s(R.string.form_unit_dialog_title)) },
+            text = {
+                Column {
+                    listOf(
+                        CountdownCalculator.UNIT_DAY to Tr.s(R.string.form_unit_days),
+                        CountdownCalculator.UNIT_MONTH to Tr.s(R.string.form_unit_months),
+                        CountdownCalculator.UNIT_YEAR to Tr.s(R.string.form_unit_years)
+                    ).forEach { (unit, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    displayUnit = unit
+                                    showUnitDialog = false
+                                }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = displayUnit == unit, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        Tr.s(R.string.event_display_unit_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showUnitDialog = false }) { Text(Tr.s(R.string.common_close)) }
+            }
+        )
+    }
+
+    // ---- 对照值：数字输入对话框（可清除） ----
+    if (showRefDialog) {
+        var refDraft by remember { mutableStateOf(refDaysText) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showRefDialog = false },
+            title = { Text(Tr.s(R.string.form_ref_dialog_title)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = refDraft,
+                        onValueChange = { refDraft = it.filter { ch -> ch.isDigit() }.take(5) },
+                        label = { Text(Tr.s(R.string.form_ref_row)) },
+                        placeholder = { Text(Tr.s(R.string.event_ref_hint)) },
+                        supportingText = { Text(Tr.s(R.string.event_ref_desc, refUnitLabel)) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    refDaysText = refDraft
+                    showRefDialog = false
+                }) { Text(Tr.s(R.string.common_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    refDaysText = ""
+                    showRefDialog = false
+                }) { Text(Tr.s(R.string.form_ref_clear)) }
+            }
+        )
     }
 
     if (showResetConfirm) {
@@ -478,7 +703,7 @@ fun EventFormScreen(
                                         showFestivalDialog = false
                                     }
                                     .padding(vertical = 10.dp),
-                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(Modifier.weight(1f)) {
                                     Text(
@@ -513,5 +738,82 @@ fun EventFormScreen(
                 TextButton(onClick = { showFestivalDialog = false }) { Text(Tr.s(R.string.common_close)) }
             }
         )
+    }
+}
+
+/** 表单分组卡片容器：圆角 + 细边框 + 内边距。 */
+@Composable
+private fun FormCard(content: @Composable () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(14.dp)) { content() }
+    }
+}
+
+/** 「更多设置」卡内的通用设置行：左标签（可带 ⓘ），右值 + ›，整行可点。 */
+@Composable
+private fun SettingRow(
+    label: String,
+    value: @Composable () -> Unit,
+    onClick: () -> Unit,
+    info: String? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        if (info != null) {
+            Spacer(Modifier.width(4.dp))
+            InfoHint(info)
+        }
+        Spacer(Modifier.weight(1f))
+        value()
+        Spacer(Modifier.width(4.dp))
+        Text("›", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+    }
+}
+
+/** ⓘ 信息气泡：轻点图标切换显示，点外部关闭。 */
+@Composable
+private fun InfoHint(text: String) {
+    var show by remember { mutableStateOf(false) }
+    Box {
+        Icon(
+            Icons.Default.Info,
+            contentDescription = null,
+            modifier = Modifier
+                .size(16.dp)
+                .clickable { show = !show },
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (show) {
+            Popup(
+                onDismissRequest = { show = false },
+                properties = PopupProperties(focusable = true)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Text(
+                        text,
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .widthIn(max = 260.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
