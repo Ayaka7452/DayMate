@@ -145,36 +145,38 @@ fun FestivalCountdownCard(
                                 )
                             }
                         }
-                        // 右侧：天数/「今天」与 emoji 底部对齐（Alignment.Bottom），观感更整齐
-                        Row(verticalAlignment = Alignment.Bottom) {
+                        // 右侧：天数/「今天」与 emoji 基线对齐——文字与 emoji 都坐在同一条基线上，
+                        // 视觉底部才真正齐平（Alignment.Bottom 对齐的是文本框底边，含下沉空间，
+                        // 字号越大下沉越多，反而看起来歪）
+                        Row {
                             if (isToday) {
                                 // 今天就是节日：大字「今天」，不再显示 0 天
                                 Text(
                                     Tr.s(R.string.common_today),
                                     style = MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.alignByBaseline()
                                 )
                             } else {
                                 val days = festival.date.toEpochDay() - LocalDate.now().toEpochDay()
-                                Row(horizontalArrangement = Arrangement.End) {
-                                    Text(
-                                        days.toString(),
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.alignByBaseline()
-                                    )
-                                    Text(
-                                        Tr.s(R.string.unit_days),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.outline,
-                                        modifier = Modifier.alignByBaseline()
-                                    )
-                                }
+                                Text(
+                                    days.toString(),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.alignByBaseline()
+                                )
+                                Text(
+                                    Tr.s(R.string.unit_days),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.alignByBaseline()
+                                )
                             }
                             Spacer(Modifier.width(10.dp))
                             Text(
                                 badgeEmoji,
-                                style = MaterialTheme.typography.titleLarge
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.alignByBaseline()
                             )
                         }
                     }
