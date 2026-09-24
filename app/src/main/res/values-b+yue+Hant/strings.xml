@@ -525,7 +525,6 @@
     <string name="festival_ui_next">下個假期</string>
     <string name="festival_ui_today_is">今日就係 %1$s</string><string name="festival_ui_span_days">休息 %1$d 日</string>
     <string name="festival_ui_span_tomorrow">聽日開始休息 %1$d 日</string>
-    <string name="festival_ui_create_event">建立倒數事件</string>
     <string name="unit_days">日</string>
     <string name="unit_months">個月</string>
     <string name="unit_years">年</string>

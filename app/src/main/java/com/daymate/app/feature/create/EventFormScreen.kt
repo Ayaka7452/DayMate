@@ -26,8 +26,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -505,35 +508,62 @@ fun EventFormScreen(
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(Modifier.width(10.dp))
-                        FilterChip(
-                            selected = !byElapsed,
-                            onClick = { byElapsed = false },
-                            label = { Text(Tr.s(R.string.form_days_remaining)) }
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        FilterChip(
-                            selected = byElapsed,
-                            onClick = { byElapsed = true },
-                            label = { Text(Tr.s(R.string.form_days_elapsed)) }
-                        )
+                        // 剩余/已过：下拉框选择，替代并排双 chip（更省空间也更清晰）
+                        Box {
+                            var modeMenuOpen by remember { mutableStateOf(false) }
+                            OutlinedButton(
+                                onClick = { modeMenuOpen = true },
+                                contentPadding = PaddingValues(horizontal = 12.dp)
+                            ) {
+                                Text(
+                                    if (byElapsed) Tr.s(R.string.form_days_elapsed)
+                                    else Tr.s(R.string.form_days_remaining)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text("▾", style = MaterialTheme.typography.labelMedium)
+                            }
+                            DropdownMenu(
+                                expanded = modeMenuOpen,
+                                onDismissRequest = { modeMenuOpen = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(Tr.s(R.string.form_days_remaining)) },
+                                    onClick = {
+                                        byElapsed = false
+                                        modeMenuOpen = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(Tr.s(R.string.form_days_elapsed)) },
+                                    onClick = {
+                                        byElapsed = true
+                                        modeMenuOpen = false
+                                    }
+                                )
+                            }
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     // ---- 单位切换：默认与显示单位一致；即便显示单位是年，也仍可切回按天设置 ----
+                    // 选中态用实底 primary + onPrimary，避免对话框浅底上浅蓝 chip 分不清是否选中
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         FilterChip(
                             selected = byUnit == CountdownCalculator.UNIT_DAY,
                             onClick = { byUnit = CountdownCalculator.UNIT_DAY },
-                            label = { Text(Tr.s(R.string.form_unit_days)) }
+                            label = { Text(Tr.s(R.string.form_unit_days)) },
+                            colors = solidSelectedChipColors()
                         )
                         FilterChip(
                             selected = byUnit == CountdownCalculator.UNIT_MONTH,
                             onClick = { byUnit = CountdownCalculator.UNIT_MONTH },
-                            label = { Text(Tr.s(R.string.form_unit_months)) }
+                            label = { Text(Tr.s(R.string.form_unit_months)) },
+                            colors = solidSelectedChipColors()
                         )
                         FilterChip(
                             selected = byUnit == CountdownCalculator.UNIT_YEAR,
                             onClick = { byUnit = CountdownCalculator.UNIT_YEAR },
-                            label = { Text(Tr.s(R.string.form_unit_years)) }
+                            label = { Text(Tr.s(R.string.form_unit_years)) },
+                            colors = solidSelectedChipColors()
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -548,7 +578,8 @@ fun EventFormScreen(
                             FilterChip(
                                 selected = byDaysText == preset,
                                 onClick = { byDaysText = preset },
-                                label = { Text(preset) }
+                                label = { Text(preset) },
+                                colors = solidSelectedChipColors()
                             )
                         }
                     }
@@ -827,6 +858,13 @@ private fun FormCard(content: @Composable () -> Unit) {
         Column(Modifier.padding(14.dp)) { content() }
     }
 }
+
+/** 对话框内 FilterChip 的选中配色：实底 primary + onPrimary 文字，选中与否一眼可辨。 */
+@Composable
+private fun solidSelectedChipColors() = FilterChipDefaults.filterChipColors(
+    selectedContainerColor = MaterialTheme.colorScheme.primary,
+    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+)
 
 /** 设置行：左标签（可带 ⓘ），右值 + ›，整行可点。 */
 @Composable

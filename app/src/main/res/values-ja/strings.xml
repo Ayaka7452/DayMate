@@ -525,7 +525,6 @@
     <string name="festival_ui_next">次の祝日</string>
     <string name="festival_ui_today_is">今日は%1$sです</string><string name="festival_ui_span_days">%1$d日間の休み</string>
     <string name="festival_ui_span_tomorrow">明日から%1$d日間の休み</string>
-    <string name="festival_ui_create_event">カウントダウンを作成</string>
     <string name="unit_days">日</string>
     <string name="unit_months">か月</string>
     <string name="unit_years">年</string>

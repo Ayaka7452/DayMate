@@ -525,7 +525,6 @@
     <string name="festival_ui_next">다음 공휴일</string>
     <string name="festival_ui_today_is">오늘은 %1$s</string><string name="festival_ui_span_days">%1$d일 휴일</string>
     <string name="festival_ui_span_tomorrow">내일부터 %1$d일 휴일</string>
-    <string name="festival_ui_create_event">카운트다운 만들기</string>
     <string name="unit_days">일</string>
     <string name="unit_months">개월</string>
     <string name="unit_years">년</string>

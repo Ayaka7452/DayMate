@@ -525,7 +525,6 @@
     <string name="festival_ui_next">Next holiday</string>
     <string name="festival_ui_today_is">Today is %1$s</string><string name="festival_ui_span_days">%1$d days off</string>
     <string name="festival_ui_span_tomorrow">%1$d days off starting tomorrow</string>
-    <string name="festival_ui_create_event">Create countdown</string>
     <string name="unit_days">days</string>
     <string name="unit_months">months</string>
     <string name="unit_years">years</string>

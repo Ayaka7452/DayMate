@@ -144,41 +144,39 @@ fun FestivalCountdownCard(
                                     style = MaterialTheme.typography.titleMedium
                                 )
                             }
-                            Text(
-                                Tr.s(R.string.festival_ui_create_event),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
                         }
-                        if (isToday) {
-                            // 今天就是节日：大字「今天」，不再显示 0 天
-                            Text(
-                                Tr.s(R.string.common_today),
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            val days = festival.date.toEpochDay() - LocalDate.now().toEpochDay()
-                            Row(horizontalArrangement = Arrangement.End) {
+                        // 右侧：天数/「今天」与 emoji 底部对齐（Alignment.Bottom），观感更整齐
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            if (isToday) {
+                                // 今天就是节日：大字「今天」，不再显示 0 天
                                 Text(
-                                    days.toString(),
+                                    Tr.s(R.string.common_today),
                                     style = MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.alignByBaseline()
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                                Text(
-                                    Tr.s(R.string.unit_days),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier.alignByBaseline()
-                                )
+                            } else {
+                                val days = festival.date.toEpochDay() - LocalDate.now().toEpochDay()
+                                Row(horizontalArrangement = Arrangement.End) {
+                                    Text(
+                                        days.toString(),
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.alignByBaseline()
+                                    )
+                                    Text(
+                                        Tr.s(R.string.unit_days),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.alignByBaseline()
+                                    )
+                                }
                             }
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                badgeEmoji,
+                                style = MaterialTheme.typography.titleLarge
+                            )
                         }
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            badgeEmoji,
-                            style = MaterialTheme.typography.titleLarge
-                        )
                     }
                         festivalStatusBar(
                             today, tomorrowMakeup, festival, spanDays, spanRemaining, showSpanTotal
@@ -213,7 +211,7 @@ private data class FestivalStatus(val isOffDay: Boolean, val preview: Boolean, v
  *  1. 今天在假期里 → 绿「休」+ 天数口径（当天实况）：
  *     - 假期最后一天 → 「剩余 1 天，假期余额不足」；
  *     - 假期中段 → 只显示剩余「还剩 X 天」，或（开关开启时）「休息 X 天 · 还剩 Y 天」；
- *     - 假期第一天（剩余=总长）→ 「休息 X 天」。
+ *     - 假期第一天（剩余=总长）→ 「休息 X 天」；开关开启时同样显示总长 + 剩余。
  *  2. 今天是调休上班日 → 橙「班」+「今日XX调休补班」（当天实况）；
  *  3. 明天要补班 → 淡蓝「班」+「明日需补班：XX调休」（预告，提前一天）；
  *  4. 明天开始放假 → 淡蓝「休」+「明天起休息 X 天」（预告，提前一天，总长口径）。
@@ -232,7 +230,7 @@ private fun festivalStatusBar(
         true, false,
         when {
             spanDays > 1 && spanRemaining <= 1 -> Tr.s(R.string.festival_ui_span_last)
-            spanDays > 1 && spanRemaining < spanDays && showSpanTotal ->
+            spanDays > 1 && showSpanTotal ->
                 Tr.s(R.string.festival_ui_span_total_left, spanDays, spanRemaining)
             spanDays > 1 && spanRemaining < spanDays ->
                 Tr.s(R.string.festival_ui_span_left, spanRemaining)
