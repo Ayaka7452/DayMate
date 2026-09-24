@@ -53,7 +53,7 @@ object EmojiCatalog {
      */
     val folderPresets: List<String> = listOf(
         "📁", "📂", "🗂️", "🗃️", "💼", "🎓",
-        "🏠", "✈️", "🚗", "🎮", "📚",
+        "🏠", "✈️", "🚗", "🎮", "📚", "⚽",
         "📷", "💰", "🍳", "💪", "🎨", "🌱"
     )
 
@@ -197,10 +197,14 @@ fun EmojiPicker(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    // 当前选中项不在推荐集合时补进默认视图，避免用户看不到自己选过的表情
-    val defaultShown = remember(selected, presets) {
+    // 当前选中项不在推荐集合时补进默认视图，避免用户看不到自己选过的表情；
+    // 补位后若不满整行则裁掉尾部多余的，保证 6 列网格始终整行、不出现孤行
+    val defaultShown = remember(selected, presets, columns) {
         if (selected.isBlank() || presets.contains(selected)) presets
-        else listOf(selected) + presets
+        else {
+            val full = listOf(selected) + presets
+            if (full.size % columns == 0) full else full.take(full.size - full.size % columns)
+        }
     }
 
     Column(modifier.fillMaxWidth()) {
