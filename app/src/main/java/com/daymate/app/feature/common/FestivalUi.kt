@@ -2,6 +2,10 @@
 
 package com.ayaka7452.daymate.feature.common
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.TextPaint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -298,7 +302,7 @@ private fun CountAndEmoji(
  * 自底向上扫描最低的非透明像素行即墨水底。失败返回 null。
  */
 private fun inkBottomBelowBaselinePx(text: String, textSizePx: Float): Float? = try {
-    val paint = android.graphics.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
     paint.textSize = textSizePx
     val fm = paint.fontMetrics
     val pad = 2f
@@ -308,10 +312,10 @@ private fun inkBottomBelowBaselinePx(text: String, textSizePx: Float): Float? = 
     if (w <= 0 || bottom <= top) {
         null
     } else {
-        val bmp = android.graphics.Bitmap.createBitmap(
-            w, bottom - top, android.graphics.Bitmap.Config.ARGB_8888
+        val bmp = Bitmap.createBitmap(
+            w, bottom - top, Bitmap.Config.ARGB_8888
         )
-        val canvas = android.graphics.Canvas(bmp)
+        val canvas = Canvas(bmp)
         val baseline = -fm.ascent + pad          // 基线在位图中的 y
         canvas.drawText(text, pad, baseline, paint)
         var found = -1
