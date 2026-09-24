@@ -28,10 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ayaka7452.daymate.data.festival.FestivalDay
 import com.ayaka7452.daymate.data.festival.HolidayNames
 import com.ayaka7452.daymate.R
@@ -193,15 +195,15 @@ private data class FestivalStatus(val isOffDay: Boolean, val preview: Boolean, v
 /**
  * 大字（+可选单位小字）与 emoji 的「墨水底」对齐容器。
  *
- * 排查结论（v1.16.7→v1.16.8 两版都没对齐的根因）：
- *  - Alignment.Bottom 对齐的是文本框底边（含 descent 与行距空隙），字号越大空隙越大，
- *    大字「今天」反而比 emoji 沉得更低；
- *  - alignByBaseline 只保证两条基线相等，但 CJK 字形墨水底≈基线，而 emoji 墨水底
- *    相对基线的位置完全由设备 emoji 字体决定（三星/Google 各家探出量不同），
- *    基线对齐后视觉底部仍差几像素且方向随设备变——排版模式治不了字体差异。
- * 方案：用 onTextLayout 的 getBoundingBox（字形 ink 边界，与文本选择手柄同源）
- * 分别量出两边「墨水底−基线」，在自定义布局里直接按墨水底摆放 emoji；
- * 首帧或量测失败时退化为基线对齐、再退化为框底对齐，不会更糟。
+ * 排查结论（v1.16.7→v1.16.9 三版都没对齐的根因链）：
+ *  - 1.16.7 Alignment.Bottom：对齐的是文本框底边（含 descent 与行距空隙），字号越大空隙越大；
+ *  - 1.16.8 alignByBaseline：基线相等了，但 emoji 墨水底相对基线的探出量由设备 emoji 字体决定，
+ *    排版模式治不了字体差异；
+ *  - 1.16.9 getBoundingBox：拿到的不是字形墨水，而是「字距 × 行高」的框
+ *    （文本选择手柄用的就是它，emoji 上是整行高的大框），等效回框底对齐，白修。
+ * 终解：软件位图 drawText 后逐像素扫描，实测字符串「墨水底 − 基线」的真实像素
+ * ——drawText 以基线为 y 锚，位图最低非透明行即墨水底。量的是设备当前真实字体
+ * （含 emoji fallback），任何机型都成立；量测失败退化为基线对齐，不会更糟。
  */
 @Composable
 private fun CountAndEmoji(
@@ -211,36 +213,38 @@ private fun CountAndEmoji(
     gap: Dp = 10.dp,
     modifier: Modifier = Modifier
 ) {
-    var mainBase by remember { mutableStateOf(Float.NaN) }  // main 基线（相对其布局顶）
-    var mainInk by remember { mutableStateOf(Float.NaN) }   // main 墨水底 − 基线
-    var emojiBase by remember { mutableStateOf(Float.NaN) }
-    var emojiInk by remember { mutableStateOf(Float.NaN) }
+    val density = LocalDensity.current
+    val bigStyle = MaterialTheme.typography.headlineMedium
+    val emojiStyle = MaterialTheme.typography.titleLarge
 
-    fun inkBottomBelowBaseline(lr: TextLayoutResult): Float = try {
-        lr.getBoundingBox(0).bottom - lr.getLineBaseline(0)
-    } catch (_: Exception) {
-        Float.NaN
+    // sp → px（含系统字体缩放），供位图实测用；字体大小缺失时用 M3 默认值兜底
+    val bigPx = with(density) {
+        (bigStyle.fontSize.takeIf { it != TextUnit.Unspecified } ?: 28.sp).toPx()
+    }
+    val emojiPx = with(density) {
+        (emojiStyle.fontSize.takeIf { it != TextUnit.Unspecified } ?: 22.sp).toPx()
     }
 
-    // 在组合期读一次状态（建立订阅），量测回填后触发重排取新值
-    val mb = mainBase
-    val mi = mainInk
+    // 位图实测：墨水底 − 基线（px）。随设备字体变化，正值 = 墨水探到基线以下
+    val bigInk = remember(big, bigPx) { inkBottomBelowBaselinePx(big, bigPx) }
+    val emojiInk = remember(emoji, emojiPx) { inkBottomBelowBaselinePx(emoji, emojiPx) }
+
+    // 布局基线（相对各自 placeable 顶），onTextLayout 回填后重排生效
+    var bigBase by remember { mutableStateOf(Float.NaN) }
+    var emojiBase by remember { mutableStateOf(Float.NaN) }
+    val bb = bigBase
     val eb = emojiBase
-    val ei = emojiInk
 
     SubcomposeLayout(modifier) { constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
 
-        val mainP = subcompose("main") {
+        val bigP = subcompose("big") {
             Row {
                 Text(
                     big,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = bigStyle,
                     color = MaterialTheme.colorScheme.primary,
-                    onTextLayout = { lr ->
-                        mainBase = lr.getLineBaseline(0)
-                        mainInk = inkBottomBelowBaseline(lr)
-                    },
+                    onTextLayout = { lr -> bigBase = lr.getLineBaseline(0) },
                     modifier = Modifier.alignByBaseline()
                 )
                 if (unit != null) {
@@ -255,41 +259,79 @@ private fun CountAndEmoji(
         }.first().measure(loose)
 
         val emojiConstraints = if (constraints.hasBoundedWidth) {
-            constraints.copy(maxWidth = (constraints.maxWidth - mainP.width).coerceAtLeast(0))
+            constraints.copy(maxWidth = (constraints.maxWidth - bigP.width).coerceAtLeast(0))
         } else {
             constraints
         }
         val emojiP = subcompose("emoji") {
             Text(
                 emoji,
-                style = MaterialTheme.typography.titleLarge,
-                onTextLayout = { lr ->
-                    emojiBase = lr.getLineBaseline(0)
-                    emojiInk = inkBottomBelowBaseline(lr)
-                }
+                style = emojiStyle,
+                onTextLayout = { lr -> emojiBase = lr.getLineBaseline(0) }
             )
         }.first().measure(emojiConstraints)
 
         val g = gap.roundToPx()
-        val width = mainP.width + g + emojiP.width
+        val width = bigP.width + g + emojiP.width
 
-        // 目标：两边墨水底同高。main 墨水底（相对 main 顶）= mb + mi；
-        // emoji 摆在 yEmoji 时其墨水底 = yEmoji + eb + ei。令二者相等解出 yEmoji。
+        // 墨水底对齐：big 墨水底（相对其顶）= bb + bigInk；emoji 摆在 y 时墨水底 = y + eb + emojiInk。
+        // 令二者相等解出 y。
         val yEmoji = when {
-            !mb.isNaN() && !mi.isNaN() && !eb.isNaN() && !ei.isNaN() ->
-                ((mb + mi) - (eb + ei)).roundToInt()
-            !mb.isNaN() && !eb.isNaN() ->
-                (mb - eb).roundToInt()                       // 退化 1：基线对齐
+            !bb.isNaN() && !eb.isNaN() && bigInk != null && emojiInk != null ->
+                ((bb + bigInk) - (eb + emojiInk)).roundToInt()
+            !bb.isNaN() && !eb.isNaN() ->
+                (bb - eb).roundToInt()                       // 退化：基线对齐
             else ->
-                mainP.height - emojiP.height                 // 退化 2：框底对齐
+                bigP.height - emojiP.height                  // 首帧兜底：框底对齐
         }
 
-        val height = maxOf(mainP.height, yEmoji + emojiP.height)
+        val height = maxOf(bigP.height, yEmoji + emojiP.height)
         layout(width, height) {
-            mainP.placeRelative(0, 0)
-            emojiP.placeRelative(mainP.width + g, yEmoji)
+            bigP.placeRelative(0, 0)
+            emojiP.placeRelative(bigP.width + g, yEmoji)
         }
     }
+}
+
+/**
+ * 软件位图实测「字形墨水底 − 基线」（px）。drawText 以基线为 y 锚点，
+ * 自底向上扫描最低的非透明像素行即墨水底。失败返回 null。
+ */
+private fun inkBottomBelowBaselinePx(text: String, textSizePx: Float): Float? = try {
+    val paint = android.graphics.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    paint.textSize = textSizePx
+    val fm = paint.fontMetrics
+    val pad = 2f
+    val w = (paint.measureText(text) + pad * 2).toInt().coerceAtLeast(1)
+    val top = (fm.ascent - pad).toInt()
+    val bottom = (fm.descent + pad).toInt()
+    if (w <= 0 || bottom <= top) {
+        null
+    } else {
+        val bmp = android.graphics.Bitmap.createBitmap(
+            w, bottom - top, android.graphics.Bitmap.Config.ARGB_8888
+        )
+        val canvas = android.graphics.Canvas(bmp)
+        val baseline = -fm.ascent + pad          // 基线在位图中的 y
+        canvas.drawText(text, pad, baseline, paint)
+        var found = -1
+        var y = bmp.height - 1
+        while (y >= 0 && found < 0) {
+            var x = 0
+            while (x < w) {
+                if ((bmp.getPixel(x, y) ushr 24) > 16) {
+                    found = y
+                    break
+                }
+                x++
+            }
+            y--
+        }
+        bmp.recycle()
+        if (found >= 0) found - baseline else null
+    }
+} catch (_: Exception) {
+    null
 }
 
 /**
