@@ -20,10 +20,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.data.festival.FestivalDay
 import com.ayaka7452.daymate.data.festival.HolidayNames
@@ -31,6 +38,7 @@ import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 private val FESTIVAL_OFF_GREEN = Color(0xFF1E8E3E)
 private val FESTIVAL_WORK_ORANGE = Color(0xFFE8710A)
@@ -145,40 +153,14 @@ fun FestivalCountdownCard(
                                 )
                             }
                         }
-                        // 右侧：天数/「今天」与 emoji 基线对齐——文字与 emoji 都坐在同一条基线上，
-                        // 视觉底部才真正齐平（Alignment.Bottom 对齐的是文本框底边，含下沉空间，
-                        // 字号越大下沉越多，反而看起来歪）
-                        Row {
-                            if (isToday) {
-                                // 今天就是节日：大字「今天」，不再显示 0 天
-                                Text(
-                                    Tr.s(R.string.common_today),
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.alignByBaseline()
-                                )
-                            } else {
-                                val days = festival.date.toEpochDay() - LocalDate.now().toEpochDay()
-                                Text(
-                                    days.toString(),
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.alignByBaseline()
-                                )
-                                Text(
-                                    Tr.s(R.string.unit_days),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier.alignByBaseline()
-                                )
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                badgeEmoji,
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.alignByBaseline()
-                            )
-                        }
+                        // 右侧：大字与 emoji 按「墨水底」对齐（字形真实边界，见 CountAndEmoji 注释）。
+                        // 框底对齐（含下沉空隙）与基线对齐（受 emoji 字体差异影响）都已验证不齐。
+                        CountAndEmoji(
+                            big = if (isToday) Tr.s(R.string.common_today)
+                            else (festival.date.toEpochDay() - LocalDate.now().toEpochDay()).toString(),
+                            unit = if (isToday) null else Tr.s(R.string.unit_days),
+                            emoji = badgeEmoji
+                        )
                     }
                         festivalStatusBar(
                             today, tomorrowMakeup, festival, spanDays, spanRemaining, showSpanTotal
@@ -207,6 +189,108 @@ fun FestivalCountdownCard(
 
 /** 底部状态条内容：角标（休/班，预告为淡蓝）+ 说明文字；无可展示内容时为 null（不画状态条）。 */
 private data class FestivalStatus(val isOffDay: Boolean, val preview: Boolean, val text: String)
+
+/**
+ * 大字（+可选单位小字）与 emoji 的「墨水底」对齐容器。
+ *
+ * 排查结论（v1.16.7→v1.16.8 两版都没对齐的根因）：
+ *  - Alignment.Bottom 对齐的是文本框底边（含 descent 与行距空隙），字号越大空隙越大，
+ *    大字「今天」反而比 emoji 沉得更低；
+ *  - alignByBaseline 只保证两条基线相等，但 CJK 字形墨水底≈基线，而 emoji 墨水底
+ *    相对基线的位置完全由设备 emoji 字体决定（三星/Google 各家探出量不同），
+ *    基线对齐后视觉底部仍差几像素且方向随设备变——排版模式治不了字体差异。
+ * 方案：用 onTextLayout 的 getBoundingBox（字形 ink 边界，与文本选择手柄同源）
+ * 分别量出两边「墨水底−基线」，在自定义布局里直接按墨水底摆放 emoji；
+ * 首帧或量测失败时退化为基线对齐、再退化为框底对齐，不会更糟。
+ */
+@Composable
+private fun CountAndEmoji(
+    big: String,
+    emoji: String,
+    unit: String? = null,
+    gap: Dp = 10.dp,
+    modifier: Modifier = Modifier
+) {
+    var mainBase by remember { mutableStateOf(Float.NaN) }  // main 基线（相对其布局顶）
+    var mainInk by remember { mutableStateOf(Float.NaN) }   // main 墨水底 − 基线
+    var emojiBase by remember { mutableStateOf(Float.NaN) }
+    var emojiInk by remember { mutableStateOf(Float.NaN) }
+
+    fun inkBottomBelowBaseline(lr: TextLayoutResult): Float = try {
+        lr.getBoundingBox(0).bottom - lr.getLineBaseline(0)
+    } catch (_: Exception) {
+        Float.NaN
+    }
+
+    // 在组合期读一次状态（建立订阅），量测回填后触发重排取新值
+    val mb = mainBase
+    val mi = mainInk
+    val eb = emojiBase
+    val ei = emojiInk
+
+    SubcomposeLayout(modifier) { constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+
+        val mainP = subcompose("main") {
+            Row {
+                Text(
+                    big,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    onTextLayout = { lr ->
+                        mainBase = lr.getLineBaseline(0)
+                        mainInk = inkBottomBelowBaseline(lr)
+                    },
+                    modifier = Modifier.alignByBaseline()
+                )
+                if (unit != null) {
+                    Text(
+                        unit,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.alignByBaseline()
+                    )
+                }
+            }
+        }.first().measure(loose)
+
+        val emojiConstraints = if (constraints.hasBoundedWidth) {
+            constraints.copy(maxWidth = (constraints.maxWidth - mainP.width).coerceAtLeast(0))
+        } else {
+            constraints
+        }
+        val emojiP = subcompose("emoji") {
+            Text(
+                emoji,
+                style = MaterialTheme.typography.titleLarge,
+                onTextLayout = { lr ->
+                    emojiBase = lr.getLineBaseline(0)
+                    emojiInk = inkBottomBelowBaseline(lr)
+                }
+            )
+        }.first().measure(emojiConstraints)
+
+        val g = gap.roundToPx()
+        val width = mainP.width + g + emojiP.width
+
+        // 目标：两边墨水底同高。main 墨水底（相对 main 顶）= mb + mi；
+        // emoji 摆在 yEmoji 时其墨水底 = yEmoji + eb + ei。令二者相等解出 yEmoji。
+        val yEmoji = when {
+            !mb.isNaN() && !mi.isNaN() && !eb.isNaN() && !ei.isNaN() ->
+                ((mb + mi) - (eb + ei)).roundToInt()
+            !mb.isNaN() && !eb.isNaN() ->
+                (mb - eb).roundToInt()                       // 退化 1：基线对齐
+            else ->
+                mainP.height - emojiP.height                 // 退化 2：框底对齐
+        }
+
+        val height = maxOf(mainP.height, yEmoji + emojiP.height)
+        layout(width, height) {
+            mainP.placeRelative(0, 0)
+            emojiP.placeRelative(mainP.width + g, yEmoji)
+        }
+    }
+}
 
 /**
  * 状态条取值（优先级从高到低）：
