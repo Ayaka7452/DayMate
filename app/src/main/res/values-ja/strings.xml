@@ -621,6 +621,10 @@
     <string name="form_days_preview">%1$s に設定します</string>
     <string name="form_days_calc_plus">今日 + %1$d 日</string>
     <string name="form_days_calc_minus">今日 − %1$d 日</string>
+    <string name="form_days_calc_plus_m">今日 + %1$d か月</string>
+    <string name="form_days_calc_minus_m">今日 − %1$d か月</string>
+    <string name="form_days_calc_plus_y">今日 + %1$d 年</string>
+    <string name="form_days_calc_minus_y">今日 − %1$d 年</string>
     <string name="form_ref_row">基準値</string>
     <string name="form_not_set">未設定</string>
     <string name="form_ref_dialog_title">基準値を設定</string>

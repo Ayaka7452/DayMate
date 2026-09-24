@@ -621,6 +621,10 @@
     <string name="form_days_preview">將設定為 %1$s</string>
     <string name="form_days_calc_plus">今天 + %1$d 天</string>
     <string name="form_days_calc_minus">今天 − %1$d 天</string>
+    <string name="form_days_calc_plus_m">今天 + %1$d 個月</string>
+    <string name="form_days_calc_minus_m">今天 − %1$d 個月</string>
+    <string name="form_days_calc_plus_y">今天 + %1$d 年</string>
+    <string name="form_days_calc_minus_y">今天 − %1$d 年</string>
     <string name="form_ref_row">對照值</string>
     <string name="form_not_set">未設定</string>
     <string name="form_ref_dialog_title">設定對照值</string>

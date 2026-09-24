@@ -621,6 +621,10 @@
     <string name="form_days_preview">Will be set to %1$s</string>
     <string name="form_days_calc_plus">today + %1$d days</string>
     <string name="form_days_calc_minus">today − %1$d days</string>
+    <string name="form_days_calc_plus_m">today + %1$d months</string>
+    <string name="form_days_calc_minus_m">today − %1$d months</string>
+    <string name="form_days_calc_plus_y">today + %1$d years</string>
+    <string name="form_days_calc_minus_y">today − %1$d years</string>
     <string name="form_ref_row">Reference value</string>
     <string name="form_not_set">Not set</string>
     <string name="form_ref_dialog_title">Set reference value</string>

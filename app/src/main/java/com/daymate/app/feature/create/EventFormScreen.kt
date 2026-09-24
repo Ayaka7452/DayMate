@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,8 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -30,6 +31,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -48,6 +50,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
@@ -98,6 +101,8 @@ fun EventFormScreen(
     var showByDaysDialog by remember { mutableStateOf(false) }
     var showUnitDialog by remember { mutableStateOf(false) }
     var showRefDialog by remember { mutableStateOf(false) }
+    // 更多设置默认折叠；从节日卡片点进（预置跟随节日）时自动展开，让用户看到节日绑定
+    var moreExpanded by remember { mutableStateOf(prefillFestival != null) }
     var festivalOptions by remember { mutableStateOf<List<com.ayaka7452.daymate.data.festival.FestivalDay>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
@@ -113,8 +118,12 @@ fun EventFormScreen(
                 repeatRule = e.repeatRule
                 linkedFestival = e.linkedFestival
                 folderIdSel = e.folderId
-                // 跟随节日的事件不用 repeatRule（节日锚定优先），加载时归零保持数据一致
-                if (e.linkedFestival != null) repeatRule = null
+                // 跟随节日的事件不用 repeatRule（节日锚定优先），加载时归零保持数据一致；
+                // 编辑已有节日绑定的事件时自动展开「更多设置」，否则绑定状态被折叠藏住
+                if (e.linkedFestival != null) {
+                    repeatRule = null
+                    moreExpanded = true
+                }
             }
         }
     }
@@ -125,6 +134,43 @@ fun EventFormScreen(
         CountdownCalculator.UNIT_MONTH -> Tr.s(R.string.form_unit_months)
         CountdownCalculator.UNIT_YEAR -> Tr.s(R.string.form_unit_years)
         else -> Tr.s(R.string.form_unit_days)
+    }
+
+    // 保存：顶栏右侧实心按钮触发；必须等写库完成后再关闭页面，否则 Activity 可能在
+    // insert 提交前就被 finish，Room 失效通知尚未发出，返回首页时列表读到的仍是旧快照
+    val onSave: () -> Unit = {
+        scope.launch {
+            val noteValue = note.takeIf { it.isNotBlank() }
+            val refValue = refDaysText.toIntOrNull()?.takeIf { it > 0 }
+            if (isEdit) {
+                container.eventRepository.update(
+                    loaded!!.copy(
+                        title = title.ifBlank { Tr.s(R.string.event_unnamed) },
+                        note = noteValue,
+                        targetDateEpochDay = epochDay,
+                        refDays = refValue,
+                        displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
+                        repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
+                        linkedFestival = linkedFestival,
+                        folderId = folderIdSel
+                    )
+                )
+            } else {
+                container.eventRepository.add(
+                    EventEntity(
+                        title = title.ifBlank { Tr.s(R.string.event_unnamed) },
+                        note = noteValue,
+                        targetDateEpochDay = epochDay,
+                        refDays = refValue,
+                        displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
+                        repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
+                        linkedFestival = linkedFestival,
+                        folderId = folderIdSel
+                    )
+                )
+            }
+            onBack()
+        }
     }
 
     val datePickerState = rememberDatePickerState()
@@ -143,6 +189,15 @@ fun EventFormScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Tr.s(R.string.common_back))
                     }
+                },
+                actions = {
+                    Button(
+                        onClick = onSave,
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        modifier = Modifier.padding(end = 6.dp)
+                    ) {
+                        Text(Tr.s(R.string.common_save))
+                    }
                 }
             )
         }
@@ -152,9 +207,9 @@ fun EventFormScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // ===== 卡片 1：基本信息 =====
+            // ===== 卡片 1：基本信息（含所在文件夹——归属是基本设置，不收进更多设置） =====
             FormCard {
                 Text(
                     Tr.s(R.string.form_section_basic),
@@ -180,9 +235,29 @@ fun EventFormScreen(
                     maxLines = 5,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(4.dp))
+                // ---- 所在文件夹：基本设置，单独成行 ----
+                SettingRow(
+                    label = Tr.s(R.string.detail_folder),
+                    value = {
+                        val currentFolder = folders.firstOrNull { it.id == folderIdSel }
+                        Text(
+                            "${currentFolder?.icon ?: "📁"}  ${currentFolder?.name ?: Tr.s(R.string.event_root_space)}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    onClick = { showFolderPicker = true }
+                )
+                if (folders.isEmpty()) {
+                    Text(
+                        Tr.s(R.string.event_no_folder_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
 
             // ===== 卡片 2：时间 =====
             FormCard {
@@ -193,7 +268,7 @@ fun EventFormScreen(
                 )
                 Spacer(Modifier.height(10.dp))
 
-                // ---- 目标日期块：日期大字 + 状态 + 选日期 / 按天数 / 重置今天 ----
+                // ---- 目标日期块：日期大字 + 还剩X天（同行）+ 选日期 / 按天数 / 重置今天 ----
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.surface,
@@ -202,31 +277,35 @@ fun EventFormScreen(
                 ) {
                     Column(Modifier.padding(12.dp)) {
                         val date = LocalDate.ofEpochDay(epochDay)
-                        Text(
-                            date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd))),
-                            style = MaterialTheme.typography.titleLarge
-                        )
                         val diff = epochDay - LocalDate.now().toEpochDay()
-                        Text(
-                            when {
-                                diff > 0 -> Tr.s(R.string.unit_days_future, diff)
-                                diff == 0L -> Tr.s(R.string.common_today)
-                                else -> Tr.s(R.string.unit_days_past, -diff)
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd))),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                when {
+                                    diff > 0 -> Tr.s(R.string.unit_days_future, diff)
+                                    diff == 0L -> Tr.s(R.string.common_today)
+                                    else -> Tr.s(R.string.unit_days_past, -diff)
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
                         Spacer(Modifier.height(10.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = { showDatePicker = true },
                                 modifier = Modifier.weight(1f)
                             ) { Text(Tr.s(R.string.form_pick_date)) }
-                            TextButton(
+                            Button(
                                 onClick = { showByDaysDialog = true },
                                 modifier = Modifier.weight(1f)
                             ) { Text(Tr.s(R.string.form_by_days)) }
-                            TextButton(
+                            OutlinedButton(
                                 onClick = { showResetConfirm = true },
                                 modifier = Modifier.weight(1f)
                             ) { Text(Tr.s(R.string.event_reset_today)) }
@@ -234,7 +313,7 @@ fun EventFormScreen(
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
 
                 // ---- 重复：跟随节日时不可选（节日每年日期不同，锚定优先） ----
                 Text(Tr.s(R.string.repeat_label), style = MaterialTheme.typography.labelMedium)
@@ -280,153 +359,105 @@ fun EventFormScreen(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
+            }
 
-                Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
 
-                // ---- 跟随节日：行式入口，ⓘ 气泡解释功能含义 ----
+            // ===== 卡片 3：更多设置（默认折叠，点击展开；只收纳低频项） =====
+            FormCard {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            // 打开弹窗时加载可快选的节日：跨年取各节日下一次日期，
-                            // 数据源还没发布新年份的（如明年春节）按「+1年」预估并标注「约」
-                            festivalOptions = container.festivalRepository.pickerFestivals(LocalDate.now())
-                            showFestivalDialog = true
-                        }
-                        .padding(vertical = 6.dp),
+                        .clickable { moreExpanded = !moreExpanded }
+                        .padding(vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(Tr.s(R.string.form_festival_row), style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.width(4.dp))
-                    InfoHint(Tr.s(R.string.form_festival_info))
+                    Text(
+                        Tr.s(R.string.form_section_more),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "›",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.rotate(if (moreExpanded) 90f else 0f)
+                    )
                     Spacer(Modifier.weight(1f))
                     Text(
-                        linkedFestival?.let {
+                        if (moreExpanded) "" else linkedFestival?.let {
                             com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(it)
-                        } ?: Tr.s(R.string.form_not_set),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (linkedFestival != null) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        } ?: refUnitLabel.takeIf { displayUnit != CountdownCalculator.UNIT_DAY } ?: "",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        maxLines = 1
                     )
-                    Spacer(Modifier.width(4.dp))
-                    Text("›", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
                 }
-                if (linkedFestival != null) {
+                if (moreExpanded) {
+                    Spacer(Modifier.height(4.dp))
+                    // ---- 跟随节日：行式入口；ⓘ 气泡后跟「取消跟随」内联操作，压缩纵向空间 ----
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // 打开弹窗时加载可快选的节日：跨年取各节日下一次日期，
+                                // 数据源还没发布新年份的（如明年春节）按「+1年」预估并标注「约」
+                                festivalOptions = container.festivalRepository.pickerFestivals(LocalDate.now())
+                                showFestivalDialog = true
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TextButton(onClick = { linkedFestival = null }) {
+                        Text(Tr.s(R.string.form_festival_row), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(4.dp))
+                        InfoHint(Tr.s(R.string.form_festival_info))
+                        if (linkedFestival != null) {
+                            Spacer(Modifier.width(8.dp))
                             Text(
                                 Tr.s(
                                     R.string.event_unfollow,
                                     com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linkedFestival.orEmpty())
-                                )
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable { linkedFestival = null }
                             )
                         }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            // ===== 卡片 3：更多设置（低频项收纳） =====
-            FormCard {
-                Text(
-                    Tr.s(R.string.form_section_more),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.height(4.dp))
-
-                // ---- 所在文件夹 ----
-                SettingRow(
-                    label = Tr.s(R.string.detail_folder),
-                    value = {
-                        val currentFolder = folders.firstOrNull { it.id == folderIdSel }
+                        Spacer(Modifier.weight(1f))
                         Text(
-                            "${currentFolder?.icon ?: "📁"}  ${currentFolder?.name ?: Tr.s(R.string.event_root_space)}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    onClick = { showFolderPicker = true }
-                )
-                if (folders.isEmpty()) {
-                    Text(
-                        Tr.s(R.string.event_no_folder_hint),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-
-                // ---- 倒计时显示单位 ----
-                SettingRow(
-                    label = Tr.s(R.string.event_display_unit),
-                    value = { Text(refUnitLabel, style = MaterialTheme.typography.bodyMedium) },
-                    onClick = { showUnitDialog = true }
-                )
-
-                // ---- 对照值（可选）：过期后卡片显示「已过 X/N」中的 N ----
-                SettingRow(
-                    label = Tr.s(R.string.form_ref_row),
-                    info = Tr.s(R.string.form_ref_info),
-                    value = {
-                        val refValue = refDaysText.toIntOrNull()?.takeIf { it > 0 }
-                        Text(
-                            if (refValue != null) "$refValue $refUnitLabel" else Tr.s(R.string.form_not_set),
+                            linkedFestival?.let {
+                                com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(it)
+                            } ?: Tr.s(R.string.form_not_set),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (refValue != null) MaterialTheme.colorScheme.primary
+                            color = if (linkedFestival != null) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
-                    },
-                    onClick = { showRefDialog = true }
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    scope.launch {
-                        val noteValue = note.takeIf { it.isNotBlank() }
-                        val refValue = refDaysText.toIntOrNull()?.takeIf { it > 0 }
-                        if (isEdit) {
-                            container.eventRepository.update(
-                                loaded!!.copy(
-                                    title = title.ifBlank { Tr.s(R.string.event_unnamed) },
-                                    note = noteValue,
-                                    targetDateEpochDay = epochDay,
-                                    refDays = refValue,
-                                    displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
-                                    repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
-                                    linkedFestival = linkedFestival,
-                                    folderId = folderIdSel
-                                )
-                            )
-                        } else {
-                            container.eventRepository.add(
-                                EventEntity(
-                                    title = title.ifBlank { Tr.s(R.string.event_unnamed) },
-                                    note = noteValue,
-                                    targetDateEpochDay = epochDay,
-                                    refDays = refValue,
-                                    displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
-                                    repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
-                                    linkedFestival = linkedFestival,
-                                    folderId = folderIdSel
-                                )
-                            )
-                        }
-                        // 必须等写库完成后再关闭页面，否则 Activity 可能在 insert 提交前就被
-                        // finish，Room 失效通知尚未发出，返回首页时列表读到的仍是旧快照（需再次操作才刷新）
-                        onBack()
+                        Spacer(Modifier.width(4.dp))
+                        Text("›", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(Tr.s(R.string.common_save))
+                    // ---- 倒计时显示单位 ----
+                    SettingRow(
+                        label = Tr.s(R.string.event_display_unit),
+                        value = { Text(refUnitLabel, style = MaterialTheme.typography.bodyMedium) },
+                        onClick = { showUnitDialog = true }
+                    )
+                    // ---- 对照值（可选）：过期后卡片显示「已过 X/N」中的 N ----
+                    SettingRow(
+                        label = Tr.s(R.string.form_ref_row),
+                        info = Tr.s(R.string.form_ref_info),
+                        value = {
+                            val refValue = refDaysText.toIntOrNull()?.takeIf { it > 0 }
+                            Text(
+                                if (refValue != null) "$refValue $refUnitLabel" else Tr.s(R.string.form_not_set),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (refValue != null) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        },
+                        onClick = { showRefDialog = true }
+                    )
+                }
             }
         }
     }
@@ -453,12 +484,13 @@ fun EventFormScreen(
         }
     }
 
-    // ---- 按天数设置：输 N 天 + 剩余(今天+N)/已过(今天-N)，默认剩余，实时预览 ----
+    // ---- 按天数设置：输 N + 单位（天/月/年，默认跟随显示单位、可手动切）+ 剩余/已过，实时预览 ----
     if (showByDaysDialog) {
         var byDaysText by remember { mutableStateOf("") }
         var byElapsed by remember { mutableStateOf(false) }
+        var byUnit by remember { mutableStateOf(displayUnit) }
         val days = byDaysText.toIntOrNull()?.takeIf { it > 0 }
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showByDaysDialog = false },
             title = { Text(Tr.s(R.string.form_by_days_title)) },
             text = {
@@ -485,9 +517,34 @@ fun EventFormScreen(
                             label = { Text(Tr.s(R.string.form_days_elapsed)) }
                         )
                     }
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(8.dp))
+                    // ---- 单位切换：默认与显示单位一致；即便显示单位是年，也仍可切回按天设置 ----
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("7", "30", "100", "365").forEach { preset ->
+                        FilterChip(
+                            selected = byUnit == CountdownCalculator.UNIT_DAY,
+                            onClick = { byUnit = CountdownCalculator.UNIT_DAY },
+                            label = { Text(Tr.s(R.string.form_unit_days)) }
+                        )
+                        FilterChip(
+                            selected = byUnit == CountdownCalculator.UNIT_MONTH,
+                            onClick = { byUnit = CountdownCalculator.UNIT_MONTH },
+                            label = { Text(Tr.s(R.string.form_unit_months)) }
+                        )
+                        FilterChip(
+                            selected = byUnit == CountdownCalculator.UNIT_YEAR,
+                            onClick = { byUnit = CountdownCalculator.UNIT_YEAR },
+                            label = { Text(Tr.s(R.string.form_unit_years)) }
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    // 快捷键随单位变化：天 7/30/100/365，月 1/3/6/12，年 1/5/10
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val presets = when (byUnit) {
+                            CountdownCalculator.UNIT_MONTH -> listOf("1", "3", "6", "12")
+                            CountdownCalculator.UNIT_YEAR -> listOf("1", "5", "10")
+                            else -> listOf("7", "30", "100", "365")
+                        }
+                        presets.forEach { preset ->
                             FilterChip(
                                 selected = byDaysText == preset,
                                 onClick = { byDaysText = preset },
@@ -497,7 +554,13 @@ fun EventFormScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                     if (days != null) {
-                        val target = LocalDate.now().plusDays(if (byElapsed) -days.toLong() else days.toLong())
+                        val now = LocalDate.now()
+                        val signed = if (byElapsed) -days.toLong() else days.toLong()
+                        val target = when (byUnit) {
+                            CountdownCalculator.UNIT_MONTH -> now.plusMonths(signed)
+                            CountdownCalculator.UNIT_YEAR -> now.plusYears(signed)
+                            else -> now.plusDays(signed)
+                        }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
@@ -512,8 +575,14 @@ fun EventFormScreen(
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
-                                    if (byElapsed) Tr.s(R.string.form_days_calc_minus, days)
-                                    else Tr.s(R.string.form_days_calc_plus, days),
+                                    when {
+                                        byUnit == CountdownCalculator.UNIT_MONTH && byElapsed -> Tr.s(R.string.form_days_calc_minus_m, days)
+                                        byUnit == CountdownCalculator.UNIT_MONTH -> Tr.s(R.string.form_days_calc_plus_m, days)
+                                        byUnit == CountdownCalculator.UNIT_YEAR && byElapsed -> Tr.s(R.string.form_days_calc_minus_y, days)
+                                        byUnit == CountdownCalculator.UNIT_YEAR -> Tr.s(R.string.form_days_calc_plus_y, days)
+                                        byElapsed -> Tr.s(R.string.form_days_calc_minus, days)
+                                        else -> Tr.s(R.string.form_days_calc_plus, days)
+                                    },
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
@@ -527,7 +596,12 @@ fun EventFormScreen(
                     enabled = days != null,
                     onClick = {
                         days?.let { d ->
-                            epochDay = LocalDate.now().plusDays(if (byElapsed) -d.toLong() else d.toLong()).toEpochDay()
+                            val signed = if (byElapsed) -d.toLong() else d.toLong()
+                            epochDay = when (byUnit) {
+                                CountdownCalculator.UNIT_MONTH -> LocalDate.now().plusMonths(signed)
+                                CountdownCalculator.UNIT_YEAR -> LocalDate.now().plusYears(signed)
+                                else -> LocalDate.now().plusDays(signed)
+                            }.toEpochDay()
                         }
                         showByDaysDialog = false
                     }
@@ -541,7 +615,7 @@ fun EventFormScreen(
 
     // ---- 显示单位：单选对话框 ----
     if (showUnitDialog) {
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showUnitDialog = false },
             title = { Text(Tr.s(R.string.form_unit_dialog_title)) },
             text = {
@@ -583,7 +657,7 @@ fun EventFormScreen(
     // ---- 对照值：数字输入对话框（可清除） ----
     if (showRefDialog) {
         var refDraft by remember { mutableStateOf(refDaysText) }
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showRefDialog = false },
             title = { Text(Tr.s(R.string.form_ref_dialog_title)) },
             text = {
@@ -617,7 +691,7 @@ fun EventFormScreen(
 
     if (showResetConfirm) {
         val current = LocalDate.ofEpochDay(epochDay)
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showResetConfirm = false },
             title = { Text(Tr.s(R.string.event_reset_title)) },
             text = {
@@ -668,7 +742,7 @@ fun EventFormScreen(
     }
 
     if (showFestivalDialog) {
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showFestivalDialog = false },
             title = { Text(Tr.s(R.string.event_follow_festival_title)) },
             text = {
@@ -754,7 +828,7 @@ private fun FormCard(content: @Composable () -> Unit) {
     }
 }
 
-/** 「更多设置」卡内的通用设置行：左标签（可带 ⓘ），右值 + ›，整行可点。 */
+/** 设置行：左标签（可带 ⓘ），右值 + ›，整行可点。 */
 @Composable
 private fun SettingRow(
     label: String,

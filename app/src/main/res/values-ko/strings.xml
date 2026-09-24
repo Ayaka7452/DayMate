@@ -621,6 +621,10 @@
     <string name="form_days_preview">%1$s 로 설정됨</string>
     <string name="form_days_calc_plus">오늘 + %1$d일</string>
     <string name="form_days_calc_minus">오늘 − %1$d일</string>
+    <string name="form_days_calc_plus_m">오늘 + %1$d개월</string>
+    <string name="form_days_calc_minus_m">오늘 − %1$d개월</string>
+    <string name="form_days_calc_plus_y">오늘 + %1$d년</string>
+    <string name="form_days_calc_minus_y">오늘 − %1$d년</string>
     <string name="form_ref_row">기준값</string>
     <string name="form_not_set">미설정</string>
     <string name="form_ref_dialog_title">기준값 설정</string>
