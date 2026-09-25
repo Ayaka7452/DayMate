@@ -55,6 +55,16 @@
     <string name="home_view_list">목록</string>
     <string name="home_view_medium">보통 아이콘</string>
     <string name="home_view_large">큰 아이콘</string>
+    <string name="settings_grid_spacing">아이콘 모드 간격</string>
+    <string name="settings_grid_spacing_desc">홈의 보통 아이콘 및 큰 아이콘 보기에서 타일 사이의 간격 너비입니다.</string>
+    <string name="settings_grid_dialog_title">간격 설정</string>
+    <string name="settings_grid_preset_compact">좁게</string>
+    <string name="settings_grid_preset_default">기본</string>
+    <string name="settings_grid_preset_relaxed">넓게</string>
+    <string name="settings_grid_preset_extra">아주 넓게</string>
+    <string name="settings_grid_custom">사용자 지정</string>
+    <string name="settings_grid_custom_desc">범위: 0–24 dp</string>
+    <string name="settings_grid_dp_value">%1$d dp</string>
     <string name="home_batch_manage">일괄 관리</string>
     <string name="home_cycle_tracker">사이클 관리</string>
     <string name="home_vault">Vault</string>

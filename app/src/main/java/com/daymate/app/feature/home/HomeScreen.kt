@@ -343,6 +343,17 @@ fun HomeScreen(
     val homeViewMode by container.settingsRepository.homeViewMode
         .collectAsState(initial = homeViewModeInit)
 
+    // 图标模式方块间隔：同款就近同步预载（冷启动首帧即真实值，避免 8dp 默认值的间隔跳动）。
+    val gridSpacingInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.homeGridSpacing.first()
+            }
+        }.getOrDefault(SettingsRepository.GRID_SPACING_DEFAULT)
+    }
+    val gridSpacing by container.settingsRepository.homeGridSpacing
+        .collectAsState(initial = gridSpacingInit)
+
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
@@ -911,6 +922,7 @@ fun HomeScreen(
                 else -> {
                 val isLarge = mode == SettingsRepository.VIEW_MODE_LARGE
                 val columns = if (isLarge) GridCells.Fixed(2) else GridCells.Fixed(3)
+                val gridSpacingDp = gridSpacing.dp
                 LazyVerticalGrid(
                     columns = columns,
                     state = gridState,
@@ -921,8 +933,8 @@ fun HomeScreen(
                         top = (if (hasHeader) 0.dp else padding.calculateTopPadding()) + 4.dp,
                         bottom = padding.calculateBottomPadding() + 80.dp
                     ),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(gridSpacingDp),
+                    verticalArrangement = Arrangement.spacedBy(gridSpacingDp)
                 ) {
                     items(folderList, key = { "f${it.id}" }) { folder ->
                         val count = allEvents.count { it.folderId == folder.id }

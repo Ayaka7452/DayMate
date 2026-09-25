@@ -55,6 +55,16 @@
     <string name="home_view_list">List</string>
     <string name="home_view_medium">Medium icons</string>
     <string name="home_view_large">Large icons</string>
+    <string name="settings_grid_spacing">Icon grid spacing</string>
+    <string name="settings_grid_spacing_desc">Spacing between tiles in the medium and large icon views on the home screen.</string>
+    <string name="settings_grid_dialog_title">Set spacing</string>
+    <string name="settings_grid_preset_compact">Compact</string>
+    <string name="settings_grid_preset_default">Default</string>
+    <string name="settings_grid_preset_relaxed">Relaxed</string>
+    <string name="settings_grid_preset_extra">Extra wide</string>
+    <string name="settings_grid_custom">Custom</string>
+    <string name="settings_grid_custom_desc">Range: 0–24 dp</string>
+    <string name="settings_grid_dp_value">%1$d dp</string>
     <string name="home_batch_manage">Batch manage</string>
     <string name="home_cycle_tracker">Cycle Tracker</string>
     <string name="home_vault">Vault</string>

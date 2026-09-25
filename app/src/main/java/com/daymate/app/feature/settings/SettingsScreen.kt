@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -57,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.AppContainer
@@ -66,6 +68,7 @@ import com.ayaka7452.daymate.core.i18n.LocaleWrap
 import com.ayaka7452.daymate.core.i18n.Tr
 import com.ayaka7452.daymate.core.update.UpdateCheckResult
 import com.ayaka7452.daymate.core.update.UpdateChecker
+import com.ayaka7452.daymate.data.repo.SettingsRepository
 import com.ayaka7452.daymate.core.update.UpdateInfo
 import com.ayaka7452.daymate.core.update.UpdatePrompt
 import com.ayaka7452.daymate.data.festival.FestivalRegion
@@ -127,6 +130,12 @@ fun SettingsScreen(
     var festivalOffsetDraft by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var autoUpdateCurrent by remember { mutableStateOf(festivalRepo.autoUpdateCurrent()) }
     var showBadgeEmojiDialog by remember { mutableStateOf(false) }
+
+    // ===== 图标模式方块间隔 =====
+    // 中图标(3列)/大图标(2列)网格的方块间距；预设在对话框里选，也支持手填 0–24 dp。
+    val gridSpacing by container.settingsRepository.homeGridSpacing
+        .collectAsState(initial = SettingsRepository.GRID_SPACING_DEFAULT)
+    var showGridSpacingDialog by remember { mutableStateOf(false) }
 
     // ===== 检查更新 =====
     // 默认开启（启动时按 24h 节流查一次，有新版本弹窗）；关掉后不发起任何请求，
@@ -371,6 +380,32 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
+            // ===== 图标模式方块间隔（中/大图标视图网格间距） =====
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showGridSpacingDialog = true }
+                    .padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_grid_spacing), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.settings_grid_spacing_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Text(
+                    stringResource(R.string.settings_grid_dp_value, gridSpacing),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             Spacer(Modifier.padding(vertical = 8.dp))
@@ -966,6 +1001,110 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { closeRegionDialog() }) {
                     Text(Tr.s(R.string.common_cancel))
+                }
+            }
+        )
+    }
+
+    // 图标模式方块间隔弹窗：预设四档（含当前默认 8dp）+ 自定义 0–24 dp。
+    // 预设选中即改选中态，按「确定」统一落盘；自定义走数字键盘，非法输入在 supportingText 位置标红不关窗。
+    if (showGridSpacingDialog) {
+        val presets = listOf(
+            4 to R.string.settings_grid_preset_compact,
+            8 to R.string.settings_grid_preset_default,
+            12 to R.string.settings_grid_preset_relaxed,
+            16 to R.string.settings_grid_preset_extra
+        )
+        val presetValues = presets.map { it.first }
+        // 打开时：当前值命中预设 → 该预设选中；否则落在自定义
+        var selectedPreset by remember(showGridSpacingDialog) {
+            mutableStateOf(if (gridSpacing in presetValues) gridSpacing else null)
+        }
+        var customSelected by remember(showGridSpacingDialog) {
+            mutableStateOf(gridSpacing !in presetValues)
+        }
+        var customText by remember(showGridSpacingDialog) { mutableStateOf(gridSpacing.toString()) }
+        var inputError by remember(showGridSpacingDialog) { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { showGridSpacingDialog = false },
+            title = { Text(stringResource(R.string.settings_grid_dialog_title)) },
+            text = {
+                Column {
+                    presets.forEach { (dp, labelRes) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedPreset = dp
+                                    customSelected = false
+                                    inputError = false
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = !customSelected && selectedPreset == dp,
+                                onClick = {
+                                    selectedPreset = dp
+                                    customSelected = false
+                                    inputError = false
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                stringResource(R.string.settings_grid_dp_value, dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { customSelected = true },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = customSelected, onClick = { customSelected = true })
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_grid_custom), style = MaterialTheme.typography.bodyLarge)
+                    }
+                    if (customSelected) {
+                        OutlinedTextField(
+                            value = customText,
+                            onValueChange = {
+                                customText = it.filter { ch -> ch.isDigit() }.take(2)
+                                inputError = false
+                            },
+                            singleLine = true,
+                            isError = inputError,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            supportingText = { Text(stringResource(R.string.settings_grid_custom_desc)) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val value = if (customSelected) {
+                        customText.toIntOrNull()?.takeIf {
+                            it in SettingsRepository.GRID_SPACING_MIN..SettingsRepository.GRID_SPACING_MAX
+                        }
+                    } else {
+                        selectedPreset
+                    }
+                    if (value == null) {
+                        inputError = true
+                    } else {
+                        scope.launch { container.settingsRepository.setHomeGridSpacing(value) }
+                        showGridSpacingDialog = false
+                    }
+                }) { Text(stringResource(R.string.common_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGridSpacingDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )

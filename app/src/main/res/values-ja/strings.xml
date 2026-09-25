@@ -55,6 +55,16 @@
     <string name="home_view_list">リスト</string>
     <string name="home_view_medium">中アイコン</string>
     <string name="home_view_large">大アイコン</string>
+    <string name="settings_grid_spacing">アイコンモードの間隔</string>
+    <string name="settings_grid_spacing_desc">ホームの中アイコン・大アイコン表示で、タイル同士の間隔の広さ。</string>
+    <string name="settings_grid_dialog_title">間隔を設定</string>
+    <string name="settings_grid_preset_compact">狭め</string>
+    <string name="settings_grid_preset_default">標準</string>
+    <string name="settings_grid_preset_relaxed">広め</string>
+    <string name="settings_grid_preset_extra">とても広い</string>
+    <string name="settings_grid_custom">カスタム</string>
+    <string name="settings_grid_custom_desc">範囲: 0～24 dp</string>
+    <string name="settings_grid_dp_value">%1$d dp</string>
     <string name="home_batch_manage">一括管理</string>
     <string name="home_cycle_tracker">サイクル管理</string>
     <string name="home_vault">Vault</string>
