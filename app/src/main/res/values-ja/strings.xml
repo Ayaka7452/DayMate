@@ -163,7 +163,7 @@
     <string name="settings_scanning">確認中…</string>
     <string name="settings_repairing">修復中…</string>
     <string name="settings_check_db">データベースを確認</string>
-    <string name="settings_check_desc">整合性、断片化、フィールドの使用状況、冗長データを確認し、何も変更しません。問題がある場合は、システムが修復方法を提示します</string>
+    <string name="settings_check_desc">データベースの整合性、断片化、フィールドの使用状況、冗長データを確認し、何も変更しません。問題がある場合は、システムが修復方法を提示します。</string>
     <string name="settings_issues_fixable">修復可能な問題が見つかりました</string>
     <string name="settings_issues_anomaly">異常なデータが見つかりました</string>
     <string name="settings_not_fixed">以下は修復されません：</string>
@@ -624,13 +624,13 @@
     <string name="form_days_calc_minus_m">今日 − %1$d か月</string>
     <string name="form_days_calc_plus_y">今日 + %1$d 年</string>
     <string name="form_days_calc_minus_y">今日 − %1$d 年</string>
-    <string name="form_ref_row">基準値</string>
+    <string name="form_ref_row">基準日</string>
     <string name="form_not_set">未設定</string>
-    <string name="form_ref_dialog_title">基準値を設定</string>
+    <string name="form_ref_dialog_title">基準日を設定</string>
     <string name="form_ref_clear">クリア</string>
     <string name="form_unit_dialog_title">表示単位</string>
-    <string name="form_ref_info">目標日を過ぎるとカードに「経過 X/N」と表示されます。N はここで入力した値で、単位は表示単位（日/月/年）に従います。必須項目ではありません。</string>
-    <string name="form_festival_info">祝日に連動させると、目標日はその祝日の次の日付に自動的に固定されます（旧暦の祝日は毎年変わります）。過ぎたら次回へ自動更新され、連動中は「繰り返し」は無効になります。</string>
+    <string name="form_ref_info">有効にすると、現在のカウントダウンの横に比較用の日数が表示されます。</string>
+    <string name="form_festival_info">祝日に連動させると、日付が毎年変わっても、毎年自動的にその祝日までのカウントダウンになります。</string>
     <string name="form_festival_row">祝日に連動</string>
     <string name="event_unnamed">無題のイベント</string>
     <string name="event_reset_title">目標日をリセット</string>

@@ -163,7 +163,7 @@
     <string name="settings_scanning">Checking…</string>
     <string name="settings_repairing">Repairing…</string>
     <string name="settings_check_db">Check Database</string>
-    <string name="settings_check_desc">Checks integrity, fragmentation, field usage, and redundant data, does not modify anything. If any issues are found, the system will offer a repair plan</string>
+    <string name="settings_check_desc">Checks database integrity, fragmentation, field usage and redundant data without modifying anything. If issues exist, the system offers repair options.</string>
     <string name="settings_issues_fixable">Fixable issues found</string>
     <string name="settings_issues_anomaly">Anomalous data found</string>
     <string name="settings_not_fixed">The following will not be fixed:</string>
@@ -624,13 +624,13 @@
     <string name="form_days_calc_minus_m">today − %1$d months</string>
     <string name="form_days_calc_plus_y">today + %1$d years</string>
     <string name="form_days_calc_minus_y">today − %1$d years</string>
-    <string name="form_ref_row">Reference value</string>
+    <string name="form_ref_row">Reference date</string>
     <string name="form_not_set">Not set</string>
-    <string name="form_ref_dialog_title">Set reference value</string>
+    <string name="form_ref_dialog_title">Set reference date</string>
     <string name="form_ref_clear">Clear</string>
     <string name="form_unit_dialog_title">Countdown unit</string>
-    <string name="form_ref_info">If the target date has passed, the card shows \"elapsed X/N\", where N is the value entered here and the unit follows the countdown unit (days/months/years). Not required.</string>
-    <string name="form_festival_info">When following a holiday, the target date is pinned to that holiday\'s next occurrence (e.g. Lunar New Year changes every year). After it passes, it rolls to the next one automatically; repeat rules do not apply while following.</string>
+    <string name="form_ref_info">When enabled, the reference days are shown next to the current countdown days, for comparison while counting down.</string>
+    <string name="form_festival_info">Once you follow a holiday, the countdown to it updates automatically every year, even though the holiday may fall on a different date each year.</string>
     <string name="form_festival_row">Follow holiday</string>
     <string name="event_unnamed">Untitled event</string>
     <string name="event_reset_title">Reset target date</string>

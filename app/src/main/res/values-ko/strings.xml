@@ -163,7 +163,7 @@
     <string name="settings_scanning">확인 중…</string>
     <string name="settings_repairing">복원 중…</string>
     <string name="settings_check_db">데이터베이스 확인</string>
-    <string name="settings_check_desc">무결성, 단편화, 필드 사용 현황, 중복 데이터를 확인하며 아무것도 수정하지 않습니다. 오류가 있으면 시스템이 복구 방법을 제안합니다</string>
+    <string name="settings_check_desc">데이터베이스 무결성, 단편화, 필드 사용 현황, 중복 데이터를 확인하며 아무것도 수정하지 않습니다. 오류가 있으면 시스템이 복구 방법을 제안합니다.</string>
     <string name="settings_issues_fixable">수정 가능한 문제 발견</string>
     <string name="settings_issues_anomaly">비정상 데이터 발견</string>
     <string name="settings_not_fixed">다음 항목은 수정되지 않습니다:</string>
@@ -624,13 +624,13 @@
     <string name="form_days_calc_minus_m">오늘 − %1$d개월</string>
     <string name="form_days_calc_plus_y">오늘 + %1$d년</string>
     <string name="form_days_calc_minus_y">오늘 − %1$d년</string>
-    <string name="form_ref_row">기준값</string>
+    <string name="form_ref_row">기준일</string>
     <string name="form_not_set">미설정</string>
-    <string name="form_ref_dialog_title">기준값 설정</string>
+    <string name="form_ref_dialog_title">기준일 설정</string>
     <string name="form_ref_clear">지우기</string>
     <string name="form_unit_dialog_title">표시 단위</string>
-    <string name="form_ref_info">목표일이 지나면 카드에 \"경과 X/N\"으로 표시됩니다. N은 여기에 입력한 값이며 단위는 표시 단위(일/월/년)를 따릅니다. 필수 항목이 아닙니다.</string>
-    <string name="form_festival_info">공휴일을 따라가면 목표일이 해당 공휴일의 다음 날짜로 자동 고정됩니다(음력 공휴일은 매년 다름). 지나면 자동으로 다음 회차로 넘어가며, 그동안 \"반복\"은 적용되지 않습니다.</string>
+    <string name="form_ref_info">사용하면 현재 카운트다운 옆에 비교용 일수가 표시되어 카운트다운 시 참고할 수 있습니다.</string>
+    <string name="form_festival_info">공휴일을 선택하면 날짜가 매년 달라지더라도 매년 해당 공휴일까지 자동으로 카운트다운됩니다.</string>
     <string name="form_festival_row">공휴일 따라가기</string>
     <string name="event_unnamed">제목 없는 이벤트</string>
     <string name="event_reset_title">목표일 초기화</string>

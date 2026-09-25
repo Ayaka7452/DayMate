@@ -163,7 +163,7 @@
     <string name="settings_scanning">正在檢查…</string>
     <string name="settings_repairing">正在修復…</string>
     <string name="settings_check_db">檢查資料庫</string>
-    <string name="settings_check_desc">檢查完整性、碎片、欄位使用同冗餘資料，唔會修改任何內容。如果有錯誤，系統會提供修復方案</string>
+    <string name="settings_check_desc">檢查資料庫完整性、碎片、欄位使用同冗餘資料，唔會修改任何內容。如果有錯誤，系統會提供修復方案。</string>
     <string name="settings_issues_fixable">發現可以修復嘅問題</string>
     <string name="settings_issues_anomaly">發現異常資料</string>
     <string name="settings_not_fixed">以下項目唔會被修復：</string>
@@ -624,13 +624,13 @@
     <string name="form_days_calc_minus_m">今日 − %1$d 個月</string>
     <string name="form_days_calc_plus_y">今日 + %1$d 年</string>
     <string name="form_days_calc_minus_y">今日 − %1$d 年</string>
-    <string name="form_ref_row">對照值</string>
+    <string name="form_ref_row">對照日期</string>
     <string name="form_not_set">未設定</string>
-    <string name="form_ref_dialog_title">設定對照值</string>
+    <string name="form_ref_dialog_title">設定對照日期</string>
     <string name="form_ref_clear">清除</string>
     <string name="form_unit_dialog_title">顯示單位</string>
-    <string name="form_ref_info">目標日期過咗之後，卡片會顯示「已過 X/N」，N 就係呢度填嘅數值，單位跟隨顯示單位（日/月/年）。唔係必填項。</string>
-    <string name="form_festival_info">跟住假期之後，目標日期自動錨定到嗰個假期嘅下一次日期（好似春節年年唔同）；過咗之後自動跳去下一次，期間「重複」唔生效。</string>
+    <string name="form_ref_info">開啟對照日期之後，會喺目前倒數日數旁邊顯示對照日數，倒數時可以用嚟對照。</string>
+    <string name="form_festival_info">跟隨節日之後，每年會自動倒數該節日，就算該節日每年可能處於唔同嘅日期。</string>
     <string name="form_festival_row">跟住假期</string>
     <string name="event_unnamed">未改名事件</string>
     <string name="event_reset_title">重設目標日期</string>
