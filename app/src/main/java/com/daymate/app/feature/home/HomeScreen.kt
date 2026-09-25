@@ -930,7 +930,10 @@ fun HomeScreen(
                     contentPadding = PaddingValues(
                         start = 12.dp,
                         end = 12.dp,
-                        top = (if (hasHeader) 0.dp else padding.calculateTopPadding()) + 4.dp,
+                        // 顶部卡片与第一行方块的间距也跟随间隔设置：卡片自身 bottom padding 4dp，
+                        // 网格补足剩余（gridSpacing−4，最小 0）——默认 8dp 时恰为原来的 4dp，零变化
+                        top = (if (hasHeader) 0.dp else padding.calculateTopPadding()) +
+                            (gridSpacing - 4).coerceAtLeast(0).dp,
                         bottom = padding.calculateBottomPadding() + 80.dp
                     ),
                     horizontalArrangement = Arrangement.spacedBy(gridSpacingDp),
