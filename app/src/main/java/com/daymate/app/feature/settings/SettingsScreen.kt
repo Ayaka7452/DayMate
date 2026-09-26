@@ -915,40 +915,24 @@ fun SettingsScreen(
                     }
                 )
             }
+            // 查看 / 导出 / 清除：三个文字按钮并排居中（TextButton 文字即主题蓝）
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showDiagViewer = true }
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.Center
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_diag_view), style = MaterialTheme.typography.bodyLarge)
+                TextButton(onClick = { showDiagViewer = true }) {
+                    Text(stringResource(R.string.settings_diag_view))
                 }
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { exportDiagLog(ctx) }
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_diag_export), style = MaterialTheme.typography.bodyLarge)
+                TextButton(onClick = { exportDiagLog(ctx) }) {
+                    Text(stringResource(R.string.settings_diag_export))
                 }
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        AppLogger.clear(ctx)
-                        Toast.makeText(ctx, R.string.settings_diag_cleared, Toast.LENGTH_SHORT).show()
-                    }
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_diag_clear), style = MaterialTheme.typography.bodyLarge)
+                TextButton(onClick = {
+                    AppLogger.clear(ctx)
+                    Toast.makeText(ctx, R.string.settings_diag_cleared, Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(stringResource(R.string.settings_diag_clear))
                 }
             }
 
