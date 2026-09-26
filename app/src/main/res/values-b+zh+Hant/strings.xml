@@ -761,6 +761,7 @@
     <string name="unit_years_past">已過 %1$d 年</string>
     <string name="unit_days_past_ref">已過 %1$d/%2$d 天</string>
     <string name="unit_holiday_day_n">假期第 %1$d 天</string>
+    <string name="detail_holiday_remaining">剩餘 %1$d 天</string>
     <string name="storage_state_unset">未設定</string>
     <string name="cycle_default_event_title">週期管家</string>
     <string name="settings_lang_auto">自動偵測</string>

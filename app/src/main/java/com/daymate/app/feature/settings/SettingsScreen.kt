@@ -382,10 +382,7 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
-            HorizontalDivider()
-
-            // ===== 图标模式方块间隔（中/大图标视图网格间距） =====
+            // ===== 图标模式方块间隔（中/大图标视图网格间距，属主题分组） =====
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

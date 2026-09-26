@@ -761,6 +761,7 @@
     <string name="unit_years_past">%1$d년 지남</string>
     <string name="unit_days_past_ref">%1$d/%2$d일 지남</string>
     <string name="unit_holiday_day_n">연휴 %1$d일째</string>
+    <string name="detail_holiday_remaining">연휴 %1$d일 남음</string>
     <string name="storage_state_unset">설정 안 됨</string>
     <string name="cycle_default_event_title">사이클 관리</string>
     <string name="settings_lang_auto">자동</string>

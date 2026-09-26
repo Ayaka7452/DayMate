@@ -64,6 +64,9 @@ fun EventDetailScreen(
         .collectAsState(initial = null)
     val folders by remember { container.folderRepository.observeAll() }
         .collectAsState(initial = emptyList())
+    // 假期显示总长开关：开启时假期段内详情 caption 附加「· 剩余X天」（剩余含今天，与节日卡同口径）
+    val showSpanTotal by remember { container.settingsRepository.holidaySpanTotal }
+        .collectAsState(initial = false)
     // 一次性存在性检查：查不到（或已在回收站）直接退出，避免停留在空详情页
     var exists by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(eventId) {
@@ -99,6 +102,7 @@ fun EventDetailScreen(
                     e,
                     f?.let { "${it.icon ?: "📁"} ${it.name}" },
                     festivalRepo = container.festivalRepository,
+                    showSpanTotal = showSpanTotal,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -126,6 +130,7 @@ private fun DetailContent(
     e: EventEntity,
     folderLabel: String?,
     festivalRepo: FestivalRepository? = null,
+    showSpanTotal: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -156,7 +161,11 @@ private fun DetailContent(
             e.linkedFestival?.takeIf { it.isNotBlank() }
                 ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
         }
-        val cd = countdownDisplay(e, holidayDayN)
+        // 「假期显示总长」开启时附假期剩余天数（含今天口径，与节日卡一致）；仅剩最后一天（=1）时不附加
+        val holidayRemaining = remember(holidayDayN, showSpanTotal, LocalDate.now().toEpochDay()) {
+            if (holidayDayN != null && showSpanTotal) festivalRepo?.offDayRemainingLength(LocalDate.now()) else null
+        }
+        val cd = countdownDisplay(e, holidayDayN, holidayRemaining)
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -249,13 +258,24 @@ private fun refUnitLabel(unit: String?): String = when (unit) {
 /** 详情页大数字：按显示单位取整数，不足一个单位时逐级退回（与 formatCountdown 规则一致）。 */
 private data class CountdownDisplay(val number: String, val unit: String, val caption: String)
 
-private fun countdownDisplay(e: EventEntity, holidayDayN: Int? = null): CountdownDisplay {
-    // 假期段内（跟随节日）：大数字即假期第几天，caption 同文案（不显示「今天/已过去」）
+private fun countdownDisplay(
+    e: EventEntity,
+    holidayDayN: Int? = null,
+    holidayRemaining: Int? = null
+): CountdownDisplay {
+    // 假期段内（跟随节日）：大数字即假期第几天，caption 同文案（不显示「今天/已过去」）；
+    // 「假期显示总长」开启且假期还有多于 1 天时，附加「· 剩余X天」
     if (holidayDayN != null) {
+        val cap = if (holidayRemaining != null && holidayRemaining > 1) {
+            Tr.s(R.string.unit_holiday_day_n, holidayDayN) + " · " +
+                Tr.s(R.string.detail_holiday_remaining, holidayRemaining)
+        } else {
+            Tr.s(R.string.unit_holiday_day_n, holidayDayN)
+        }
         return CountdownDisplay(
             number = "$holidayDayN",
             unit = Tr.s(R.string.unit_days),
-            caption = Tr.s(R.string.unit_holiday_day_n, holidayDayN)
+            caption = cap
         )
     }
     val today = LocalDate.now()
