@@ -167,6 +167,11 @@
     <string name="settings_repair_done_snapshot">복원 완료: 스냅샷 daymate.db.bak 저장 및 백업에 동기화됨</string>
     <string name="settings_repair_done">복원 완료, 백업에 동기화됨</string>
     <string name="settings_repair_failed">복원 실패: %1$s</string>
+    <string name="settings_widget_section">위젯</string>
+    <string name="settings_widget_log">위젯 진단 로그</string>
+    <string name="settings_widget_log_desc">위젯 추가 및 갱신 과정을 기록하여 문제 진단에 도움을 줍니다. 로그는 기기에만 저장됩니다.</string>
+    <string name="settings_widget_log_export">로그 내보내기</string>
+    <string name="settings_widget_log_empty">내보낼 로그가 아직 없습니다</string>
     <string name="settings_maintenance_section">데이터 유지 관리</string>
     <string name="settings_maintenance_desc">데이터베이스 무결성과 중복 데이터를 확인합니다.</string>
     <string name="settings_check_ok">확인 완료, 문제 없음</string>

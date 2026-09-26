@@ -167,6 +167,11 @@
     <string name="settings_repair_done_snapshot">修復完了: スナップショット daymate.db.bak を保存し、バックアップに同期しました</string>
     <string name="settings_repair_done">修復完了、バックアップに同期しました</string>
     <string name="settings_repair_failed">修復失敗: %1$s</string>
+    <string name="settings_widget_section">ウィジェット</string>
+    <string name="settings_widget_log">ウィジェット診断ログ</string>
+    <string name="settings_widget_log_desc">ウィジェットの追加・更新過程を記録し、問題の診断に役立てます。ログは端末内にのみ保存されます。</string>
+    <string name="settings_widget_log_export">ログをエクスポート</string>
+    <string name="settings_widget_log_empty">エクスポートできるログはまだありません</string>
     <string name="settings_maintenance_section">データメンテナンス</string>
     <string name="settings_maintenance_desc">データベースの整合性と冗長データを確認します。</string>
     <string name="settings_check_ok">確認完了、問題は見つかりませんでした</string>

@@ -78,9 +78,12 @@ import com.ayaka7452.daymate.feature.common.EmojiPicker
 import com.ayaka7452.daymate.feature.common.UpdateAvailableDialog
 import com.ayaka7452.daymate.feature.common.rememberUpdateStarter
 import com.ayaka7452.daymate.feature.setup.StorageSetupBody
+import com.ayaka7452.daymate.widget.WidgetLogger
 import com.ayaka7452.daymate.widget.WidgetRenderer
 import kotlinx.coroutines.launch
+import android.content.Intent
 import android.widget.Toast
+import androidx.core.content.FileProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -801,6 +804,50 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
+            // ===== 小组件诊断日志：排查特定桌面（如 OriginOS）无法添加小组件的问题 =====
+            Text(
+                stringResource(R.string.settings_widget_section),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            var widgetLogEnabled by remember { mutableStateOf(WidgetLogger.isEnabled(ctx)) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_widget_log), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.settings_widget_log_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = widgetLogEnabled,
+                    onCheckedChange = { enabled ->
+                        WidgetLogger.setEnabled(ctx, enabled)
+                        widgetLogEnabled = enabled
+                    }
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { exportWidgetLog(ctx) }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_widget_log_export), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
             // ===== 数据维护（体检 + 无损修复 + 回收碎片，完成后同步各备份点） =====
             DataMaintenanceSection(container = container)
 
@@ -1357,6 +1404,26 @@ private fun WidgetEventOption(
                 color = MaterialTheme.colorScheme.outline
             )
         }
+    }
+}
+
+/** 导出小组件诊断日志：走系统分享（文本文件，无存储权限），日志不存在或为空时提示。 */
+private fun exportWidgetLog(ctx: android.content.Context) {
+    runCatching {
+        val f = WidgetLogger.logFile(ctx)
+        if (!f.exists() || f.length() == 0L) {
+            Toast.makeText(ctx, R.string.settings_widget_log_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", f)
+        val share = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        ctx.startActivity(Intent.createChooser(share, ctx.getString(R.string.settings_widget_log_export)))
+    }.onFailure {
+        Toast.makeText(ctx, R.string.settings_widget_log_empty, Toast.LENGTH_SHORT).show()
     }
 }
 

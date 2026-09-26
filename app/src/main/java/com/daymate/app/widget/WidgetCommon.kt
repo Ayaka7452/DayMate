@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.util.Log
 import android.widget.RemoteViews
 import com.ayaka7452.daymate.DayMateApp
 import com.ayaka7452.daymate.MainActivity
@@ -18,10 +19,65 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.Period
 import java.time.format.DateTimeFormatter
+import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
+
+/**
+ * 小组件诊断日志：记录小组件「添加（配置页）→ 渲染 → 刷新」全链路，用于排查
+ * 特定厂商桌面（如 OriginOS）上「无法添加小组件」的问题。
+ *  - 默认开启；设置页可关闭、可导出（FileProvider 分享文本）；
+ *  - 日志仅写应用私有目录 filesDir/widget_log/widget_log.txt，不联网不上传；
+ *  - 超 512KB 自动轮转为 widget_log.old.txt（最多保留一份），不会无限增长；
+ *  - 开关存 SharedPreferences（与 WidgetPrefs 同文件）：widget 渲染路径要无阻塞读取，
+ *    不走 DataStore；写入全程 runCatching，日志任何异常都不影响小组件本身。
+ */
+object WidgetLogger {
+    private const val KEY_ENABLED = "widget_log_enabled"
+    private const val DIR = "widget_log"
+    private const val FILE = "widget_log.txt"
+    private const val MAX_BYTES = 512L * 1024
+
+    private fun prefs(ctx: Context) =
+        ctx.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
+
+    fun isEnabled(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_ENABLED, true)
+
+    fun setEnabled(ctx: Context, enabled: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_ENABLED, enabled).apply()
+        log(ctx, "Logger", if (enabled) "日志已开启" else "日志已关闭")
+    }
+
+    fun logFile(ctx: Context): File = File(ctx.filesDir, "$DIR/$FILE")
+
+    /** 追加一行日志（自动带时间戳）。任何异常吞掉，绝不影响调用方。 */
+    fun log(ctx: Context, tag: String, message: String) {
+        runCatching {
+            if (!isEnabled(ctx)) return
+            val dir = File(ctx.filesDir, DIR)
+            if (!dir.exists()) dir.mkdirs()
+            val f = logFile(ctx)
+            if (f.length() > MAX_BYTES) {
+                val old = File(dir, "widget_log.old.txt")
+                if (old.exists()) old.delete()
+                f.renameTo(old)
+            }
+            val ts = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
+            FileWriter(f, true).use { it.write("$ts [$tag] $message\n") }
+        }
+    }
+
+    fun logError(ctx: Context, tag: String, message: String, t: Throwable? = null) {
+        val st = t?.let { Log.getStackTraceString(it) }.orEmpty()
+        log(ctx, tag, if (st.isEmpty()) message else "$message\n  $st")
+    }
+}
 
 /**
  * 小组件偏好（SharedPreferences，供 Widget 进程同步读取）。
@@ -133,6 +189,8 @@ object WidgetRenderer {
                     val ids = manager.getAppWidgetIds(ComponentName(appContext, cls))
                     if (ids.isNotEmpty()) renderAll(appContext, manager, ids, style)
                 }
+            }.onFailure {
+                WidgetLogger.logError(appContext, "Renderer", "refreshAll 全量刷新异常", it)
             }
         }
     }
@@ -143,19 +201,34 @@ object WidgetRenderer {
     }
 
     suspend fun renderOne(context: Context, manager: AppWidgetManager, appWidgetId: Int, style: Style) {
-        val container = (context.applicationContext as? DayMateApp)?.container ?: return
+        WidgetLogger.log(context, "Renderer", "renderOne id=$appWidgetId style=$style")
+        val container = (context.applicationContext as? DayMateApp)?.container ?: run {
+            WidgetLogger.log(context, "Renderer", "renderOne id=$appWidgetId 容器未就绪，跳过")
+            return
+        }
         val pair = buildViewsForWidget(context, container, appWidgetId, style)
         manager.updateAppWidget(appWidgetId, pair.first)
         if (pair.second) manager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_list)
     }
 
     suspend fun renderAll(context: Context, manager: AppWidgetManager, ids: IntArray, style: Style) {
-        val container = (context.applicationContext as? DayMateApp)?.container ?: return
-        for (id in ids) {
-            val pair = buildViewsForWidget(context, container, id, style)
-            manager.updateAppWidget(id, pair.first)
-            if (pair.second) manager.notifyAppWidgetViewDataChanged(id, R.id.widget_list)
+        WidgetLogger.log(context, "Renderer", "renderAll style=$style ids=${ids.joinToString()}")
+        val container = (context.applicationContext as? DayMateApp)?.container ?: run {
+            WidgetLogger.log(context, "Renderer", "renderAll 容器未就绪，跳过")
+            return
         }
+        for (id in ids) {
+            try {
+                val pair = buildViewsForWidget(context, container, id, style)
+                manager.updateAppWidget(id, pair.first)
+                if (pair.second) manager.notifyAppWidgetViewDataChanged(id, R.id.widget_list)
+            } catch (t: Throwable) {
+                // 单个小组件渲染失败不影响其余实例——记录后继续（系统在特定桌面可能对
+                // RemoteViews 的某些操作抛异常，这正是诊断日志要抓的东西）
+                WidgetLogger.logError(context, "Renderer", "render id=$id style=$style 异常", t)
+            }
+        }
+        WidgetLogger.log(context, "Renderer", "renderAll 完成 style=$style 共 ${ids.size} 个")
     }
 
     /**

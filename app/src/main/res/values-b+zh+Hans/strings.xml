@@ -167,6 +167,11 @@
     <string name="settings_repair_done_snapshot">修复完成：已留快照 daymate.db.bak，并同步到备份</string>
     <string name="settings_repair_done">修复完成，已同步到备份</string>
     <string name="settings_repair_failed">修复失败：%1$s</string>
+    <string name="settings_widget_section">小组件</string>
+    <string name="settings_widget_log">小组件诊断日志</string>
+    <string name="settings_widget_log_desc">记录小组件的添加与刷新过程，便于排查问题。日志仅保存在本机。</string>
+    <string name="settings_widget_log_export">导出日志</string>
+    <string name="settings_widget_log_empty">暂无日志可导出</string>
     <string name="settings_maintenance_section">数据维护</string>
     <string name="settings_maintenance_desc">检查数据库完整性与冗余数据。</string>
     <string name="settings_check_ok">检查完成，未发现问题</string>

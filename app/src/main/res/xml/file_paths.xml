@@ -9,4 +9,6 @@
     <external-files-path name="update_ext" path="update/" />
     <!-- 回退：外部私有目录不可用时用 filesDir/update -->
     <files-path name="update_int" path="update/" />
+    <!-- 小组件诊断日志导出（filesDir/widget_log/） -->
+    <files-path name="widget_log" path="widget_log/" />
 </paths>

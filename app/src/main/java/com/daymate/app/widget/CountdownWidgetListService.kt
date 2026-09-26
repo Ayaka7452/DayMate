@@ -18,8 +18,10 @@ import kotlin.math.abs
  */
 class CountdownWidgetListService : RemoteViewsService() {
 
-    override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
-        ListFactory(applicationContext)
+    override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
+        WidgetLogger.log(this, "ListService", "onGetViewFactory")
+        return ListFactory(applicationContext)
+    }
 
     class ListFactory(private val context: Context) : RemoteViewsFactory {
 
@@ -28,16 +30,28 @@ class CountdownWidgetListService : RemoteViewsService() {
         private val rows = mutableListOf<Row>()
         private var empty = false
 
-        override fun onCreate() {}
+        override fun onCreate() {
+            WidgetLogger.log(context, "ListService", "factory onCreate")
+        }
 
         override fun onDataSetChanged() {
+            WidgetLogger.log(context, "ListService", "onDataSetChanged 开始")
             rows.clear()
             empty = false
-            val container = (context.applicationContext as? DayMateApp)?.container ?: run { empty = true; return }
+            val container = (context.applicationContext as? DayMateApp)?.container ?: run {
+                WidgetLogger.log(context, "ListService", "onDataSetChanged 容器未就绪，显示空态")
+                empty = true
+                return
+            }
+            try {
             val events = runCatching {
                 runBlocking { container.eventRepository.observeAll().first() }
-            }.getOrDefault(emptyList())
+            }.getOrElse { t ->
+                WidgetLogger.logError(context, "ListService", "onDataSetChanged 读取事件异常", t)
+                emptyList()
+            }
             if (events.isEmpty()) {
+                WidgetLogger.log(context, "ListService", "onDataSetChanged 无事件，显示空态")
                 empty = true
                 return
             }
@@ -61,15 +75,31 @@ class CountdownWidgetListService : RemoteViewsService() {
                         )
                     )
                 }
+            WidgetLogger.log(context, "ListService", "onDataSetChanged 完成，共 ${rows.size} 行")
+            } catch (t: Throwable) {
+                WidgetLogger.logError(context, "ListService", "onDataSetChanged 异常", t)
+                rows.clear()
+                empty = true
+            }
         }
 
         override fun onDestroy() {
+            WidgetLogger.log(context, "ListService", "factory onDestroy")
             rows.clear()
         }
 
         override fun getCount(): Int = if (empty) 0 else rows.size
 
         override fun getViewAt(position: Int): RemoteViews {
+            return try {
+                buildRowView(position)
+            } catch (t: Throwable) {
+                WidgetLogger.logError(context, "ListService", "getViewAt position=$position 异常", t)
+                RemoteViews(context.packageName, R.layout.widget_list_row)
+            }
+        }
+
+        private fun buildRowView(position: Int): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_list_row)
             val dark = (context.resources.configuration.uiMode and
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==

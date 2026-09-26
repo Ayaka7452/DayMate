@@ -167,6 +167,11 @@
     <string name="settings_repair_done_snapshot">修復完成：已留快照 daymate.db.bak，並同步到備份</string>
     <string name="settings_repair_done">修復完成，已同步到備份</string>
     <string name="settings_repair_failed">修復失敗：%1$s</string>
+    <string name="settings_widget_section">小工具</string>
+    <string name="settings_widget_log">小工具診斷日誌</string>
+    <string name="settings_widget_log_desc">記錄小工具的新增與更新過程，方便排查問題。日誌僅會儲存在本機。</string>
+    <string name="settings_widget_log_export">匯出日誌</string>
+    <string name="settings_widget_log_empty">尚無日誌可匯出</string>
     <string name="settings_maintenance_section">資料維護</string>
     <string name="settings_maintenance_desc">檢查資料庫完整性與冗餘資料。</string>
     <string name="settings_check_ok">檢查完成，未發現問題</string>
