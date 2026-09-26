@@ -915,23 +915,32 @@ fun SettingsScreen(
                     }
                 )
             }
-            // 查看 / 导出 / 清除：三个文字按钮并排居中（TextButton 文字即主题蓝）
+            // 查看 / 导出 / 清除：三枚等宽文字按钮铺满整行（各 1/3 + 间距，蓝字居中）
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.Center
+                    .padding(top = 6.dp, bottom = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TextButton(onClick = { showDiagViewer = true }) {
+                TextButton(
+                    onClick = { showDiagViewer = true },
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(stringResource(R.string.settings_diag_view))
                 }
-                TextButton(onClick = { exportDiagLog(ctx) }) {
+                TextButton(
+                    onClick = { exportDiagLog(ctx) },
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(stringResource(R.string.settings_diag_export))
                 }
-                TextButton(onClick = {
-                    AppLogger.clear(ctx)
-                    Toast.makeText(ctx, R.string.settings_diag_cleared, Toast.LENGTH_SHORT).show()
-                }) {
+                TextButton(
+                    onClick = {
+                        AppLogger.clear(ctx)
+                        Toast.makeText(ctx, R.string.settings_diag_cleared, Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(stringResource(R.string.settings_diag_clear))
                 }
             }
