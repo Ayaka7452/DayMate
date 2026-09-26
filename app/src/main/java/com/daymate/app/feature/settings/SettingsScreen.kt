@@ -78,7 +78,7 @@ import com.ayaka7452.daymate.feature.common.EmojiPicker
 import com.ayaka7452.daymate.feature.common.UpdateAvailableDialog
 import com.ayaka7452.daymate.feature.common.rememberUpdateStarter
 import com.ayaka7452.daymate.feature.setup.StorageSetupBody
-import com.ayaka7452.daymate.widget.WidgetLogger
+import com.ayaka7452.daymate.core.log.AppLogger
 import com.ayaka7452.daymate.widget.WidgetRenderer
 import kotlinx.coroutines.launch
 import android.content.Intent
@@ -152,6 +152,9 @@ fun SettingsScreen(
     /** 手动检查发现的新版本 → 复用主页那套更新弹窗。 */
     var updateFound by remember { mutableStateOf<UpdateInfo?>(null) }
     val startUpdate = rememberUpdateStarter()
+
+    // ===== 诊断日志（app 内查看弹窗） =====
+    var showDiagViewer by remember { mutableStateOf(false) }
 
     // 节日数据变更信号（切源 / 下载完成 / 启动时自动补下都会 +1）：在这台页面上重新读一次
     // 源名与缓存状态。没有它，切完区域自动下载完成后这里仍显示「未下载」，直到退出重进。
@@ -804,50 +807,6 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
-            // ===== 小组件诊断日志：排查特定桌面（如 OriginOS）无法添加小组件的问题 =====
-            Text(
-                stringResource(R.string.settings_widget_section),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-            var widgetLogEnabled by remember { mutableStateOf(WidgetLogger.isEnabled(ctx)) }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_widget_log), style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        stringResource(R.string.settings_widget_log_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Switch(
-                    checked = widgetLogEnabled,
-                    onCheckedChange = { enabled ->
-                        WidgetLogger.setEnabled(ctx, enabled)
-                        widgetLogEnabled = enabled
-                    }
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { exportWidgetLog(ctx) }
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_widget_log_export), style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-
-            Spacer(Modifier.padding(vertical = 8.dp))
-            HorizontalDivider()
-
             // ===== 数据维护（体检 + 无损修复 + 回收碎片，完成后同步各备份点） =====
             DataMaintenanceSection(container = container)
 
@@ -924,6 +883,75 @@ fun SettingsScreen(
                 }
             }
 
+            // ===== 诊断日志（检查更新之下）：全 app 关键操作链路，仅本机，新用户默认关 =====
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
+            Text(
+                stringResource(R.string.settings_diag_section),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            var diagEnabled by remember { mutableStateOf(AppLogger.isEnabled(ctx)) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_diag_log), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.settings_diag_log_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = diagEnabled,
+                    onCheckedChange = { enabled ->
+                        AppLogger.setEnabled(ctx, enabled)
+                        diagEnabled = enabled
+                    }
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDiagViewer = true }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_diag_view), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { exportDiagLog(ctx) }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_diag_export), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        AppLogger.clear(ctx)
+                        Toast.makeText(ctx, R.string.settings_diag_cleared, Toast.LENGTH_SHORT).show()
+                    }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_diag_clear), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
@@ -952,6 +980,43 @@ fun SettingsScreen(
                 startUpdate(info)
             },
             onLater = { updateFound = null }
+        )
+    }
+
+    // 诊断日志 app 内查看：只显示尾部若干行（完整内容走导出），等宽字体便于对时间线
+    if (showDiagViewer) {
+        val (text, truncated) = remember { AppLogger.readTail(ctx, maxLines = 800) }
+        AlertDialog(
+            onDismissRequest = { showDiagViewer = false },
+            title = { Text(stringResource(R.string.settings_diag_section)) },
+            text = {
+                Column {
+                    if (truncated) {
+                        Text(
+                            stringResource(R.string.settings_diag_truncated, 800),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text.ifBlank { stringResource(R.string.settings_diag_empty) },
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDiagViewer = false }) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            }
         )
     }
 
@@ -1407,12 +1472,12 @@ private fun WidgetEventOption(
     }
 }
 
-/** 导出小组件诊断日志：走系统分享（文本文件，无存储权限），日志不存在或为空时提示。 */
-private fun exportWidgetLog(ctx: android.content.Context) {
+/** 导出诊断日志：走系统分享（文本文件，无存储权限），日志不存在或为空时提示。 */
+private fun exportDiagLog(ctx: android.content.Context) {
     runCatching {
-        val f = WidgetLogger.logFile(ctx)
+        val f = AppLogger.logFile(ctx)
         if (!f.exists() || f.length() == 0L) {
-            Toast.makeText(ctx, R.string.settings_widget_log_empty, Toast.LENGTH_SHORT).show()
+            Toast.makeText(ctx, R.string.settings_diag_empty, Toast.LENGTH_SHORT).show()
             return
         }
         val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", f)
@@ -1421,9 +1486,9 @@ private fun exportWidgetLog(ctx: android.content.Context) {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        ctx.startActivity(Intent.createChooser(share, ctx.getString(R.string.settings_widget_log_export)))
+        ctx.startActivity(Intent.createChooser(share, ctx.getString(R.string.settings_diag_export)))
     }.onFailure {
-        Toast.makeText(ctx, R.string.settings_widget_log_empty, Toast.LENGTH_SHORT).show()
+        Toast.makeText(ctx, R.string.settings_diag_empty, Toast.LENGTH_SHORT).show()
     }
 }
 

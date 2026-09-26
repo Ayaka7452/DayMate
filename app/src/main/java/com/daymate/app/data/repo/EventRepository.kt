@@ -1,5 +1,6 @@
 package com.ayaka7452.daymate.data.repo
 
+import com.ayaka7452.daymate.core.log.AppLogger
 import com.ayaka7452.daymate.data.db.EventDao
 import com.ayaka7452.daymate.data.db.EventEntity
 import kotlinx.coroutines.flow.Flow
@@ -39,36 +40,64 @@ class EventRepository(
     fun observeById(id: Long): Flow<EventEntity?> = dao.observeById(id)
 
     suspend fun add(event: EventEntity): Long =
-        dao.insert(event).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.insert(event).also {
+            AppLogger.log("Data", "新增事件 id=$it")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun update(event: EventEntity) =
-        dao.update(event).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.update(event).also {
+            AppLogger.log("Data", "更新事件 id=${event.id}")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun delete(event: EventEntity) =
-        dao.delete(event).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.delete(event).also {
+            AppLogger.log("Data", "删除事件 id=${event.id}")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun deleteByIds(ids: List<Long>) =
-        dao.deleteByIds(ids).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.deleteByIds(ids).also {
+            AppLogger.log("Data", "删除事件 ids=$ids")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun countAll(): Int = dao.countAll()
 
     suspend fun softDeleteByIds(ids: List<Long>, ts: Long) =
-        dao.softDeleteByIds(ids, ts).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.softDeleteByIds(ids, ts).also {
+            AppLogger.log("Data", "移入回收站 ids=$ids")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun restoreByIds(ids: List<Long>) =
-        dao.restoreByIds(ids).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.restoreByIds(ids).also {
+            AppLogger.log("Data", "从回收站恢复 ids=$ids")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun unparentByFolders(folderIds: List<Long>) =
-        dao.unparentByFolders(folderIds).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.unparentByFolders(folderIds).also {
+            AppLogger.log("Data", "删除文件夹，事件解除关联 folderIds=$folderIds")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun restoreByFolders(folderIds: List<Long>) =
-        dao.restoreByFolders(folderIds).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.restoreByFolders(folderIds).also {
+            AppLogger.log("Data", "恢复文件夹事件 folderIds=$folderIds")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?) =
-        dao.moveToFolder(ids, folderId).also { onChanged(); refreshSignal.tryEmit(Unit) }
+        dao.moveToFolder(ids, folderId).also {
+            AppLogger.log("Data", "移动事件 ids=$ids → folderId=$folderId")
+            onChanged(); refreshSignal.tryEmit(Unit)
+        }
 
     suspend fun hardDeleteEventsByFolders(folderIds: List<Long>) {
         dao.hardDeleteEventsByFolders(folderIds)
+        AppLogger.log("Data", "彻底删除文件夹事件 folderIds=$folderIds")
         onChanged()
         refreshSignal.tryEmit(Unit)
     }

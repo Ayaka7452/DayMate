@@ -1,6 +1,7 @@
 package com.ayaka7452.daymate.core.update
 
 import android.content.Context
+import com.ayaka7452.daymate.core.log.AppLogger
 import com.ayaka7452.daymate.data.repo.SettingsRepository
 import kotlinx.coroutines.flow.first
 
@@ -42,6 +43,7 @@ object UpdatePrompt {
         val info = UpdateChecker.fetchLatest().getOrNull() ?: return null
         if (!UpdateChecker.isNewer(info.version, UpdateChecker.currentVersion(context))) return null
         if (info.version == settings.updateSkippedVersion()) return null
+        AppLogger.log("Update", "启动检查更新：发现新版本 v${info.version}")
         return info
     }
 
@@ -49,10 +51,18 @@ object UpdatePrompt {
     suspend fun checkNow(context: Context): UpdateCheckResult {
         val result = UpdateChecker.fetchLatest()
         val info = result.getOrNull()
-            ?: return if (result.isFailure) UpdateCheckResult.Failed else UpdateCheckResult.Latest
+            ?: return if (result.isFailure) {
+                AppLogger.log("Update", "手动检查更新失败：${result.exceptionOrNull()?.message ?: "未知错误"}")
+                UpdateCheckResult.Failed
+            } else {
+                AppLogger.log("Update", "手动检查更新：已是最新")
+                UpdateCheckResult.Latest
+            }
         return if (UpdateChecker.isNewer(info.version, UpdateChecker.currentVersion(context))) {
+            AppLogger.log("Update", "手动检查更新：发现新版本 v${info.version}")
             UpdateCheckResult.Available(info)
         } else {
+            AppLogger.log("Update", "手动检查更新：已是最新")
             UpdateCheckResult.Latest
         }
     }

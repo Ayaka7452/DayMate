@@ -2,6 +2,7 @@ package com.ayaka7452.daymate.core
 
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.core.log.AppLogger
 import android.content.Context
 import com.ayaka7452.daymate.data.db.DayMateDatabase
 import kotlinx.coroutines.Dispatchers
@@ -218,7 +219,12 @@ class DbRepair(
     )
 
     /** 只体检、不修改任何内容。 */
-    suspend fun diagnose(): Report = withContext(Dispatchers.IO) { buildReport() }
+    suspend fun diagnose(): Report = withContext(Dispatchers.IO) {
+        AppLogger.log("Maintain", "数据库体检开始")
+        val report = buildReport()
+        AppLogger.log("Maintain", "数据库体检完成 可修复=${report.hasFixableIssues}")
+        report
+    }
 
     /**
      * 执行无损修复：留快照 → 修复无效引用与异常时间戳 → VACUUM 回收 → 同步各备份点。
@@ -228,6 +234,7 @@ class DbRepair(
      *   [RepairResult.snapshotCreated] 为 false）。
      */
     suspend fun repair(createSnapshot: Boolean = true): RepairResult = withContext(Dispatchers.IO) {
+        AppLogger.log("Maintain", "数据库修复开始 snapshot=$createSnapshot")
         val before = buildReport()
         val d = db.openHelper.writableDatabase
         val mainDb = context.getDatabasePath("daymate.db")
@@ -286,6 +293,10 @@ class DbRepair(
         // 4) 同步各备份点（本地文件夹 + 云端，按「备份位置」三态分发）
         runCatching { autoBackup.flush() }
 
+        AppLogger.log(
+            "Maintain",
+            "数据库修复完成 ok=true snapshot=$snapshotCreated 悬空引用=$dangling 时间戳=$timestamps"
+        )
         RepairResult(
             ok = true,
             failureReason = null,

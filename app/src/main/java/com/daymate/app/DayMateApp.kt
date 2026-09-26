@@ -26,7 +26,14 @@ class DayMateApp : Application() {
         super.onCreate()
         // 必须最先执行：此后任何 Tr.s(...) 取词才拿得到「按设置语言包装过」的 Context
         com.ayaka7452.daymate.core.i18n.Tr.init(this)
+        // 诊断日志：绑定应用级 Context（此后仓库/网络层可无 Context 记日志）
+        com.ayaka7452.daymate.core.log.AppLogger.init(this)
         container = AppContainer(this)
+        com.ayaka7452.daymate.core.log.AppLogger.log(
+            "App",
+            "应用启动 v${com.ayaka7452.daymate.core.update.UpdateChecker.currentVersion(this)}" +
+                " Android ${android.os.Build.VERSION.SDK_INT} ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+        )
         migrateLegacyVault()
         installCrashHandler()
         // 一次性迁移：旧版全局的 widget 透明度/默认事件 → 按小组件实例各自保存
@@ -43,6 +50,7 @@ class DayMateApp : Application() {
                 if (festival.shouldAutoUpdateCurrent()) {
                     festival.markAutoTried()
                     if (festival.updateFromNetwork().success) {
+                        com.ayaka7452.daymate.core.log.AppLogger.log("Festival", "启动自动补下节假日数据成功，重锚定跟随事件")
                         container.eventRepository.reanchorFestivalEstimates(festival)
                         com.ayaka7452.daymate.widget.WidgetRenderer.refreshAll(this@DayMateApp)
                     }
@@ -182,6 +190,7 @@ class DayMateApp : Application() {
 
     /** 切换数据库存储位置后，关闭旧库并以新位置重建容器。 */
     fun rebuildContainer() {
+        com.ayaka7452.daymate.core.log.AppLogger.log("Storage", "切换数据库存储位置，重建数据库容器")
         runCatching { container.close() }
         container = AppContainer(this)
     }
@@ -195,6 +204,10 @@ class DayMateApp : Application() {
                 throwable.printStackTrace(PrintWriter(sw))
                 val trace = sw.toString()
                 Log.e("DayMateCrash", trace)
+                // 同步写一份进诊断日志（开关关闭时自动跳过）
+                com.ayaka7452.daymate.core.log.AppLogger.logError(
+                    this, "Crash", "未捕获异常 thread=${thread.name}", throwable
+                )
                 getExternalFilesDir(null)?.let { dir ->
                     runCatching {
                         File(dir, "daymate_crash.txt").writeText(

@@ -1,5 +1,6 @@
 package com.ayaka7452.daymate.core
 
+import com.ayaka7452.daymate.core.log.AppLogger
 import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.VaultEventEntity
 import com.ayaka7452.daymate.data.repo.EventRepository
@@ -15,7 +16,10 @@ class VaultBridge(
     private val vaultRepository: VaultRepository
 ) {
     suspend fun moveEventToVault(eventId: Long): Boolean {
-        val e = eventRepository.getById(eventId) ?: return false
+        val e = eventRepository.getById(eventId) ?: run {
+            AppLogger.log("Vault", "移入 Vault 失败：事件不存在 id=$eventId")
+            return false
+        }
         vaultRepository.add(
             VaultEventEntity(
                 title = e.title,
@@ -34,11 +38,15 @@ class VaultBridge(
             )
         )
         eventRepository.delete(e)
+        AppLogger.log("Vault", "事件移入 Vault id=$eventId")
         return true
     }
 
     suspend fun moveVaultEventToMain(vaultEventId: Long): Boolean {
-        val v = vaultRepository.getById(vaultEventId) ?: return false
+        val v = vaultRepository.getById(vaultEventId) ?: run {
+            AppLogger.log("Vault", "移出 Vault 失败：事件不存在 id=$vaultEventId")
+            return false
+        }
         eventRepository.add(
             EventEntity(
                 title = v.title,
@@ -57,6 +65,7 @@ class VaultBridge(
             )
         )
         vaultRepository.delete(v)
+        AppLogger.log("Vault", "事件移出 Vault id=$vaultEventId")
         return true
     }
 }

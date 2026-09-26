@@ -3,6 +3,7 @@ package com.ayaka7452.daymate.widget
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import com.ayaka7452.daymate.core.log.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -11,14 +12,14 @@ import kotlinx.coroutines.launch
 class CountdownWidgetSquareProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
-        WidgetLogger.log(context, "Square", "onUpdate ids=${appWidgetIds.joinToString()}")
+        AppLogger.log(context, "Square", "onUpdate ids=${appWidgetIds.joinToString()}")
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 WidgetRenderer.renderAll(context.applicationContext, manager, appWidgetIds, WidgetRenderer.Style.SQUARE)
-                WidgetLogger.log(context, "Square", "onUpdate 渲染完成")
+                AppLogger.log(context, "Square", "onUpdate 渲染完成")
             } catch (t: Throwable) {
-                WidgetLogger.logError(context, "Square", "onUpdate 渲染异常", t)
+                AppLogger.logError(context, "Square", "onUpdate 渲染异常", t)
             } finally {
                 pending.finish()
             }
@@ -26,7 +27,7 @@ class CountdownWidgetSquareProvider : AppWidgetProvider() {
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-        WidgetLogger.log(context, "Square", "onDeleted ids=${appWidgetIds.joinToString()}")
+        AppLogger.log(context, "Square", "onDeleted ids=${appWidgetIds.joinToString()}")
         appWidgetIds.forEach { WidgetPrefs.clearWidget(context, it) }
     }
 }

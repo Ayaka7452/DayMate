@@ -6,6 +6,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ayaka7452.daymate.core.cloud.CloudBackup
 import com.ayaka7452.daymate.core.cloud.WebDavConfig
 import com.ayaka7452.daymate.core.cloud.WebDavStore
+import com.ayaka7452.daymate.core.log.AppLogger
 import com.ayaka7452.daymate.data.db.DayMateDatabase
 import com.ayaka7452.daymate.data.repo.SettingsRepository
 import kotlinx.coroutines.CancellationException
@@ -166,11 +167,14 @@ class AutoBackupManager(
 
         if (localUri != null && localBackupAllowed(localUri)) {
             runCatching { StorageBackup.exportInternal(context, internalDb, localUri) }
+                .onSuccess { AppLogger.log("Backup", "本地自动备份完成 target=$target") }
+                .onFailure { AppLogger.logError("Backup", "本地自动备份失败", it) }
         }
         if (cloudCfg != null && cloudBackupAllowed(cloudCfg)) {
             _cloudState.value = CloudBackupState.Syncing
             try {
                 CloudBackup.upload(internalDb, cloudCfg)
+                AppLogger.log("Backup", "云端自动备份完成")
                 _cloudState.value = CloudBackupState.Success(System.currentTimeMillis())
                 // 勾停留片刻后回到常态；期间若又开始新一轮备份则不打扰（届时已是 Syncing）
                 scope.launch {
@@ -183,6 +187,7 @@ class AutoBackupManager(
                 throw ce
             } catch (t: Throwable) {
                 // 失败必须留痕：主页常驻红叉角标，直到下次成功或用户手动重试
+                AppLogger.logError("Backup", "云端自动备份失败", t)
                 _cloudState.value = CloudBackupState.Failure(
                     reason = t.message ?: t::class.java.simpleName,
                     at = System.currentTimeMillis()

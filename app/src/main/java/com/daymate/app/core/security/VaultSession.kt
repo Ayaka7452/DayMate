@@ -1,5 +1,6 @@
 package com.ayaka7452.daymate.core.security
 
+import com.ayaka7452.daymate.core.log.AppLogger
 import javax.crypto.SecretKey
 
 /**
@@ -19,9 +20,11 @@ object VaultSession {
 
     fun unlock(key: SecretKey) {
         _key = key
+        AppLogger.log("Vault", "Vault 解锁")
     }
 
     fun lock() {
         _key = null
+        AppLogger.log("Vault", "Vault 上锁")
     }
 }

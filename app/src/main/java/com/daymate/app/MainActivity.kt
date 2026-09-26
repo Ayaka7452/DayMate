@@ -32,6 +32,7 @@ class MainActivity : ComposeActivity() {
     private fun handleWidgetDeepLink(intent: Intent?) {
         val id = intent?.getLongExtra("eventId", -1L) ?: -1L
         if (id <= 0) return
+        com.ayaka7452.daymate.core.log.AppLogger.log("Main", "小组件深链打开事件 id=$id")
         // 周期管家快捷事件：深链直达功能页（与列表点击行为一致）
         val special = kotlinx.coroutines.runBlocking {
             runCatching { container.eventRepository.getById(id)?.specialType }.getOrNull()

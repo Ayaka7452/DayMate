@@ -3,6 +3,7 @@ package com.ayaka7452.daymate.data.festival
 import android.content.Context
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.core.log.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -514,6 +515,10 @@ class FestivalRepository(private val appContext: Context) {
             }
             // 下载完顺手清一次：年份滑走后旧缓存就没用了
             pruneOldCache()
+            AppLogger.log(
+                "Festival",
+                "节假日下载完成 key=$key 成功=${ok.sorted()} 未发布=${pending.sorted()} 失败=${fail.sorted()} 清残留=$removed"
+            )
             // removed 也要触发重读：清残留会改变「已缓存」年份列表，设置页得跟着刷新
             if (ok.isNotEmpty() || removed.isNotEmpty()) changed()
             FestivalUpdateResult(ok.sorted(), pending.sorted(), fail.sorted())

@@ -44,6 +44,7 @@ import com.ayaka7452.daymate.DayMateApp
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.core.log.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,7 +62,7 @@ class WidgetConfigActivity : ComposeActivity() {
         val appWidgetId = intent?.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
-        WidgetLogger.log(
+        AppLogger.log(
             this, "Config",
             "onCreate widgetId=$appWidgetId, device=${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, " +
                 "api=${android.os.Build.VERSION.SDK_INT}, launcher=" + runCatching {
@@ -71,7 +72,7 @@ class WidgetConfigActivity : ComposeActivity() {
                 }.getOrDefault("unknown")
         )
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            WidgetLogger.log(this, "Config", "onCreate 收到无效 widgetId，直接结束")
+            AppLogger.log(this, "Config", "onCreate 收到无效 widgetId，直接结束")
             finish()
             return
         }
@@ -80,17 +81,17 @@ class WidgetConfigActivity : ComposeActivity() {
 
         val container = (application as? DayMateApp)?.container
         if (container == null) {
-            WidgetLogger.logError(this, "Config", "onCreate Application 容器尚未初始化，直接结束")
+            AppLogger.logError(this, "Config", "onCreate Application 容器尚未初始化，直接结束")
             finish()
             return
         }
-        WidgetLogger.log(this, "Config", "配置页就绪，等待用户选择")
+        AppLogger.log(this, "Config", "配置页就绪，等待用户选择")
         setDayMateContent {
             WidgetConfigScreen(
                 container = container,
                 appWidgetId = appWidgetId,
                 onConfirm = { id ->
-                    WidgetLogger.log(this, "Config", "用户确认，widgetId=$id，回传 RESULT_OK")
+                    AppLogger.log(this, "Config", "用户确认，widgetId=$id，回传 RESULT_OK")
                     setResult(RESULT_OK, resultIntent(id))
                     CoroutineScope(Dispatchers.IO).launch {
                         runCatching {
@@ -101,15 +102,15 @@ class WidgetConfigActivity : ComposeActivity() {
                                 id,
                                 styleForWidgetId(id)
                             )
-                            WidgetLogger.log(this@WidgetConfigActivity, "Config", "确认后首次渲染完成 widgetId=$id")
+                            AppLogger.log(this@WidgetConfigActivity, "Config", "确认后首次渲染完成 widgetId=$id")
                         }.onFailure {
-                            WidgetLogger.logError(this@WidgetConfigActivity, "Config", "确认后首次渲染异常 widgetId=$id", it)
+                            AppLogger.logError(this@WidgetConfigActivity, "Config", "确认后首次渲染异常 widgetId=$id", it)
                         }
                     }
                     finish()
                 },
                 onCancel = {
-                    WidgetLogger.log(this, "Config", "用户取消，回传 RESULT_CANCELED")
+                    AppLogger.log(this, "Config", "用户取消，回传 RESULT_CANCELED")
                     setResult(RESULT_CANCELED, resultIntent(appWidgetId))
                     finish()
                 }

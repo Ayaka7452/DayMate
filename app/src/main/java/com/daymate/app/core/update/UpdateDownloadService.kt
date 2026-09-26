@@ -18,6 +18,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.FileProvider
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.core.log.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -131,6 +132,7 @@ class UpdateDownloadService : Service() {
         }
 
         ensureChannel(this)
+        AppLogger.log(this, "Update", "开始下载新版本 v$version")
         // 必须在 5 秒内进入前台，否则系统抛 ANR/崩溃；先挂一条 0% 的通知上去
         startForegroundCompat(buildProgressNotification(0, 0L, 0L, version))
 
@@ -191,9 +193,11 @@ class UpdateDownloadService : Service() {
                 part.copyTo(target, overwrite = true)
                 part.delete()
             }
+            AppLogger.log(this, "Update", "下载完成 v$version（${target.length()} 字节）")
             done(target, version)
         } catch (t: Throwable) {
             Log.w("DayMateUpdate", "download failed", t)
+            AppLogger.logError(this, "Update", "下载失败 v$version", t)
             runCatching { part.delete() }
             fail(version)
         }
@@ -201,6 +205,7 @@ class UpdateDownloadService : Service() {
 
     private fun done(apk: File, version: String) {
         val allowed = canInstall(this)
+        AppLogger.log(this, "Update", if (allowed) "已授权安装，拉起安装界面 v$version" else "未授权「安装未知应用」，等待用户授权 v$version")
         val tap = if (allowed) {
             PendingIntent.getActivity(
                 this, 0, installIntent(this, apk),
