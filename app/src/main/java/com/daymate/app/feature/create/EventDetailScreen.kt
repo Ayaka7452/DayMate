@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
+import com.ayaka7452.daymate.data.festival.FestivalRepository
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
@@ -94,7 +95,12 @@ fun EventDetailScreen(
             e != null -> {
                 // 用文件夹自己的 emoji（与主页/文件夹列表一致），缺省回落到默认文件夹图标
                 val f = folders.firstOrNull { it.id == e.folderId }
-                DetailContent(e, f?.let { "${it.icon ?: "📁"} ${it.name}" }, Modifier.padding(padding))
+                DetailContent(
+                    e,
+                    f?.let { "${it.icon ?: "📁"} ${it.name}" },
+                    festivalRepo = container.festivalRepository,
+                    modifier = Modifier.padding(padding)
+                )
             }
             exists == false -> Column(
                 modifier = Modifier
@@ -116,7 +122,12 @@ fun EventDetailScreen(
 
 @Composable
 // folderLabel 已带文件夹自己的 emoji（调用方拼好），此处不再补硬编码图标
-private fun DetailContent(e: EventEntity, folderLabel: String?, modifier: Modifier = Modifier) {
+private fun DetailContent(
+    e: EventEntity,
+    folderLabel: String?,
+    festivalRepo: FestivalRepository? = null,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -143,7 +154,7 @@ private fun DetailContent(e: EventEntity, folderLabel: String?, modifier: Modifi
         // 跟随节日的假期段内（如中秋、国庆连休中）覆盖为「假期第 x 天」口径
         val holidayDayN = remember(e.linkedFestival, LocalDate.now().toEpochDay()) {
             e.linkedFestival?.takeIf { it.isNotBlank() }
-                ?.let { container.festivalRepository.holidayDayIndexOf(it, LocalDate.now()) }
+                ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
         }
         val cd = countdownDisplay(e, holidayDayN)
         Column(
