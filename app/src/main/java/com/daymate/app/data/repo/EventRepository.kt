@@ -100,6 +100,11 @@ class EventRepository(
         if (festivalRepo != null) {
             for (e in dao.getFestivalLinkedPast(todayEpochDay)) {
                 val name = e.linkedFestival ?: continue
+                // 今天仍在该节日的假期段内时不滚动：数据源假期每天一条同名条目，
+                // 放行会把目标日期滚到假期内的当天，导致假期里天天显示 0 天。
+                // 假期内由显示层呈现「假期第 x 天」；假期结束后这里恢复放行，
+                // 锚定到数据源中该节日的下一次（明年）假期首日。
+                if (festivalRepo.holidayDayIndexOf(name, today) != null) continue
                 val next = festivalRepo.nextOccurrenceOf(name, today) ?: continue
                 if (next.toEpochDay() != e.targetDateEpochDay) {
                     dao.update(

@@ -98,6 +98,7 @@ import com.ayaka7452.daymate.core.CloudBackupState
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
+import com.ayaka7452.daymate.data.festival.FestivalRepository
 import com.ayaka7452.daymate.data.repo.SettingsRepository
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
@@ -117,6 +118,7 @@ import com.ayaka7452.daymate.core.i18n.Tr
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import android.widget.Toast
 import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
@@ -731,6 +733,7 @@ fun HomeScreen(
                         items(searchResults, key = { "e${it.id}" }) { event ->
                             EventRow(
                                 event = event,
+                                festivalRepo = festivalRepo,
                                 onClick = {
                                     if (event.specialType == "cycle") onNavigate("cycle")
                                     else onNavigate("event_detail?eventId=${event.id}")
@@ -892,6 +895,7 @@ fun HomeScreen(
                         } else null
                         EventRow(
                             event = event,
+                            festivalRepo = festivalRepo,
                             selectionMode = selectionMode,
                             selected = event.id in selectedEventIds,
                             onClick = {
@@ -966,6 +970,7 @@ fun HomeScreen(
                     items(displayEvents, key = { "e${it.id}" }) { event ->
                         EventGridItem(
                             event = event,
+                            festivalRepo = festivalRepo,
                             isLarge = isLarge,
                             selectionMode = selectionMode,
                             selected = event.id in selectedEventIds,
@@ -1253,11 +1258,20 @@ fun EventRow(
     dragHandle: Modifier? = null,
     searchQuery: String = "",
     folderBadge: String? = null,
-    noteHit: Boolean = false
+    noteHit: Boolean = false,
+    festivalRepo: FestivalRepository? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
-    val text = CountdownCalculator.formatCountdown(
+    // 跟随节日的假期段内（如中秋、国庆连休中）覆盖为「假期第 x 天」：
+    // 滚动守卫让目标日期停在假期首日，此处按假期段序号呈现，避免假期内天天显示 0/已过。
+    // remember 以「锚定名 + 今天」为 key：跨天自动重算，同一天内不重复读节日缓存文件。
+    val holidayDayN = remember(event.linkedFestival, LocalDate.now().toEpochDay()) {
+        event.linkedFestival?.takeIf { it.isNotBlank() }
+            ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
+    }
+    val text = if (holidayDayN != null) Tr.s(R.string.unit_holiday_day_n, holidayDayN)
+    else CountdownCalculator.formatCountdown(
         event.targetDateEpochDay,
         event.displayUnit,
         event.refDays
@@ -1819,6 +1833,7 @@ fun FolderGridItem(
 fun EventGridItem(
     event: EventEntity,
     isLarge: Boolean,
+    festivalRepo: FestivalRepository? = null,
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
@@ -1829,7 +1844,13 @@ fun EventGridItem(
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
-    val text = CountdownCalculator.formatCountdown(
+    // 跟随节日的假期段内覆盖为「假期第 x 天」（与 EventRow 同口径，见 EventRow 注释）
+    val holidayDayN = remember(event.linkedFestival, LocalDate.now().toEpochDay()) {
+        event.linkedFestival?.takeIf { it.isNotBlank() }
+            ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
+    }
+    val text = if (holidayDayN != null) Tr.s(R.string.unit_holiday_day_n, holidayDayN)
+    else CountdownCalculator.formatCountdown(
         event.targetDateEpochDay,
         event.displayUnit,
         event.refDays

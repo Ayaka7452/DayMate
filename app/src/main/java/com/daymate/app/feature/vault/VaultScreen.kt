@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.data.festival.FestivalRepository
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import sh.calvin.reorderable.ReorderableItem
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -620,6 +621,7 @@ private fun VaultListScreen(
                         items(vaultSearchResults, key = { "e${it.id}" }) { event ->
                             VaultEventRow(
                                 event = event,
+                                festivalRepo = container.festivalRepository,
                                 onClick = {
                                     editingEvent = event
                                     showEventDialog = true
@@ -697,6 +699,7 @@ private fun VaultListScreen(
                         } else null
                         VaultEventRow(
                             event = event,
+                            festivalRepo = container.festivalRepository,
                             selectionMode = selectionMode,
                             selected = event.id in selectedEventIds,
                             onClick = {
@@ -1056,6 +1059,7 @@ fun VaultFolderScreen(
                         } else null
                         VaultEventRow(
                             event = event,
+                            festivalRepo = container.festivalRepository,
                             selectionMode = selectionMode,
                             selected = event.id in selectedEventIds,
                             onClick = {
@@ -1435,11 +1439,18 @@ private fun VaultEventRow(
     dragHandle: Modifier? = null,
     searchQuery: String = "",
     folderBadge: String? = null,
-    noteHit: Boolean = false
+    noteHit: Boolean = false,
+    festivalRepo: FestivalRepository? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
-    val text = CountdownCalculator.formatCountdown(
+    // 跟随节日的假期段内覆盖为「假期第 x 天」（与主页 EventRow 同口径）
+    val holidayDayN = remember(event.linkedFestival, LocalDate.now().toEpochDay()) {
+        event.linkedFestival?.takeIf { it.isNotBlank() }
+            ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
+    }
+    val text = if (holidayDayN != null) Tr.s(R.string.unit_holiday_day_n, holidayDayN)
+    else CountdownCalculator.formatCountdown(
         event.targetDateEpochDay,
         event.displayUnit,
         event.refDays

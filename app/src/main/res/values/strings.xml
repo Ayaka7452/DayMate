@@ -760,6 +760,7 @@
     <string name="unit_years_past_ref">%1$d/%2$d years elapsed</string>
     <string name="unit_years_past">%1$d years elapsed</string>
     <string name="unit_days_past_ref">%1$d/%2$d days elapsed</string>
+    <string name="unit_holiday_day_n">Day %1$d of the holiday</string>
     <string name="storage_state_unset">Not set</string>
     <string name="cycle_default_event_title">Cycle Tracker</string>
     <string name="settings_lang_auto">Automatic</string>

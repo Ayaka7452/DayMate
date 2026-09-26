@@ -329,6 +329,7 @@ fun FolderScreen(
                         } else null
                         EventRow(
                             event = event,
+                            festivalRepo = container.festivalRepository,
                             selectionMode = selectionMode,
                             selected = event.id in selectedEventIds,
                             onClick = {

@@ -400,6 +400,35 @@ class FestivalRepository(private val appContext: Context) {
         return len
     }
 
+    /**
+     * [name]（锚定名=数据源原名）的假期段若包含 [today]，返回今天在段内的序号（段首为 1），否则 null。
+     * 段口径与 [offDaySpanLength] 一致：数据条目优先，未列出的周六/周日按休息日延伸（连休自然延伸）；
+     * 段内任一数据条目名与 [name] 相同即视为该节日的假期（连休合并名每天条目同名，如「国庆节，中秋节」）。
+     * 供「跟随节日」事件在假期内呈现「假期第 x 天」：假期内滚动守卫不放行（数据源假期每天一条同名
+     * 条目，滚过去会天天归零），显示层用这里的序号覆盖天数。
+     */
+    fun holidayDayIndexOf(name: String, today: LocalDate): Int? {
+        // 段最多跨两个自然年（12/31 ↔ 1/1），一次性预载相邻三份数据，避免段循环里反复读文件
+        val data = (today.year - 1..today.year + 1).associateWith { loadYear(it) }
+        fun entryOf(d: LocalDate) = data[d.year]?.firstOrNull { it.date == d }
+        fun isRest(d: LocalDate): Boolean {
+            val e = entryOf(d)
+                ?: return d.dayOfWeek == DayOfWeek.SATURDAY || d.dayOfWeek == DayOfWeek.SUNDAY
+            return e.isOffDay
+        }
+        if (!isRest(today)) return null
+        var start = today
+        while (isRest(start.minusDays(1))) start = start.minusDays(1)
+        var d = start
+        while (isRest(d)) {
+            if (entryOf(d)?.name == name) {
+                return (today.toEpochDay() - start.toEpochDay()).toInt() + 1
+            }
+            d = d.plusDays(1)
+        }
+        return null
+    }
+
     /** 单日是否为放假日：数据源有该日条目时以 isOffDay 为准（调休补班的周六日不算休），否则按普通周末。 */
     private fun isOffDay(date: LocalDate): Boolean {
         val entry = loadYear(date.year).firstOrNull { it.date == date }

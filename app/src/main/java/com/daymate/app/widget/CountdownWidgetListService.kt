@@ -47,10 +47,14 @@ class CountdownWidgetListService : RemoteViewsService() {
                 .take(4)
                 .forEach { e ->
                     val diff = (e.targetDateEpochDay - today).toInt()
+                    // 跟随节日的假期段内覆盖为「假期第 x 天」（与主页同口径）
+                    val holidayN = e.linkedFestival?.takeIf { it.isNotBlank() }
+                        ?.let { container.festivalRepository.holidayDayIndexOf(it, LocalDate.now()) }
                     rows.add(
                         Row(
                             title = e.title,
-                            daysText = if (diff >= 0) Tr.s(R.string.unit_days_future, diff)
+                            daysText = if (holidayN != null) Tr.s(R.string.unit_holiday_day_n, holidayN)
+                            else if (diff >= 0) Tr.s(R.string.unit_days_future, diff)
                             else Tr.s(R.string.unit_days_past, -diff),
                             isPast = diff < 0,
                             eventId = e.id

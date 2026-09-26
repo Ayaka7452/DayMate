@@ -140,7 +140,12 @@ private fun DetailContent(e: EventEntity, folderLabel: String?, modifier: Modifi
         Spacer(Modifier.height(24.dp))
 
         // ===== 倒计时主视觉：大数字 + 单位 =====
-        val cd = countdownDisplay(e)
+        // 跟随节日的假期段内（如中秋、国庆连休中）覆盖为「假期第 x 天」口径
+        val holidayDayN = remember(e.linkedFestival, LocalDate.now().toEpochDay()) {
+            e.linkedFestival?.takeIf { it.isNotBlank() }
+                ?.let { container.festivalRepository.holidayDayIndexOf(it, LocalDate.now()) }
+        }
+        val cd = countdownDisplay(e, holidayDayN)
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -233,7 +238,15 @@ private fun refUnitLabel(unit: String?): String = when (unit) {
 /** 详情页大数字：按显示单位取整数，不足一个单位时逐级退回（与 formatCountdown 规则一致）。 */
 private data class CountdownDisplay(val number: String, val unit: String, val caption: String)
 
-private fun countdownDisplay(e: EventEntity): CountdownDisplay {
+private fun countdownDisplay(e: EventEntity, holidayDayN: Int? = null): CountdownDisplay {
+    // 假期段内（跟随节日）：大数字即假期第几天，caption 同文案（不显示「今天/已过去」）
+    if (holidayDayN != null) {
+        return CountdownDisplay(
+            number = "$holidayDayN",
+            unit = Tr.s(R.string.unit_days),
+            caption = Tr.s(R.string.unit_holiday_day_n, holidayDayN)
+        )
+    }
     val today = LocalDate.now()
     val diffDays = e.targetDateEpochDay - today.toEpochDay()
     val isFuture = diffDays >= 0
