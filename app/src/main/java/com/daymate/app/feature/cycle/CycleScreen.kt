@@ -228,9 +228,6 @@ private fun CycleOverviewScreen(
     val periodManual by container.settingsRepository.cyclePeriodDays.collectAsState(initial = CycleCalculator.DEFAULT_PERIOD_DAYS)
     val cycleAuto by container.settingsRepository.cycleCycleAuto.collectAsState(initial = true)
     val periodAuto by container.settingsRepository.cyclePeriodAuto.collectAsState(initial = true)
-    // 详情栏显示开关：记录标签默认不显示（性行为等隐私标签不上墙），经期预测默认显示
-    val showNoteTags by container.settingsRepository.cycleShowNotes.collectAsState(initial = false)
-    val showPrediction by container.settingsRepository.cycleShowPrediction.collectAsState(initial = true)
     // 生效参数：自动开启且数据足够时按近 3 次记录均值推算，否则回落到手动设置值
     val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
     val periodDays = container.cycleRepository.effectivePeriodDays(logs, periodManual, periodAuto)
@@ -478,8 +475,6 @@ private fun CycleOverviewScreen(
                             dayNotes = notes.filter { it.dateEpochDay == day },
                             cycleDays = cycleDays,
                             today = today,
-                            showNoteTags = showNoteTags,
-                            showPrediction = showPrediction,
                             onAdd = { showAddNote = true },
                             onEdit = { editingNote = it },
                             onDelete = { showDeleteNote = true }
@@ -2402,8 +2397,8 @@ internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
  * 位置紧贴日历下方——点某天之后的即时反馈必须离被点的格子足够近，否则用户不知道点中了什么。
  * 本区只做展示与入口，不含任何推算副作用：日常记录永远不参与周期计算（见 CycleNoteEntity）。
  *
- * 显示开关（周期管家设置里调）：
- *  - [showNoteTags]：当天登记的记录标签（默认关——性行为等隐私标签不主动上墙）；
+ * 显示开关（周期管家设置里调，**只作用于日历记事的详情栏**；管家自己的详情栏永远完整显示）：
+ *  - [showNoteTags]：当天登记的记录标签（默认关——性行为等隐私标签不在日历记事上墙）；
  *  - [showPrediction]：周期阶段 chip 与经期预测副文案（默认开）。
  *
  * 详情栏常驻（未选中显示今天），因此不设「收起」按钮；想看别的日期直接点格子即可。
@@ -2417,6 +2412,8 @@ internal fun CycleDayDetail(
     today: Long,
     showNoteTags: Boolean = true,
     showPrediction: Boolean = true,
+    /** 节日说明行（日历记事传入：法定节假日/调休补班 + 节日名），null = 不显示。 */
+    festivalNote: String? = null,
     onAdd: () -> Unit,
     /** 修改某一条已有记录（入口就挂在那一行右侧）。 */
     onEdit: (CycleNoteEntity) -> Unit,
@@ -2465,6 +2462,15 @@ internal fun CycleDayDetail(
                         Text(phaseLabel, style = MaterialTheme.typography.labelSmall, color = chipFg)
                     }
                 }
+            }
+
+            if (festivalNote != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    festivalNote,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             if (showNoteTags) {

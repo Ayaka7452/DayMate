@@ -831,9 +831,11 @@
     <string name="calendar_legend_event">디데이</string>
     <string name="cycle_detail_display">상세 표시줄</string>
     <string name="cycle_show_notes_title">기록 태그 표시</string>
-    <string name="cycle_show_notes_desc">날짜 상세 표시줄에 당일 등록한 기록 태그를 표시합니다.</string>
+    <string name="cycle_show_notes_desc">캘린더 노트 상세 표시줄에 당일 등록한 기록 태그를 표시합니다.</string>
     <string name="cycle_show_prediction_title">생리 예측 표시</string>
-    <string name="cycle_show_prediction_desc">날짜 상세 표시줄에 주기 단계와 생리 예측 정보를 표시합니다.</string>
+    <string name="cycle_show_prediction_desc">캘린더 노트 상세 표시줄에 주기 단계와 생리 예측 정보를 표시합니다.</string>
+    <string name="calendar_detail_holiday">공휴일: %1$s</string>
+    <string name="calendar_detail_makeup">대체 근무일: %1$s</string>
     <string name="calendar_no_festival_data">올해 공휴일 데이터가 아직 다운로드되지 않았습니다. 설정에서 다운로드할 수 있습니다.</string>
     <string name="cycle_tip_frequent_body">3일 연속으로 성관계가 기록되었습니다. 몸을 잘 돌보고 충분히 쉬어 주세요.</string>
     <string name="cycle_tip_ovulation_body">배란기에 성관계가 기록되었습니다. 효과적인 피임을 하지 않았다면 임신 위험이 높습니다. 몸 상태에 유의해 주세요.</string>
