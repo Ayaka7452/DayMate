@@ -191,6 +191,16 @@ object NoteCatalog {
     /** 自定义记录的落库大类 key。 */
     val CUSTOM_KEY: String = Category.CUSTOM.key
 
+    /**
+     * 「日历记事」写的记录用的大类 key。
+     *
+     * 与周期管家的记录同表（都是 cycle_notes），但语义完全不同——记事是「开会 / 买菜 / 缴费」
+     * 这类日常事务，不参与任何周期推算，也不该出现在经期管家的记录列表里。
+     * 刻意不进 [Category] 枚举：它不是一个可选分段，只是一个落库标记。
+     * 周期管家侧一律按此 key 过滤掉，两边互不串味。
+     */
+    const val CALENDAR_KEY: String = "CALENDAR"
+
     /** 自定义文本长度上限（与备注一致，避免撑爆界面）。 */
     const val MAX_LABEL_LENGTH = 20
 

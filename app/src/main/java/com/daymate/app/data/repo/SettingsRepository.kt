@@ -37,7 +37,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val CYCLE_CYCLE_AUTO = booleanPreferencesKey("cycle_cycle_auto")     // 周期天数自动按记录均值推算（默认开；手改即固定）
         private val CYCLE_PERIOD_AUTO = booleanPreferencesKey("cycle_period_auto")   // 经期天数自动按记录均值推算（默认开；手改即固定）
         private val CYCLE_SHOW_NOTES = booleanPreferencesKey("cycle_show_notes")       // 日期详情栏显示日常记录标签（默认关）
-        private val CYCLE_SHOW_PREDICTION = booleanPreferencesKey("cycle_show_prediction") // 日期详情栏显示经期预测（默认开）
+        private val CYCLE_SHOW_PREDICTION = booleanPreferencesKey("cycle_show_prediction") // 日历记事详情栏显示经期预测（默认关）
         private val ALLOW_SCREENSHOT_CYCLE = booleanPreferencesKey("allow_screenshot_cycle") // 周期管家允许截屏（默认关＝阻止）
         private val ALLOW_SCREENSHOT_VAULT = booleanPreferencesKey("allow_screenshot_vault") // 保险箱允许截屏（默认关＝阻止）
         private val UPDATE_CHECK = booleanPreferencesKey("update_check_enabled")             // 启动时检查新版本（默认开）
@@ -207,10 +207,16 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val cycleDefaultCalendar: Flow<Boolean> = dataStore.data.map { it[CYCLE_DEFAULT_CALENDAR] ?: false }
     val cycleCycleAuto: Flow<Boolean> = dataStore.data.map { it[CYCLE_CYCLE_AUTO] ?: true }
     val cyclePeriodAuto: Flow<Boolean> = dataStore.data.map { it[CYCLE_PERIOD_AUTO] ?: true }
-    /** 日期详情栏是否显示当天登记的记录标签（默认关——性行为等隐私标签不主动上墙）。 */
+    /**
+     * 日历记事的详情栏是否显示经期管家登记的自定义记录（默认关——性行为等隐私标签不主动上墙）。
+     * 只作用于日历记事；周期管家自己的界面永远完整显示。
+     */
     val cycleShowNotes: Flow<Boolean> = dataStore.data.map { it[CYCLE_SHOW_NOTES] ?: false }
-    /** 日期详情栏是否显示周期阶段与经期预测信息（默认开）。 */
-    val cycleShowPrediction: Flow<Boolean> = dataStore.data.map { it[CYCLE_SHOW_PREDICTION] ?: true }
+    /**
+     * 日历记事的详情栏是否显示周期阶段与经期预测信息（默认关——经期信息不外露到日历）。
+     * 只作用于日历记事；周期管家自己的界面永远完整显示。
+     */
+    val cycleShowPrediction: Flow<Boolean> = dataStore.data.map { it[CYCLE_SHOW_PREDICTION] ?: false }
 
     /** 长按主页加号时，展开面板中是否显示「日历预览」入口（默认开）。 */
     val calendarLongPressEnabled: Flow<Boolean> =

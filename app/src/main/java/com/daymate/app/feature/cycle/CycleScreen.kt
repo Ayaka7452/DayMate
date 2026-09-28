@@ -388,7 +388,7 @@ private fun CycleOverviewScreen(
                     if (cal) {
                         CycleCalendarMonth(
                             logs = logs,
-                            notes = notes,
+                            notes = notes.trackerNotes(),
                             cycleDays = cycleDays,
                             today = today,
                             selectedDay = selectedDay,
@@ -472,7 +472,7 @@ private fun CycleOverviewScreen(
                         CycleDayDetail(
                             day = day,
                             logs = logs,
-                            dayNotes = notes.filter { it.dateEpochDay == day },
+                            dayNotes = notes.trackerNotes().filter { it.dateEpochDay == day },
                             cycleDays = cycleDays,
                             today = today,
                             onAdd = { showAddNote = true },
@@ -959,7 +959,7 @@ private fun CycleOverviewScreen(
     if (showDeleteNote && detailDay != null) {
         DeleteNotesDialog(
             day = detailDay,
-            dayNotes = notes.filter { it.dateEpochDay == detailDay },
+            dayNotes = notes.trackerNotes().filter { it.dateEpochDay == detailDay },
             onDismiss = { showDeleteNote = false },
             onConfirm = { ids ->
                 scope.launch { container.cycleNoteRepository.deleteByIds(ids) }
@@ -1156,7 +1156,7 @@ private fun CycleSettingsScreen(
         if (hist) {
             CycleHistoryScreen(
                 logs = logs,
-                notes = notes,
+                notes = notes.trackerNotes(),
                 onBack = { showHistory = false },
                 onEdit = { editingLog = it },
                 onDelete = { deletingLog = it },
@@ -1277,7 +1277,7 @@ private fun CycleSettingsScreen(
 
             // ===== 详情栏显示 =====
             val showNotesSetting by container.settingsRepository.cycleShowNotes.collectAsState(initial = false)
-            val showPredictionSetting by container.settingsRepository.cycleShowPrediction.collectAsState(initial = true)
+            val showPredictionSetting by container.settingsRepository.cycleShowPrediction.collectAsState(initial = false)
             Text(stringResource(R.string.cycle_detail_display), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
             ToggleRow(
@@ -2258,7 +2258,7 @@ private fun CycleCalendarMonth(
  * 详情区却写排卵期」这种自相矛盾的展示。锚点推进逻辑与之一一对应：先把锚点推到不晚于该日，
  * 再以「锚点 + 周期天数」为下次经期，避免逾期未登记时算出负的「距下次经期天数」。
  */
-private fun describeDay(
+internal fun describeDay(
     day: Long,
     logs: List<CycleLogEntity>,
     cycleDays: Int,
@@ -2319,7 +2319,7 @@ private fun describeDay(
 
 /** 阶段标签的配色（与圆环/日历同一套色板，保证三处说法一致）。 */
 @Composable
-private fun phaseChipColors(label: String): Pair<Color, Color> = when (label) {
+internal fun phaseChipColors(label: String): Pair<Color, Color> = when (label) {
     stringResource(R.string.cycle_phase_period) ->
         MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
     stringResource(R.string.cycle_predict_period) ->
@@ -2341,6 +2341,13 @@ private fun noteCategoryColor(category: String): Color = when (NoteCatalog.Categ
     NoteCatalog.Category.MOOD -> MaterialTheme.colorScheme.tertiary
     NoteCatalog.Category.CUSTOM -> MaterialTheme.colorScheme.secondary
 }
+
+/**
+ * 周期管家只认自己登记的记录：日历记事写的那些（[NoteCatalog.CALENDAR_KEY]）落在同一张表，
+ * 但属于另一个入口的语义（日常事务，不参与周期），管家侧一律不显示。
+ */
+private fun List<CycleNoteEntity>.trackerNotes(): List<CycleNoteEntity> =
+    filter { it.category != NoteCatalog.CALENDAR_KEY }
 
 /**
  * 一条日常记录：左侧大类色条 + 名称 +（可选）补充说明 +（可选）修改入口。
@@ -2397,9 +2404,10 @@ internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
  * 位置紧贴日历下方——点某天之后的即时反馈必须离被点的格子足够近，否则用户不知道点中了什么。
  * 本区只做展示与入口，不含任何推算副作用：日常记录永远不参与周期计算（见 CycleNoteEntity）。
  *
- * 显示开关（周期管家设置里调，**只作用于日历记事的详情栏**；管家自己的详情栏永远完整显示）：
- *  - [showNoteTags]：当天登记的记录标签（默认关——性行为等隐私标签不在日历记事上墙）；
- *  - [showPrediction]：周期阶段 chip 与经期预测副文案（默认开）。
+ * 显示开关（周期管家设置里调，**只作用于日历记事的详情栏**；管家自己的详情栏永远完整显示，
+ * 两个开关默认都关——经期信息与自定义记录（含性生活）默认不外露到日历记事）：
+ *  - [showNoteTags]：经期管家登记的自定义记录标签；
+ *  - [showPrediction]：周期阶段 chip 与经期预测副文案。
  *
  * 详情栏常驻（未选中显示今天），因此不设「收起」按钮；想看别的日期直接点格子即可。
  */
@@ -2414,6 +2422,11 @@ internal fun CycleDayDetail(
     showPrediction: Boolean = true,
     /** 节日说明行（日历记事传入：法定节假日/调休补班 + 节日名），null = 不显示。 */
     festivalNote: String? = null,
+    /**
+     * 删除按钮是否可用。日历记事传入「自己写的记事」是否非空——经期管家的记录即便被开关
+     * 放行进详情栏也只是「看」，不能在日历记事里删掉（那是管家的数据）。
+     */
+    canDelete: Boolean = true,
     onAdd: () -> Unit,
     /** 修改某一条已有记录（入口就挂在那一行右侧）。 */
     onEdit: (CycleNoteEntity) -> Unit,
@@ -2504,7 +2517,7 @@ internal fun CycleDayDetail(
                 }
                 OutlinedButton(
                     onClick = onDelete,
-                    enabled = showNoteTags && dayNotes.isNotEmpty(),
+                    enabled = canDelete,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.cycle_delete_record), maxLines = 1)
@@ -2686,9 +2699,16 @@ internal fun DeleteNotesDialog(
     day: Long,
     dayNotes: List<CycleNoteEntity>,
     onDismiss: () -> Unit,
-    onConfirm: (List<Long>) -> Unit
+    onConfirm: (List<Long>) -> Unit,
+    /**
+     * 哪些记录允许勾选删除。日历记事传「只删自己写的记事」——经期管家的记录即便被开关放行
+     * 进来也只是展示，删掉别人的数据属于越界。
+     */
+    deletable: (CycleNoteEntity) -> Boolean = { true }
 ) {
-    var checkedIds by remember(dayNotes) { mutableStateOf(dayNotes.map { it.id }.toSet()) }
+    var checkedIds by remember(dayNotes) {
+        mutableStateOf(dayNotes.filter(deletable).map { it.id }.toSet())
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2705,26 +2725,38 @@ internal fun DeleteNotesDialog(
                 )
                 Spacer(Modifier.height(8.dp))
                 dayNotes.forEach { n ->
+                    val canCheck = deletable(n)
                     val on = n.id in checkedIds
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .clickable(enabled = canCheck) {
                                 checkedIds = if (on) checkedIds - n.id else checkedIds + n.id
                             },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
                             checked = on,
+                            enabled = canCheck,
                             onCheckedChange = { v ->
                                 checkedIds = if (v) checkedIds + n.id else checkedIds - n.id
                             }
                         )
                         Column(Modifier.weight(1f)) {
-                            Text(NoteCatalog.displayLabel(n.presetKey, n.label), style = MaterialTheme.typography.bodyMedium)
-                            val meta = listOfNotNull(NoteCatalog.labelOf(n.category), n.note)
-                                .joinToString(" · ")
-                            if (meta.isNotEmpty()) {
+                            Text(
+                                NoteCatalog.displayLabel(n.presetKey, n.label),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (canCheck) Color.Unspecified
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                            )
+                            // 日历记事写的记录没有「大类」这一层，别给它贴一个「自定义」标签
+                            val meta = if (n.category == NoteCatalog.CALENDAR_KEY) {
+                                n.note
+                            } else {
+                                listOfNotNull(NoteCatalog.labelOf(n.category), n.note)
+                                    .joinToString(" · ").ifEmpty { null }
+                            }
+                            if (meta != null) {
                                 Text(
                                     meta,
                                     style = MaterialTheme.typography.bodySmall,
