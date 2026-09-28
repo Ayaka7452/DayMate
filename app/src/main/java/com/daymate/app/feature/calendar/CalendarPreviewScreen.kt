@@ -1,7 +1,6 @@
 package com.ayaka7452.daymate.feature.calendar
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -122,13 +121,14 @@ fun CalendarPreviewScreen(
     var deletingNote by remember { mutableStateOf<Long?>(null) } // 删除确认针对的日期
     var editingNote by remember { mutableStateOf<com.ayaka7452.daymate.data.db.CycleNoteEntity?>(null) }
 
-    // 当月每天的目标日期 → 第一枚倒数日点的颜色（一天只显示一枚点，多了也不堆）
+    // 当月每天的目标日期 → 第一枚倒数日点的颜色（一天只显示一枚点，多了也不堆）。
+    // null = 事件未自定义颜色，绘制处再回落到主题色（remember 块内不能取 MaterialTheme）
     val dotColorByDay = remember(events, month) {
         val map = mutableMapOf<Long, Color?>()
         for (e in events) {
             val d = e.targetDateEpochDay
             if (YearMonth.from(LocalDate.ofEpochDay(d)) == month && !map.containsKey(d)) {
-                map[d] = e.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
+                map[d] = e.color?.let { Color(it) }
             }
         }
         map
@@ -381,7 +381,7 @@ fun CalendarPreviewScreen(
                 targetState = detailDay,
                 transitionSpec = {
                     val spec = tween<IntOffset>(260, easing = FastOutSlowInEasing)
-                    val fade = tween(180, easing = FastOutSlowInEasing)
+                    val fade = tween<Float>(180, easing = FastOutSlowInEasing)
                     // 新日期在旧日期右边（更晚）→ 内容从右滑入、旧内容向左滑出；更早则反向
                     val forward = targetState > initialState
                     if (forward) {

@@ -458,7 +458,7 @@ private fun CycleOverviewScreen(
                     targetState = detailDay,
                     transitionSpec = {
                         val spec = tween<IntOffset>(260, easing = FastOutSlowInEasing)
-                        val fade = tween(180, easing = FastOutSlowInEasing)
+                        val fade = tween<Float>(180, easing = FastOutSlowInEasing)
                         val forward = targetState > initialState
                         if (forward) {
                             (slideInHorizontally(spec) { it } + fadeIn(fade)) togetherWith
