@@ -306,6 +306,9 @@ private fun CycleOverviewScreen(
     var showDeleteNote by remember { mutableStateOf(false) }
     // 正在修改的那条日常记录（null = 未打开修改弹窗）。修改入口挂在选中日详情区的每一行右侧。
     var editingNote by remember { mutableStateOf<CycleNoteEntity?>(null) }
+    // 温馨提示队列：①连续三天性生活 ②排卵期无保护。两个都触发时先弹①、关掉再弹②，避免打架
+    var showTipFrequent by remember { mutableStateOf(false) }
+    var showTipOvulation by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -862,6 +865,29 @@ private fun CycleOverviewScreen(
         )
     }
 
+    // 温馨提示①：连续三天登记性生活（文案口径已经用户拍板）
+    if (showTipFrequent) {
+        AlertDialog(
+            onDismissRequest = { showTipFrequent = false },
+            confirmButton = {
+                TextButton(onClick = { showTipFrequent = false }) { Text(stringResource(R.string.common_ok)) }
+            },
+            title = { Text(stringResource(R.string.cycle_tips_title)) },
+            text = { Text(stringResource(R.string.cycle_tip_frequent_body)) }
+        )
+    }
+    // 温馨提示②：排卵期无保护。排在①之后（①开着时不显示），关掉①后自然衔接
+    if (showTipOvulation && !showTipFrequent) {
+        AlertDialog(
+            onDismissRequest = { showTipOvulation = false },
+            confirmButton = {
+                TextButton(onClick = { showTipOvulation = false }) { Text(stringResource(R.string.common_ok)) }
+            },
+            title = { Text(stringResource(R.string.cycle_tips_title)) },
+            text = { Text(stringResource(R.string.cycle_tip_ovulation_body)) }
+        )
+    }
+
     // 添加记录弹窗（仅从选中日详情区唤起；选中日即记录日）
     val detailDay = selectedDay
     if (showAddNote && detailDay != null) {
@@ -869,8 +895,35 @@ private fun CycleOverviewScreen(
             day = detailDay,
             onDismiss = { showAddNote = false },
             onConfirm = { newNotes ->
+                val day = detailDay
+                val sexWindow = (day - 2)..day // 提示①的「连续 3 天」窗口：以登记日结尾往前数 3 个自然日
+                val beforeSex = notes.count {
+                    NoteCatalog.Category.of(it.category) == NoteCatalog.Category.SEX &&
+                        it.dateEpochDay in sexWindow
+                }
+                val addedSex = newNotes.count {
+                    NoteCatalog.Category.of(it.category) == NoteCatalog.Category.SEX &&
+                        it.dateEpochDay in sexWindow
+                }
+                val hasUnprotected = newNotes.any { it.presetKey == "sex_unprotected" }
                 scope.launch { container.cycleNoteRepository.addAll(newNotes) }
                 showAddNote = false
+                // 提示①：3 天窗口内满 3 次（含一天多次）。只在本次保存使计数从 <3 跨到 ≥3 时弹一次，
+                // 之后的第 4、5 次不再连环打扰
+                if (beforeSex < 3 && beforeSex + addedSex >= 3) {
+                    showTipFrequent = true
+                }
+                // 提示②：登记了排卵期的无保护性生活。判定口径与管家日历底色完全一致（phaseOfAnyDay），
+                // 无经期记录时不推算、不弹
+                if (hasUnprotected && logs.isNotEmpty() &&
+                    CycleCalculator.phaseOfAnyDay(
+                        day,
+                        logs.map { it.startDateEpochDay to it.periodDays },
+                        cycleDays
+                    ) == CycleCalculator.Phase.OVULATION
+                ) {
+                    showTipOvulation = true
+                }
             }
         )
     }
@@ -2257,7 +2310,7 @@ private fun noteCategoryColor(category: String): Color = when (NoteCatalog.Categ
  * [onEdit] 只在选中日详情区传入——历史页是只读列表，不给入口（那里只做浏览与删除）。
  */
 @Composable
-private fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
+internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2307,7 +2360,7 @@ private fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
  * 本区只做展示与入口，不含任何推算副作用：日常记录永远不参与周期计算（见 CycleNoteEntity）。
  */
 @Composable
-private fun CycleDayDetail(
+internal fun CycleDayDetail(
     day: Long,
     logs: List<CycleLogEntity>,
     dayNotes: List<CycleNoteEntity>,
@@ -2405,7 +2458,7 @@ private fun CycleDayDetail(
 
 /** 记录选择用的圆角 chip（与「圆环/日历」切换同一套外观，全 App 只此一种 chip 样式）。 */
 @Composable
-private fun NoteChip(text: String, selected: Boolean, onClick: () -> Unit) {
+internal fun NoteChip(text: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
@@ -2433,7 +2486,7 @@ private fun NoteChip(text: String, selected: Boolean, onClick: () -> Unit) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AddNoteDialog(
+internal fun AddNoteDialog(
     day: Long,
     onDismiss: () -> Unit,
     onConfirm: (List<CycleNoteEntity>) -> Unit
@@ -2571,7 +2624,7 @@ private fun AddNoteDialog(
  * 再叠一层「你确定吗」只会让删除变啰嗦而不会更安全。
  */
 @Composable
-private fun DeleteNotesDialog(
+internal fun DeleteNotesDialog(
     day: Long,
     dayNotes: List<CycleNoteEntity>,
     onDismiss: () -> Unit,
@@ -2673,7 +2726,7 @@ private fun NoteHint(resId: Int) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun EditNoteDialog(
+internal fun EditNoteDialog(
     note: CycleNoteEntity,
     onDismiss: () -> Unit,
     onConfirm: (CycleNoteEntity) -> Unit

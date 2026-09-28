@@ -45,6 +45,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val UPDATE_SKIPPED = stringPreferencesKey("update_skipped_version")          // 用户点过「稍后」的版本
         private val HOME_VIEW_MODE = stringPreferencesKey("home_view_mode")                  // 主页视图：list(列表) / medium(中图标) / large(大图标)
         private val HOME_GRID_SPACING = intPreferencesKey("home_grid_spacing")               // 图标模式方块间隔 dp（默认 8）
+        private val CALENDAR_LONG_PRESS = booleanPreferencesKey("calendar_long_press_enabled") // 长按主页加号在展开面板显示「日历预览」入口（默认开）
 
         /** 主页视图模式取值：列表 / 中图标(3列) / 大图标(2列)。 */
         const val VIEW_MODE_LIST = "list"
@@ -205,6 +206,10 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val cycleCycleAuto: Flow<Boolean> = dataStore.data.map { it[CYCLE_CYCLE_AUTO] ?: true }
     val cyclePeriodAuto: Flow<Boolean> = dataStore.data.map { it[CYCLE_PERIOD_AUTO] ?: true }
 
+    /** 长按主页加号时，展开面板中是否显示「日历预览」入口（默认开）。 */
+    val calendarLongPressEnabled: Flow<Boolean> =
+        dataStore.data.map { it[CALENDAR_LONG_PRESS] ?: true }
+
     suspend fun setCycleDays(days: Int) {
         dataStore.edit { it[CYCLE_CYCLE_DAYS] = days }
     }
@@ -239,6 +244,10 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setCycleEntryEnabled(enabled: Boolean) {
         dataStore.edit { it[CYCLE_ENTRY_ENABLED] = enabled }
+    }
+
+    suspend fun setCalendarLongPressEnabled(enabled: Boolean) {
+        dataStore.edit { it[CALENDAR_LONG_PRESS] = enabled }
     }
 
     suspend fun setCycleDefaultCalendar(calendar: Boolean) {

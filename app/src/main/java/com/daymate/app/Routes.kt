@@ -10,5 +10,6 @@ object Routes {
     const val ABOUT = "about"
     const val VAULT = "vault"
     const val CYCLE = "cycle"
+    const val CALENDAR_PREVIEW = "calendar_preview"
     const val RECYCLE_BIN = "recycle_bin"
 }

@@ -251,7 +251,7 @@
     <string name="cycle_ovulation_day">排卵日</string>
     <string name="cycle_window_range">期間 %1$s ～ %2$s</string>
     <string name="cycle_no_record_overview">記録がありません。直近の生理の初日を記録すると、ここに予測が表示されます。</string>
-    <string name="cycle_tips_title">参考情報</string>
+    <string name="cycle_tips_title">お知らせ</string>
     <string name="cycle_disclaimer_calendar">カレンダー式の予測は参考程度で、避妊や医学的診断の根拠にはなりません。</string>
     <string name="cycle_select_period_range">今回の生理の開始日と終了日を選択</string>
     <string name="cycle_period_days_range">期間は %1$d～%2$d 日である必要があります</string>
@@ -823,4 +823,15 @@
     <string name="settings_span_total_mode">休暇の総日数を表示</string>
 
     <string name="settings_span_total_mode_desc">休暇中は総日数と残り日数の両方を表示します。オフにすると残り日数のみ表示します</string>
+    <string name="home_calendar_preview">カレンダープレビュー</string>
+    <string name="calendar_preview_title">カレンダープレビュー</string>
+    <string name="calendar_today">今日</string>
+    <string name="calendar_legend_off">休</string>
+    <string name="calendar_legend_makeup">出勤</string>
+    <string name="calendar_legend_event">カウントダウン</string>
+    <string name="calendar_no_festival_data">今年の祝日データは未ダウンロードです。設定からダウンロードできます。</string>
+    <string name="cycle_tip_frequent_body">性生活が3日連続で記録されました。体を大切に、しっかり休んでくださいね。</string>
+    <string name="cycle_tip_ovulation_body">排卵日に性生活の記録があります。有効な避妊をしていない場合、妊娠のリスクが高まります。体調の変化にご注意ください。</string>
+    <string name="settings_calendar_long_press">長押しで「＋」を展開</string>
+    <string name="settings_calendar_long_press_desc">ホーム画面の追加ボタンを長押ししたとき、展開パネルにカレンダープレビューの項目を表示します。</string>
 </resources>

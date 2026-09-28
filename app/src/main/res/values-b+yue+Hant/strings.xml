@@ -251,7 +251,7 @@
     <string name="cycle_ovulation_day">排卵日</string>
     <string name="cycle_window_range">窗口 %1$s ~ %2$s</string>
     <string name="cycle_no_record_overview">仲未有大嘢記。登記最近一次經期第一日之後，呢度會顯示完整推算。</string>
-    <string name="cycle_tips_title">溫馨提示</string>
+    <string name="cycle_tips_title">貼心提示</string>
     <string name="cycle_disclaimer_calendar">月曆法推算只供參考，唔可以作為避孕或者醫學診斷依據。</string>
     <string name="cycle_select_period_range">揀選今次經期嘅開始同結束日期</string>
     <string name="cycle_period_days_range">持續日數需要喺 %1$d~%2$d 日之間</string>
@@ -823,4 +823,15 @@
     <string name="settings_span_total_mode">假期顯示總長</string>
 
     <string name="settings_span_total_mode_desc">假期中段同時顯示假期總長同剩餘日數；關閉後只顯示剩餘日數</string>
+    <string name="home_calendar_preview">日曆預覽</string>
+    <string name="calendar_preview_title">日曆預覽</string>
+    <string name="calendar_today">今日</string>
+    <string name="calendar_legend_off">休</string>
+    <string name="calendar_legend_makeup">補班</string>
+    <string name="calendar_legend_event">倒數日</string>
+    <string name="calendar_no_festival_data">當年假期資料尚未下載，可以喺設定度下載。</string>
+    <string name="cycle_tip_frequent_body">您已連續三日進行了性行為，請注意身體，適當休息吓。</string>
+    <string name="cycle_tip_ovulation_body">您喺排卵期進行了性行為，如果排卵期冇採取有效避孕措施，懷孕風險會比較大，請隨時留意身體情況。</string>
+    <string name="settings_calendar_long_press">長按加號入口</string>
+    <string name="settings_calendar_long_press_desc">長按主頁加號時，喺展開面板度顯示「日曆預覽」入口。</string>
 </resources>

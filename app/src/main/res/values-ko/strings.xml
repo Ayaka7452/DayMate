@@ -251,7 +251,7 @@
     <string name="cycle_ovulation_day">배란일</string>
     <string name="cycle_window_range">기간 %1$s ~ %2$s</string>
     <string name="cycle_no_record_overview">기록이 없습니다. 가장 최근 생리의 첫날을 기록하면 여기에 전체 예측이 표시됩니다.</string>
-    <string name="cycle_tips_title">도움말</string>
+    <string name="cycle_tips_title">알림</string>
     <string name="cycle_disclaimer_calendar">달력 기반 예측은 참고용이며 피임이나 의학적 진단의 근거가 될 수 없습니다.</string>
     <string name="cycle_select_period_range">이번 생리의 시작일과 종료일 선택</string>
     <string name="cycle_period_days_range">기간은 %1$d~%2$d일 사이여야 합니다</string>
@@ -823,4 +823,15 @@
     <string name="settings_span_total_mode">휴가 총 일수 표시</string>
 
     <string name="settings_span_total_mode_desc">휴가 중에는 총 일수와 남은 일수를 모두 표시합니다. 끄면 남은 일수만 표시합니다</string>
+    <string name="home_calendar_preview">달력 미리보기</string>
+    <string name="calendar_preview_title">달력 미리보기</string>
+    <string name="calendar_today">오늘</string>
+    <string name="calendar_legend_off">휴무</string>
+    <string name="calendar_legend_makeup">출근</string>
+    <string name="calendar_legend_event">디데이</string>
+    <string name="calendar_no_festival_data">올해 공휴일 데이터가 아직 다운로드되지 않았습니다. 설정에서 다운로드할 수 있습니다.</string>
+    <string name="cycle_tip_frequent_body">3일 연속으로 성관계가 기록되었습니다. 몸을 잘 돌보고 충분히 쉬어 주세요.</string>
+    <string name="cycle_tip_ovulation_body">배란기에 성관계가 기록되었습니다. 효과적인 피임을 하지 않았다면 임신 위험이 높습니다. 몸 상태에 유의해 주세요.</string>
+    <string name="settings_calendar_long_press">길게 눌러 «＋» 열기</string>
+    <string name="settings_calendar_long_press_desc">홈 화면의 추가 버튼을 길게 누르면 펼쳐지는 패널에 달력 미리보기 항목을 표시합니다.</string>
 </resources>

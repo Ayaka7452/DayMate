@@ -165,6 +165,9 @@ fun HomeScreen(
     // 周期管家入口按钮：默认关，需在「周期管家 → 设置 → 隐私与快捷事件」里开启
     val cycleEntryEnabled by container.settingsRepository.cycleEntryEnabled
         .collectAsState(initial = false)
+    // 日历预览的长按加号入口：默认开；开启后长按 + 号的展开面板中多一枚「日历预览」小按钮
+    val calendarLongPressEnabled by container.settingsRepository.calendarLongPressEnabled
+        .collectAsState(initial = true)
 
     // 云备份指示器：备份位置含云端（both/cloud）且 WebDAV 配置完整时常驻显示
     val cloudEnabled by container.autoBackup.cloudEnabled.collectAsState(initial = false)
@@ -554,6 +557,13 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_calendar_preview)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigate(Routes.CALENDAR_PREVIEW)
+                                    }
+                                )
+                                DropdownMenuItem(
                                     text = { Text(stringResource(R.string.home_vault)) },
                                     onClick = {
                                         menuExpanded = false
@@ -640,6 +650,29 @@ fun HomeScreen(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // 日历预览入口：长按展开面板的第一枚（排在周期管家之上），设置开关控制。
+                    AnimatedVisibility(
+                        visible = calendarLongPressEnabled && fabExpanded,
+                        enter = fadeIn(tween(140)) + expandVertically(
+                            expandFrom = Alignment.Bottom,
+                            animationSpec = tween(200)
+                        ),
+                        exit = fadeOut(tween(100)) + shrinkVertically(
+                            shrinkTowards = Alignment.Bottom,
+                            animationSpec = tween(160)
+                        )
+                    ) {
+                        SmallFloatingActionButton(
+                            onClick = {
+                                fabExpanded = false
+                                onNavigate(Routes.CALENDAR_PREVIEW)
+                            },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ) {
+                            Icon(Icons.Filled.CalendarMonth, contentDescription = stringResource(R.string.home_calendar_preview))
+                        }
+                    }
                     // 周期管家入口：只在展开态出现（开关关着则永不出现），所以平时右下角仍只有一枚加号。
                     // 从下往上撑开——它长在加号上方，若从上方展开会像从屏幕外掉进来。
                     AnimatedVisibility(
@@ -683,8 +716,8 @@ fun HomeScreen(
                                         showAddSheet = true
                                     },
                                     onLongClick = {
-                                        // 开关关着时没有入口可展开，长按保持无动作
-                                        if (cycleEntryEnabled) fabExpanded = !fabExpanded
+                                        // 两个开关都关着时没有入口可展开，长按保持无动作
+                                        if (cycleEntryEnabled || calendarLongPressEnabled) fabExpanded = !fabExpanded
                                     }
                                 )
                         )
@@ -1003,7 +1036,7 @@ fun HomeScreen(
 
         // 展开态遮罩：点空白处收起。压在列表之上、顶栏之下——顶栏的搜索/菜单仍可正常点，
         // 不把整页都吃掉。用 indication = null，避免整屏泛出水波纹。
-        if (fabExpanded && cycleEntryEnabled) {
+        if (fabExpanded && (cycleEntryEnabled || calendarLongPressEnabled)) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

@@ -499,6 +499,31 @@ fun SettingsScreen(
                 Text(homeBadgeEmoji, style = MaterialTheme.typography.titleLarge)
             }
 
+            // 长按主页加号的展开面板中是否显示「日历预览」入口（默认开）
+            val calendarLongPressEnabled by container.settingsRepository.calendarLongPressEnabled
+                .collectAsState(initial = true)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_calendar_long_press), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.settings_calendar_long_press_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Switch(
+                    checked = calendarLongPressEnabled,
+                    onCheckedChange = { enabled ->
+                        scope.launch { container.settingsRepository.setCalendarLongPressEnabled(enabled) }
+                    }
+                )
+            }
+
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 

@@ -105,6 +105,8 @@ fun Context.route(route: String) {
             Intent(this, VaultActivity::class.java)
         route == "cycle" ->
             Intent(this, CycleActivity::class.java)
+        route == "calendar_preview" ->
+            Intent(this, CalendarPreviewActivity::class.java)
         route == "settings" ->
             Intent(this, SettingsActivity::class.java)
         route == "about" ->
@@ -245,6 +247,19 @@ class CycleActivity : ComposeActivity() {
             com.ayaka7452.daymate.feature.cycle.CycleScreen(
                 container = container,
                 onExit = { finish() }
+            )
+        }
+    }
+}
+
+/** 日历预览：整月节假日/补班/倒数日目标日 + 点击备注（复用周期管家组件）。 */
+class CalendarPreviewActivity : ComposeActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setDayMateContent {
+            com.ayaka7452.daymate.feature.calendar.CalendarPreviewScreen(
+                container = container,
+                onBack = { finish() }
             )
         }
     }

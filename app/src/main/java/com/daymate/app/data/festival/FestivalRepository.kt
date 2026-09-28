@@ -350,6 +350,13 @@ class FestivalRepository(private val appContext: Context) {
     private fun allDays(): List<FestivalDay> =
         cachedYears().flatMap { loadYear(it) }.sortedBy { it.date }
 
+    /**
+     * 批量读取若干年份的节假日条目（日历预览等需要整月标注的页面用）。
+     * 一次把所需年份全部读进内存再按日期索引，避免逐格查询反复读盘。
+     */
+    fun daysOfYears(years: Collection<Int>): List<FestivalDay> =
+        years.map { loadYear(it) }.flatten().sortedBy { it.date }
+
     // ---------- 查询（缓存为空时返回 null/空，调用方负责提示下载） ----------
 
     /** 今天是否为节假日/调休上班日。 */

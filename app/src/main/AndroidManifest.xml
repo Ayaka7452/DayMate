@@ -69,6 +69,12 @@
             android:theme="@style/Theme.DayMate" />
 
         <activity
+            android:name=".CalendarPreviewActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.DayMate" />
+
+        <activity
             android:name=".VaultFolderActivity"
             android:exported="false"
             android:parentActivityName=".VaultActivity"

@@ -251,7 +251,7 @@
     <string name="cycle_ovulation_day">Ovulation Day</string>
     <string name="cycle_window_range">Fertile window %1$s – %2$s</string>
     <string name="cycle_no_record_overview">No records yet. After logging the first day of your most recent period, full predictions will appear here.</string>
-    <string name="cycle_tips_title">Tips</string>
+    <string name="cycle_tips_title">Friendly reminder</string>
     <string name="cycle_disclaimer_calendar">Calendar-based predictions are for reference only and are not a basis for contraception or medical diagnosis.</string>
     <string name="cycle_select_period_range">Select the start and end dates of this period</string>
     <string name="cycle_period_days_range">Duration must be between %1$d and %2$d days</string>
@@ -823,4 +823,15 @@
     <string name="settings_span_total_mode">Show total holiday length</string>
 
     <string name="settings_span_total_mode_desc">During a holiday, show both the total length and days remaining; off shows remaining days only</string>
+    <string name="home_calendar_preview">Calendar preview</string>
+    <string name="calendar_preview_title">Calendar Preview</string>
+    <string name="calendar_today">Today</string>
+    <string name="calendar_legend_off">Day off</string>
+    <string name="calendar_legend_makeup">Makeup workday</string>
+    <string name="calendar_legend_event">Countdown event</string>
+    <string name="calendar_no_festival_data">Holiday data for this year is not downloaded yet. You can download it in Settings.</string>
+    <string name="cycle_tip_frequent_body">You have logged sexual activity three days in a row. Please take care of your body and get proper rest.</string>
+    <string name="cycle_tip_ovulation_body">You had sexual activity during your ovulation window. If effective contraception was not used, the risk of pregnancy is higher. Please stay alert to how your body feels.</string>
+    <string name="settings_calendar_long_press">Long-press \"+\" entry</string>
+    <string name="settings_calendar_long_press_desc">When long-pressing the add button on the home screen, show the calendar preview entry in the panel.</string>
 </resources>
