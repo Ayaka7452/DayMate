@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -187,8 +188,8 @@ fun CalendarPreviewScreen(
             }
             Spacer(Modifier.height(4.dp))
 
-            // 日期网格
-            val leading = month.dayOfWeek.value - 1 // 周一=1 → 前导空格数
+            // 日期网格（YearMonth 经 atDay() 落到具体 LocalDate 再取星期/epochDay）
+            val leading = month.atDay(1).dayOfWeek.value - 1 // 周一=1 → 前导空格数
             val daysInMonth = month.lengthOfMonth()
             val rows = (leading + daysInMonth + 6) / 7
             Column(Modifier.fillMaxWidth()) {
@@ -205,12 +206,10 @@ fun CalendarPreviewScreen(
                             ) {
                             val dayNum = idx - leading + 1
                                 if (dayNum in 1..daysInMonth) {
-                                    val epochDay = month.withDayOfMonth(dayNum).toEpochDay()
+                                    val epochDay = month.atDay(dayNum).toEpochDay()
                                     val festival = festivalByDate[epochDay]
-                                    val isWeekend = epochDay.let {
-                                        val dow = LocalDate.ofEpochDay(it).dayOfWeek
-                                        dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY
-                                    }
+                                    val dow = month.atDay(dayNum).dayOfWeek
+                                    val isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY
                                     val isToday = epochDay == today
                                     val isSelected = selectedDay == epochDay
                                     val dots = dotsByDay[epochDay].orEmpty()
