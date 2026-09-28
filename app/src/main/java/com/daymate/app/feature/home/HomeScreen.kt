@@ -1305,7 +1305,10 @@ fun EventRow(
             ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
     }
     val text = if (holidayDayN != null) Tr.s(R.string.unit_holiday_day_n, holidayDayN)
-    else CountdownCalculator.formatCountdown(
+    // 按时间倒数：列表行给「还剩 3 天 5 小时」这类两段式文案（不足 1 小时按分钟、不足 3 分钟按秒）
+    else event.endMinuteOfDay?.let {
+        CountdownCalculator.formatTimedShort(event.targetDateEpochDay, it)
+    } ?: CountdownCalculator.formatCountdown(
         event.targetDateEpochDay,
         event.displayUnit,
         event.refDays
@@ -1884,7 +1887,10 @@ fun EventGridItem(
             ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
     }
     val text = if (holidayDayN != null) Tr.s(R.string.unit_holiday_day_n, holidayDayN)
-    else CountdownCalculator.formatCountdown(
+    // 按时间倒数：列表行给「还剩 3 天 5 小时」这类两段式文案（不足 1 小时按分钟、不足 3 分钟按秒）
+    else event.endMinuteOfDay?.let {
+        CountdownCalculator.formatTimedShort(event.targetDateEpochDay, it)
+    } ?: CountdownCalculator.formatCountdown(
         event.targetDateEpochDay,
         event.displayUnit,
         event.refDays

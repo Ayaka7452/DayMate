@@ -39,10 +39,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -95,6 +98,9 @@ fun EventFormScreen(
     var refDaysText by remember { mutableStateOf("") }
     var displayUnit by remember { mutableStateOf(CountdownCalculator.UNIT_DAY) }
     var repeatRule by remember { mutableStateOf<String?>(null) }
+    // 按时间倒数：打开后目标时刻精确到分（默认 09:00，用户可在行内改）
+    var timedMode by remember { mutableStateOf(false) }
+    var targetMinute by remember { mutableStateOf(9 * 60) }
     // 跟随节日：从节日快选或主页节日卡片进入时预置；保存后随事件持久化
     var linkedFestival by remember { mutableStateOf(prefillFestival) }
     var loaded by remember { mutableStateOf<EventEntity?>(null) }
@@ -104,6 +110,7 @@ fun EventFormScreen(
     var showByDaysDialog by remember { mutableStateOf(false) }
     var showUnitDialog by remember { mutableStateOf(false) }
     var showRefDialog by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
     // 更多设置默认折叠；从节日卡片点进（预置跟随节日）时自动展开，让用户看到节日绑定
     var moreExpanded by remember { mutableStateOf(prefillFestival != null) }
     var festivalOptions by remember { mutableStateOf<List<com.ayaka7452.daymate.data.festival.FestivalDay>>(emptyList()) }
@@ -121,12 +128,16 @@ fun EventFormScreen(
                 repeatRule = e.repeatRule
                 linkedFestival = e.linkedFestival
                 folderIdSel = e.folderId
+                timedMode = e.endMinuteOfDay != null
+                targetMinute = e.endMinuteOfDay ?: (9 * 60)
                 // 跟随节日的事件不用 repeatRule（节日锚定优先），加载时归零保持数据一致；
                 // 编辑已有节日绑定的事件时自动展开「更多设置」，否则绑定状态被折叠藏住
                 if (e.linkedFestival != null) {
                     repeatRule = null
                     moreExpanded = true
                 }
+                // 按时间倒数同样收在「更多设置」里，编辑时必须展开才能看见当前设置
+                if (e.endMinuteOfDay != null) moreExpanded = true
             }
         }
     }
@@ -155,6 +166,7 @@ fun EventFormScreen(
                         displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
                         repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
                         linkedFestival = linkedFestival,
+                        endMinuteOfDay = targetMinute.takeIf { timedMode },
                         folderId = folderIdSel
                     )
                 )
@@ -168,6 +180,7 @@ fun EventFormScreen(
                         displayUnit = displayUnit.takeIf { it != CountdownCalculator.UNIT_DAY },
                         repeatRule = repeatRule.takeIf { linkedFestival.isNullOrBlank() },
                         linkedFestival = linkedFestival,
+                        endMinuteOfDay = targetMinute.takeIf { timedMode },
                         folderId = folderIdSel
                     )
                 )
@@ -389,9 +402,11 @@ fun EventFormScreen(
                     )
                     Spacer(Modifier.weight(1f))
                     Text(
+                        // 折叠摘要按「信息量大的优先」排：节日绑定 > 按时间倒数 > 显示单位
                         if (moreExpanded) "" else linkedFestival?.let {
                             com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(it)
-                        } ?: refUnitLabel.takeIf { displayUnit != CountdownCalculator.UNIT_DAY } ?: "",
+                        } ?: timeText(targetMinute).takeIf { timedMode }
+                        ?: refUnitLabel.takeIf { displayUnit != CountdownCalculator.UNIT_DAY } ?: "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         maxLines = 1
@@ -460,6 +475,33 @@ fun EventFormScreen(
                         },
                         onClick = { showRefDialog = true }
                     )
+                    // ---- 按时间进行倒数：打开后倒计时精确到分（不足 1 小时按分、不足 3 分钟按秒） ----
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { timedMode = !timedMode }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(Tr.s(R.string.form_timed_row), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(4.dp))
+                        InfoHint(Tr.s(R.string.form_timed_info))
+                        Spacer(Modifier.weight(1f))
+                        Switch(checked = timedMode, onCheckedChange = { timedMode = it })
+                    }
+                    if (timedMode) {
+                        SettingRow(
+                            label = Tr.s(R.string.form_target_time_row),
+                            value = {
+                                Text(
+                                    timeText(targetMinute),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = { showTimePicker = true }
+                        )
+                    }
                 }
             }
         }
@@ -760,6 +802,29 @@ fun EventFormScreen(
         )
     }
 
+    // ---- 目标时刻：时/分选择（24 小时制，精确到分） ----
+    if (showTimePicker) {
+        val tpState = rememberTimePickerState(
+            initialHour = targetMinute / 60,
+            initialMinute = targetMinute % 60,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text(Tr.s(R.string.form_time_dialog_title)) },
+            text = { TimePicker(state = tpState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    targetMinute = tpState.hour * 60 + tpState.minute
+                    showTimePicker = false
+                }) { Text(Tr.s(R.string.common_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text(Tr.s(R.string.common_cancel)) }
+            }
+        )
+    }
+
     if (showFolderPicker) {
         com.ayaka7452.daymate.feature.common.PickFolderDialog(
             title = Tr.s(R.string.event_pick_folder),
@@ -845,6 +910,10 @@ fun EventFormScreen(
         )
     }
 }
+
+/** 目标时刻的展示文本：24 小时制 HH:mm。 */
+private fun timeText(minuteOfDay: Int): String =
+    "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
 
 /** 表单分组卡片容器：圆角 + 细边框 + 内边距。 */
 @Composable

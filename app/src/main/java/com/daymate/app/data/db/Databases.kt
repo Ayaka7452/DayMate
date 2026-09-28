@@ -15,7 +15,7 @@ import androidx.room.migration.Migration
         CycleLogEntity::class,
         CycleNoteEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -262,6 +262,26 @@ abstract class DayMateDatabase : RoomDatabase() {
         }
 
         /**
+         * v10 -> v11：事件与 Vault 事件新增「按时间倒数」的目标时刻 endMinuteOfDay（可空，当天分钟数）。
+         *
+         * 纯加列，既有数据一律为 NULL（= 保持原来的按日期倒数行为），老用户的倒数日不受影响。
+         * 与 MIGRATION_3_4 同样做幂等处理：历史发布包出现过库结构与版本号不同步的设备，
+         * 列已存在时跳过，避免重复 ALTER TABLE 崩溃。
+         */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                addColumnIfMissing(
+                    db, "events", "endMinuteOfDay",
+                    "ALTER TABLE events ADD COLUMN endMinuteOfDay INTEGER"
+                )
+                addColumnIfMissing(
+                    db, "vault_events", "endMinuteOfDay",
+                    "ALTER TABLE vault_events ADD COLUMN endMinuteOfDay INTEGER"
+                )
+            }
+        }
+
+        /**
          * 重建一张事件表并丢弃 repeatYearly 列，见 [MIGRATION_8_9] 的说明。
          * @param table 目标表名（重建完成后仍是该名字）。
          * @param parentTable 外键指向的父表（folders / vault_folders），用于剔除悬空引用。
@@ -342,7 +362,7 @@ abstract class DayMateDatabase : RoomDatabase() {
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                    MIGRATION_9_10
+                    MIGRATION_9_10, MIGRATION_10_11
                 )
                 .build()
         }

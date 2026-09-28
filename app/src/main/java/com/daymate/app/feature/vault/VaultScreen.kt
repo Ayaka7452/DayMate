@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import com.ayaka7452.daymate.data.festival.FestivalRepository
+import com.ayaka7452.daymate.feature.create.EventDetailBody
+import com.ayaka7452.daymate.feature.create.EventDetailData
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import sh.calvin.reorderable.ReorderableItem
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +37,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -54,6 +57,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -77,6 +81,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.ayaka7452.daymate.core.AppContainer
@@ -500,6 +506,8 @@ private fun VaultListScreen(
     var showAddSheet by remember { mutableStateOf(false) }
     var showEventDialog by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<VaultEventEntity?>(null) }
+    // 只读预览：点事件先看详情（与主空间一致），要改再点钢笔进编辑表单
+    var previewEvent by remember { mutableStateOf<VaultEventEntity?>(null) }
     var showFolderDialog by remember { mutableStateOf(false) }
     var folderTarget by remember { mutableStateOf<VaultFolderEntity?>(null) }
     var pendingMoveAfterCreate by remember { mutableStateOf(false) }
@@ -622,10 +630,7 @@ private fun VaultListScreen(
                             VaultEventRow(
                                 event = event,
                                 festivalRepo = container.festivalRepository,
-                                onClick = {
-                                    editingEvent = event
-                                    showEventDialog = true
-                                },
+                                onClick = { previewEvent = event },
                                 onMoveToMain = {
                                     scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                                 },
@@ -703,11 +708,7 @@ private fun VaultListScreen(
                             selectionMode = selectionMode,
                             selected = event.id in selectedEventIds,
                             onClick = {
-                                if (selectionMode) toggleEvent(event.id)
-                                else {
-                                    editingEvent = event
-                                    showEventDialog = true
-                                }
+                                if (selectionMode) toggleEvent(event.id) else previewEvent = event
                             },
                             onMoveToMain = {
                                 scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
@@ -736,6 +737,20 @@ private fun VaultListScreen(
                 folderTarget = null
                 pendingMoveAfterCreate = false
                 showFolderDialog = true
+            }
+        )
+    }
+
+    previewEvent?.let { ev ->
+        VaultEventPreviewDialog(
+            event = ev,
+            folderLabel = ev.folderId?.let { vaultFolderNameById[it] },
+            festivalRepo = container.festivalRepository,
+            onDismiss = { previewEvent = null },
+            onEdit = {
+                previewEvent = null
+                editingEvent = ev
+                showEventDialog = true
             }
         )
     }
@@ -972,6 +987,8 @@ fun VaultFolderScreen(
 
     var showEventDialog by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<VaultEventEntity?>(null) }
+    // 只读预览：点事件先看详情（与主空间一致），要改再点钢笔进编辑表单
+    var previewEvent by remember { mutableStateOf<VaultEventEntity?>(null) }
 
     // folderTarget=null 表示「新建文件夹」（从移入文件夹的创建入口进入），非 null 表示重命名当前文件夹
     var showFolderDialog by remember { mutableStateOf(false) }
@@ -1063,11 +1080,7 @@ fun VaultFolderScreen(
                             selectionMode = selectionMode,
                             selected = event.id in selectedEventIds,
                             onClick = {
-                                if (selectionMode) toggleEvent(event.id)
-                                else {
-                                    editingEvent = event
-                                    showEventDialog = true
-                                }
+                                if (selectionMode) toggleEvent(event.id) else previewEvent = event
                             },
                             onMoveToMain = {
                                 scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
@@ -1080,6 +1093,20 @@ fun VaultFolderScreen(
                 }
             }
         }
+    }
+
+    previewEvent?.let { ev ->
+        VaultEventPreviewDialog(
+            event = ev,
+            folderLabel = folder?.let { "${it.icon ?: "📁"} ${it.name}" },
+            festivalRepo = container.festivalRepository,
+            onDismiss = { previewEvent = null },
+            onEdit = {
+                previewEvent = null
+                editingEvent = ev
+                showEventDialog = true
+            }
+        )
     }
 
     if (showEventDialog) {
@@ -1450,7 +1477,10 @@ private fun VaultEventRow(
             ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
     }
     val text = if (holidayDayN != null) Tr.s(R.string.unit_holiday_day_n, holidayDayN)
-    else CountdownCalculator.formatCountdown(
+    // 按时间倒数：与主空间列表行同一口径（「还剩 3 天 5 小时」）
+    else event.endMinuteOfDay?.let {
+        CountdownCalculator.formatTimedShort(event.targetDateEpochDay, it)
+    } ?: CountdownCalculator.formatCountdown(
         event.targetDateEpochDay,
         event.displayUnit,
         event.refDays
@@ -1607,6 +1637,74 @@ private fun VaultFolderRow(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
+        }
+    }
+}
+
+/**
+ * Vault 事件预览：与主空间事件详情页共用 [EventDetailBody] 渲染。
+ *
+ * 此前点 Vault 事件直接弹出编辑表单——用户看不到「还剩多少天」的大数字，也没有只读浏览这一层
+ * （主空间是「点 → 预览 → 钢笔 → 编辑」）。这里补上同样的路径：预览页右上角钢笔才进编辑。
+ * 用全屏 Dialog 而非新路由：Vault 的全部数据依赖当前解锁会话，换页会带来锁屏/密钥丢失的边界，
+ * 弹层则天然继承当前会话。
+ */
+@Composable
+private fun VaultEventPreviewDialog(
+    event: VaultEventEntity,
+    folderLabel: String?,
+    festivalRepo: FestivalRepository?,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.detail_title)) },
+                        navigationIcon = {
+                            IconButton(onClick = onDismiss) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.common_back)
+                                )
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = onEdit) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.common_edit)
+                                )
+                            }
+                        }
+                    )
+                }
+            ) { padding ->
+                EventDetailBody(
+                    data = EventDetailData(
+                        title = event.title,
+                        note = event.note,
+                        targetDateEpochDay = event.targetDateEpochDay,
+                        refDays = event.refDays,
+                        displayUnit = event.displayUnit,
+                        repeatRule = event.repeatRule,
+                        linkedFestival = event.linkedFestival,
+                        endMinuteOfDay = event.endMinuteOfDay,
+                        isPinned = event.isPinned,
+                        folderLabel = folderLabel
+                    ),
+                    festivalRepo = festivalRepo,
+                    modifier = Modifier.padding(padding)
+                )
+            }
         }
     }
 }

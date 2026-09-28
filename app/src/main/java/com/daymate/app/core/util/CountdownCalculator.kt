@@ -96,4 +96,108 @@ object CountdownCalculator {
         refDays != null && refDays > 0 -> Tr.s(R.string.unit_days_past_ref, -diffDays, refDays)
         else -> Tr.s(R.string.unit_days_past, -diffDays)
     }
+
+    // ===================== 「按时间倒数」（精确到分，见 EventEntity.endMinuteOfDay） =====================
+
+    /** 秒级刷新阈值：剩余不足 3 分钟时按秒走，否则按分钟刷新就够（省电）。 */
+    const val TIMED_TICK_SECONDS = 3 * 60L
+
+    /**
+     * 时间模式倒计时的展示结果。
+     *
+     * [number]/[unit] 给详情页大数字用（取最大的有效单位，逐级退到秒）；
+     * [caption] 是次级说明（「还剩 X 小时 Y 分」这类），列表行与详情页副行共用。
+     */
+    data class TimedCountdown(
+        val number: String,
+        val unit: String,
+        val caption: String,
+        /** 剩余秒数（正=还没到，负=已过），供调用方决定刷新节奏。 */
+        val seconds: Long
+    )
+
+    /**
+     * 按「目标日期 + 目标时刻（当天分钟数）」计算倒计时。
+     *
+     * 分段规则（用户定）：有整天就看天+小时，不足 1 小时看分钟，不足 3 分钟看秒；
+     * 已过一侧完全镜像（同样先看天、再小时、再分、再秒）。
+     */
+    fun timedCountdown(
+        targetEpochDay: Long,
+        endMinuteOfDay: Int,
+        now: java.time.LocalDateTime = java.time.LocalDateTime.now()
+    ): TimedCountdown {
+        val (d, h, m, s, isFuture) = timedParts(targetEpochDay, endMinuteOfDay, now)
+        val number = when {
+            d >= 1 -> d.toString()
+            h >= 1 -> h.toString()
+            m >= 3 -> m.toString()
+            else -> s.toString()
+        }
+        val unit = when {
+            d >= 1 -> Tr.s(R.string.unit_days)
+            h >= 1 -> Tr.s(R.string.unit_hours)
+            m >= 3 -> Tr.s(R.string.unit_minutes)
+            else -> Tr.s(R.string.unit_seconds)
+        }
+        val totalSecs = d * 86_400 + h * 3_600 + m * 60 + s
+        return TimedCountdown(number, unit, timedCaption(d, h, m, s, isFuture), if (isFuture) totalSecs else -totalSecs)
+    }
+
+    /** 列表行用的时间模式文案：带最大单位的两段（「还剩 3 天 5 小时」）。 */
+    fun formatTimedShort(
+        targetEpochDay: Long,
+        endMinuteOfDay: Int,
+        now: java.time.LocalDateTime = java.time.LocalDateTime.now()
+    ): String {
+        val (d, h, m, s, isFuture) = timedParts(targetEpochDay, endMinuteOfDay, now)
+        return when {
+            d >= 1 -> pair(R.string.timed_remaining_dh, R.string.timed_past_dh, d, h, isFuture)
+            h >= 1 -> pair(R.string.timed_remaining_hm, R.string.timed_past_hm, h, m, isFuture)
+            m >= 3 -> pair(R.string.timed_remaining_ms, R.string.timed_past_ms, m, s, isFuture)
+            else -> single(R.string.timed_remaining_s, R.string.timed_past_s, s, isFuture)
+        }
+    }
+
+    /** 时间模式的分解结果：天/小时/分/秒 + 是否还没到点。 */
+    private data class TimedParts(
+        val days: Long,
+        val hours: Long,
+        val minutes: Long,
+        val seconds: Long,
+        val isFuture: Boolean
+    )
+
+    private fun timedParts(
+        targetEpochDay: Long,
+        endMinuteOfDay: Int,
+        now: java.time.LocalDateTime
+    ): TimedParts {
+        val minute = endMinuteOfDay.coerceIn(0, 24 * 60 - 1)
+        val target = java.time.LocalDate.ofEpochDay(targetEpochDay)
+            .atTime(minute / 60, minute % 60)
+        val isFuture = !target.isBefore(now)
+        val secs = if (isFuture) {
+            java.time.Duration.between(now, target).seconds
+        } else {
+            java.time.Duration.between(target, now).seconds
+        }
+        return TimedParts(secs / 86_400, secs % 86_400 / 3_600, secs % 3_600 / 60, secs % 60, isFuture)
+    }
+
+    /** 次级说明：主数字已占用最大单位，这里只报更小的那一段。 */
+    private fun timedCaption(d: Long, h: Long, m: Long, s: Long, isFuture: Boolean): String = when {
+        d >= 1 && h > 0 -> pair(R.string.timed_remaining_hm, R.string.timed_past_hm, h, m, isFuture)
+        d >= 1 && m > 0 -> pair(R.string.timed_remaining_ms, R.string.timed_past_ms, m, s, isFuture)
+        h >= 1 && m > 0 -> pair(R.string.timed_remaining_ms, R.string.timed_past_ms, m, s, isFuture)
+        h >= 1 && s > 0 -> single(R.string.timed_remaining_s, R.string.timed_past_s, s, isFuture)
+        m >= 3 && s > 0 -> single(R.string.timed_remaining_s, R.string.timed_past_s, s, isFuture)
+        else -> Tr.s(if (isFuture) R.string.detail_until_time else R.string.detail_past_time)
+    }
+
+    private fun pair(futureRes: Int, pastRes: Int, a: Long, b: Long, isFuture: Boolean): String =
+        Tr.s(if (isFuture) futureRes else pastRes, a, b)
+
+    private fun single(futureRes: Int, pastRes: Int, a: Long, isFuture: Boolean): String =
+        Tr.s(if (isFuture) futureRes else pastRes, a)
 }

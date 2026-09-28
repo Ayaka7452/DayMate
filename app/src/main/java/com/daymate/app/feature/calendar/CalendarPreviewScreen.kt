@@ -1,6 +1,7 @@
 package com.ayaka7452.daymate.feature.calendar
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -67,6 +68,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -153,18 +155,16 @@ fun CalendarPreviewScreen(
     var editingNote by remember { mutableStateOf<CycleNoteEntity?>(null) }
     var deletingDay by remember { mutableStateOf<Long?>(null) }
 
-    // 当月每天的目标日期 → 第一枚倒数日点的颜色（一天只显示一枚点，多了也不堆）。
-    // null = 事件未自定义颜色，绘制处再回落到主题色（remember 块内不能取 MaterialTheme）
-    val dotColorByDay = remember(events, month) {
-        val map = mutableMapOf<Long, Color?>()
-        for (e in events) {
-            val d = e.targetDateEpochDay
-            if (YearMonth.from(LocalDate.ofEpochDay(d)) == month && !map.containsKey(d)) {
-                map[d] = e.color?.let { Color(it) }
-            }
-        }
-        map
+    // 当月有倒数事件的目标日（一天只显示一枚点，多了也不堆）。
+    // 颜色统一用默认主题色（青蓝），不再跟随事件自定义配色——日历格子里颜色已经要承担
+    // 休/班/经期/排卵四种语义，再让事件自带颜色会彻底看花。
+    val eventDotDays = remember(events, month) {
+        events.filter { YearMonth.from(LocalDate.ofEpochDay(it.targetDateEpochDay)) == month }
+            .map { it.targetDateEpochDay }
+            .toSet()
     }
+    // 经期/排卵推算用的登记条目（与周期管家日历同一口径）
+    val logEntries = remember(logs) { logs.map { it.startDateEpochDay to it.periodDays } }
 
     // 农历只在中文环境下显示（农历本身没有自然的外语译法，其他语言留白更干净）
     val showLunar = remember { LocaleWrap.locale().language == "zh" }
@@ -241,9 +241,12 @@ fun CalendarPreviewScreen(
             Spacer(Modifier.height(4.dp))
 
             // 星期表头 + 日期网格（一起跟手平移）
+            // animateContentSize：翻月时行数会在 4/5/6 行之间跳，高度突变会把下方图例与详情栏
+            // 硬生生推一下（看着像页面重排）；这里只做高度过渡，宽度恒定所以不影响翻月手势测量。
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .animateContentSize(tween(240, easing = FastOutSlowInEasing))
                     .clipToBounds()                 // 平移出界的部分裁掉，免得在屏幕边缘留残影
                     .onSizeChanged { gridWidth = it.width.toFloat() }
                     .graphicsLayer { translationX = slideX.value }
@@ -312,9 +315,26 @@ fun CalendarPreviewScreen(
                                         val isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY
                                         val isToday = epochDay == today
                                         val isSelected = selectedDay == epochDay
-                                        val dotColor = dotColorByDay[epochDay]
+                                        val hasEventDot = eventDotDays.contains(epochDay)
                                         val hasOwnNote = ownNoteDays.contains(epochDay)
                                         val hasTrackerNote = trackerNoteDays.contains(epochDay)
+                                        // 经期/排卵只在「显示经期信息」打开时才提示，且只标阶段首日：
+                                        // 经期首日（登记与预测都算）蓝点、排卵期首日红点；已到/已过实心，未来空心。
+                                        // 用 phaseOfAnyDay 与周期管家日历完全同一套推算口径。
+                                        val periodStart: Boolean
+                                        val ovulationStart: Boolean
+                                        if (showPeriod) {
+                                            val phase = CycleCalculator.phaseOfAnyDay(epochDay, logEntries, cycleDays)
+                                            val prevPhase = CycleCalculator.phaseOfAnyDay(epochDay - 1, logEntries, cycleDays)
+                                            periodStart = phase == CycleCalculator.Phase.PERIOD &&
+                                                prevPhase != CycleCalculator.Phase.PERIOD
+                                            ovulationStart = phase == CycleCalculator.Phase.OVULATION &&
+                                                prevPhase != CycleCalculator.Phase.OVULATION
+                                        } else {
+                                            periodStart = false
+                                            ovulationStart = false
+                                        }
+                                        val phaseReached = epochDay <= today
 
                                         // 常态就是一枚浅色方块（与周期管家「每天都有底色」同一套视觉）；
                                         // 休/班换绿/橙——只靠颜色表达，不放角标挡日期。
@@ -369,18 +389,39 @@ fun CalendarPreviewScreen(
                                                 } else {
                                                     Spacer(Modifier.height(9.dp))
                                                 }
-                                                // 倒数日目标点：一天只一枚，颜色跟随首个事件
-                                                if (dotColor != null) {
-                                                    Box(
-                                                        Modifier
-                                                            .size(5.dp)
-                                                            .background(
-                                                                dotColor ?: MaterialTheme.colorScheme.primary,
-                                                                CircleShape
+                                                // 圆点行（农历小字正下方）：
+                                                // 经期首日（青蓝，同管家 periodColor）+ 排卵期首日（红，同管家 ovulationColor）
+                                                // + 倒数事件目标日（主题青蓝，一天只一枚，多了也不堆）
+                                                if (periodStart || ovulationStart || hasEventDot) {
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        if (periodStart) {
+                                                            PhaseDot(
+                                                                MaterialTheme.colorScheme.primary,
+                                                                filled = phaseReached
                                                             )
-                                                    )
+                                                        }
+                                                        if (ovulationStart) {
+                                                            PhaseDot(
+                                                                MaterialTheme.colorScheme.tertiary,
+                                                                filled = phaseReached
+                                                            )
+                                                        }
+                                                        if (hasEventDot) {
+                                                            Box(
+                                                                Modifier
+                                                                    .size(4.dp)
+                                                                    .background(
+                                                                        MaterialTheme.colorScheme.primary,
+                                                                        CircleShape
+                                                                    )
+                                                            )
+                                                        }
+                                                    }
                                                 } else {
-                                                    Spacer(Modifier.height(5.dp))
+                                                    Spacer(Modifier.height(6.dp))
                                                 }
                                             }
                                             // 当天有记录：右上角一枚小点。自己写的记事用主色，
@@ -434,33 +475,33 @@ fun CalendarPreviewScreen(
                 }
             }
 
-            // 图例：休 / 班 / 倒数日（休班用小方块呼应底色，倒数日用圆点呼应格内圆点）
+            // 图例：休 / 班 / 倒数日（休班用小方块呼应底色，倒数日用圆点呼应格内圆点）；
+            // 经期与排卵两项只在「显示经期信息」打开时出现——解释了不存在的颜色反而让人困惑。
             Spacer(Modifier.height(12.dp))
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                LegendSwatch(OFF_GREEN)
-                Text(
-                    stringResource(R.string.calendar_legend_off),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-                Spacer(Modifier.width(12.dp))
-                LegendSwatch(MAKEUP_ORANGE)
-                Text(
-                    stringResource(R.string.calendar_legend_makeup),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-                Spacer(Modifier.width(12.dp))
-                LegendDot()
-                Text(
-                    stringResource(R.string.calendar_legend_event),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LegendSwatch(OFF_GREEN)
+                    LegendLabel(stringResource(R.string.calendar_legend_off))
+                    Spacer(Modifier.width(12.dp))
+                    LegendSwatch(MAKEUP_ORANGE)
+                    LegendLabel(stringResource(R.string.calendar_legend_makeup))
+                    Spacer(Modifier.width(12.dp))
+                    LegendDot(MaterialTheme.colorScheme.primary)
+                    LegendLabel(stringResource(R.string.calendar_legend_event))
+                }
+                if (showPeriod) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LegendDot(MaterialTheme.colorScheme.primary, size = 7.dp)
+                        LegendLabel(stringResource(R.string.calendar_legend_period))
+                        Spacer(Modifier.width(12.dp))
+                        LegendDot(MaterialTheme.colorScheme.tertiary, size = 7.dp)
+                        LegendLabel(stringResource(R.string.calendar_legend_ovulation))
+                    }
+                }
             }
             if (!hasFestivalData) {
                 Text(
@@ -479,6 +520,8 @@ fun CalendarPreviewScreen(
             val detailDay = selectedDay ?: today
             AnimatedContent(
                 targetState = detailDay,
+                // 换天时记录条数不同 → 卡片高度不同，让高度也平滑过渡而不是硬切
+                modifier = Modifier.animateContentSize(),
                 transitionSpec = {
                     val spec = tween<IntOffset>(260, easing = FastOutSlowInEasing)
                     val fade = tween<Float>(180, easing = FastOutSlowInEasing)
@@ -831,6 +874,22 @@ private fun CalendarNoteDialog(
     )
 }
 
+/** 经期/排卵提示点：已到（含今天）为实心，未来预测为空心圆环。 */
+@Composable
+private fun PhaseDot(color: Color, filled: Boolean) {
+    Box(
+        if (filled) {
+            Modifier
+                .size(6.dp)
+                .background(color, CircleShape)
+        } else {
+            Modifier
+                .size(6.dp)
+                .border(1.2.dp, color, CircleShape)
+        }
+    )
+}
+
 /** 图例小方块（休/班底色同款）。 */
 @Composable
 private fun LegendSwatch(color: Color) {
@@ -843,13 +902,23 @@ private fun LegendSwatch(color: Color) {
     )
 }
 
-/** 图例小圆点（倒数日目标点同款）。 */
+/** 图例小圆点（格内圆点同款，颜色由调用方给）。 */
 @Composable
-private fun LegendDot() {
+private fun LegendDot(color: Color, size: Dp = 8.dp) {
     Box(
         Modifier
             .padding(end = 4.dp)
-            .size(8.dp)
-            .background(MaterialTheme.colorScheme.primary, CircleShape)
+            .size(size)
+            .background(color, CircleShape)
+    )
+}
+
+/** 图例文字：统一字号与弱化色，避免每处各写一遍样式。 */
+@Composable
+private fun LegendLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
     )
 }

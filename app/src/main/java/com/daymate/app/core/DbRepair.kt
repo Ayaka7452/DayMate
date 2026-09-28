@@ -164,7 +164,7 @@ class DbRepair(
     private val expectedColumns = mapOf(
         "events" to setOf(
             "id", "title", "targetDateEpochDay", "note", "color", "folderId", "refDays",
-            "displayUnit", "repeatRule", "linkedFestival", "specialType",
+            "displayUnit", "repeatRule", "linkedFestival", "endMinuteOfDay", "specialType",
             "sortIndex", "isPinned", "isDeleted", "deletedAt", "createdAt", "updatedAt"
         ),
         "folders" to setOf(
@@ -173,8 +173,8 @@ class DbRepair(
         ),
         "vault_events" to setOf(
             "id", "title", "targetDateEpochDay", "note", "color", "folderId", "refDays",
-            "displayUnit", "repeatRule", "linkedFestival", "sortIndex", "isPinned",
-            "createdAt", "updatedAt"
+            "displayUnit", "repeatRule", "linkedFestival", "endMinuteOfDay",
+            "sortIndex", "isPinned", "createdAt", "updatedAt"
         ),
         "vault_folders" to setOf(
             "id", "name", "icon", "color", "sortIndex", "isPinned", "createdAt"

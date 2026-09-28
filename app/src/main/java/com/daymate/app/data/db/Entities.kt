@@ -48,6 +48,11 @@ data class EventEntity(
     val repeatRule: String? = null,
     /** 跟随的节日名（来自节假日数据源）：目标日期过后自动锚定到该节日的下一次日期。优先于 repeatRule。 */
     val linkedFestival: String? = null,
+    /**
+     * 「按时间倒数」的目标时刻：当天 0 点到目标时刻的分钟数（0..1439），null = 按日期倒数（整天）。
+     * 启用后倒计时精确到分钟，显示「剩余 X 天 X 小时」，不足 1 小时按分钟、不足 3 分钟按秒。
+     */
+    val endMinuteOfDay: Int? = null,
     /** 功能快捷事件标记：null=普通事件；"cycle"=周期管家入口（点击进入周期管家而非详情页）。 */
     val specialType: String? = null,
     val sortIndex: Int = 0,
@@ -127,6 +132,8 @@ data class VaultEventEntity(
     val repeatRule: String? = null,
     /** 跟随的节日名（来自节假日数据源）。与主表 events.linkedFestival 同义。 */
     val linkedFestival: String? = null,
+    /** 「按时间倒数」的目标时刻（当天分钟数 0..1439），null = 按日期倒数。与主表同义。 */
+    val endMinuteOfDay: Int? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

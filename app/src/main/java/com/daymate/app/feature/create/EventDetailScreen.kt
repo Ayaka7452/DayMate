@@ -41,10 +41,47 @@ import com.ayaka7452.daymate.data.festival.FestivalRepository
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.Period
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+
+/**
+ * 详情页渲染所需的全部字段。
+ *
+ * 主表事件与 Vault 事件（解密后）字段几乎一致，抽取成这个中立数据类后，
+ * 两边共用同一套渲染与同一套倒计时口径——否则「主空间显示 3 天、Vault 显示 4 天」这类
+ * 不一致迟早会出现。
+ */
+data class EventDetailData(
+    val title: String,
+    val note: String?,
+    val targetDateEpochDay: Long,
+    val refDays: Int? = null,
+    val displayUnit: String? = null,
+    val repeatRule: String? = null,
+    val linkedFestival: String? = null,
+    /** 「按时间倒数」的目标时刻（当天分钟数），null = 按日期倒数。 */
+    val endMinuteOfDay: Int? = null,
+    val isPinned: Boolean = false,
+    /** 所在文件夹的展示名（已含图标 emoji），null = 不显示该行。 */
+    val folderLabel: String? = null
+)
+
+/** 主表事件 → 详情数据。 */
+fun EventEntity.toDetailData(folderLabel: String?): EventDetailData = EventDetailData(
+    title = title,
+    note = note,
+    targetDateEpochDay = targetDateEpochDay,
+    refDays = refDays,
+    displayUnit = displayUnit,
+    repeatRule = repeatRule,
+    linkedFestival = linkedFestival,
+    endMinuteOfDay = endMinuteOfDay,
+    isPinned = isPinned,
+    folderLabel = folderLabel
+)
 
 /**
  * 事件详情页（只读）：点击列表行 / 桌面小组件进入，浏览而不误触编辑。
@@ -98,9 +135,8 @@ fun EventDetailScreen(
             e != null -> {
                 // 用文件夹自己的 emoji（与主页/文件夹列表一致），缺省回落到默认文件夹图标
                 val f = folders.firstOrNull { it.id == e.folderId }
-                DetailContent(
-                    e,
-                    f?.let { "${it.icon ?: "📁"} ${it.name}" },
+                EventDetailBody(
+                    data = e.toDetailData(f?.let { "${it.icon ?: "📁"} ${it.name}" }),
                     festivalRepo = container.festivalRepository,
                     showSpanTotal = showSpanTotal,
                     modifier = Modifier.padding(padding)
@@ -124,15 +160,31 @@ fun EventDetailScreen(
     }
 }
 
+/**
+ * 详情正文（主空间与 Vault 共用）。
+ *
+ * 「按时间倒数」的事件会自建一个 ticker：不足 3 分钟时每秒刷新，否则 30 秒一次——
+ * 秒级刷新只在真正需要看秒的时候跑，不会在列表/详情常驻时白耗电。
+ */
 @Composable
-// folderLabel 已带文件夹自己的 emoji（调用方拼好），此处不再补硬编码图标
-private fun DetailContent(
-    e: EventEntity,
-    folderLabel: String?,
+fun EventDetailBody(
+    data: EventDetailData,
     festivalRepo: FestivalRepository? = null,
     showSpanTotal: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    // ticker 只在时间模式存在；endMinuteOfDay 变化时重启
+    var now by remember(data.endMinuteOfDay) { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(data.endMinuteOfDay, data.targetDateEpochDay) {
+        val minute = data.endMinuteOfDay ?: return@LaunchedEffect
+        while (true) {
+            now = LocalDateTime.now()
+            val c = CountdownCalculator.timedCountdown(data.targetDateEpochDay, minute, now)
+            val fast = kotlin.math.abs(c.seconds) < CountdownCalculator.TIMED_TICK_SECONDS
+            kotlinx.coroutines.delay(if (fast) 1_000L else 30_000L)
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -141,14 +193,14 @@ private fun DetailContent(
     ) {
         Spacer(Modifier.height(8.dp))
         Text(
-            e.title,
+            data.title,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
-        if (!e.note.isNullOrBlank()) {
+        if (!data.note.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
             Text(
-                e.note!!,
+                data.note!!,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
@@ -157,15 +209,15 @@ private fun DetailContent(
 
         // ===== 倒计时主视觉：大数字 + 单位 =====
         // 跟随节日的假期段内（如中秋、国庆连休中）覆盖为「假期第 x 天」口径
-        val holidayDayN = remember(e.linkedFestival, LocalDate.now().toEpochDay()) {
-            e.linkedFestival?.takeIf { it.isNotBlank() }
+        val holidayDayN = remember(data.linkedFestival, LocalDate.now().toEpochDay()) {
+            data.linkedFestival?.takeIf { it.isNotBlank() }
                 ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
         }
         // 「假期显示总长」开启时附假期剩余天数（含今天口径，与节日卡一致）；仅剩最后一天（=1）时不附加
         val holidayRemaining = remember(holidayDayN, showSpanTotal, LocalDate.now().toEpochDay()) {
             if (holidayDayN != null && showSpanTotal) festivalRepo?.offDayRemainingLength(LocalDate.now()) else null
         }
-        val cd = countdownDisplay(e, holidayDayN, holidayRemaining)
+        val cd = countdownDisplay(data, holidayDayN, holidayRemaining, now)
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -197,34 +249,42 @@ private fun DetailContent(
         Spacer(Modifier.height(28.dp))
 
         // ===== 信息行 =====
-        val date = LocalDate.ofEpochDay(e.targetDateEpochDay)
+        val date = LocalDate.ofEpochDay(data.targetDateEpochDay)
         InfoRow(
             Tr.s(R.string.detail_target_date),
             date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd))) +
                 " · " + date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.forLanguageTag(Tr.s(R.string.locale_tag)))
         )
+        // 按时间倒数时目标日期还带一个时刻，单列一行才看得清（并进日期行会被读漏）
+        if (data.endMinuteOfDay != null) {
+            InfoRow(Tr.s(R.string.detail_target_time), minuteText(data.endMinuteOfDay))
+        }
         InfoRow(
             Tr.s(R.string.repeat_label),
             when {
                 // 存的是锚定名，展示按当前语言译一遍
-                e.linkedFestival != null -> Tr.s(
+                data.linkedFestival != null -> Tr.s(
                     R.string.detail_follow_festival,
-                    com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(e.linkedFestival.orEmpty())
+                    com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(data.linkedFestival.orEmpty())
                 )
-                e.repeatRule == CountdownCalculator.REPEAT_WEEKLY -> Tr.s(R.string.repeat_weekly)
-                e.repeatRule == CountdownCalculator.REPEAT_MONTHLY -> Tr.s(R.string.repeat_monthly)
-                e.repeatRule == CountdownCalculator.REPEAT_YEARLY -> Tr.s(R.string.repeat_yearly)
+                data.repeatRule == CountdownCalculator.REPEAT_WEEKLY -> Tr.s(R.string.repeat_weekly)
+                data.repeatRule == CountdownCalculator.REPEAT_MONTHLY -> Tr.s(R.string.repeat_monthly)
+                data.repeatRule == CountdownCalculator.REPEAT_YEARLY -> Tr.s(R.string.repeat_yearly)
                 else -> Tr.s(R.string.repeat_none)
             }
         )
-        if (e.refDays != null && e.refDays > 0) {
-            InfoRow(Tr.s(R.string.detail_ref_value), "${e.refDays} ${refUnitLabel(e.displayUnit)}")
+        if (data.refDays != null && data.refDays > 0) {
+            InfoRow(Tr.s(R.string.detail_ref_value), "${data.refDays} ${refUnitLabel(data.displayUnit)}")
         }
-        if (folderLabel != null) InfoRow(Tr.s(R.string.detail_folder), folderLabel)
-        if (e.isPinned) InfoRow(Tr.s(R.string.detail_pinned), Tr.s(R.string.detail_pinned_yes))
+        if (data.folderLabel != null) InfoRow(Tr.s(R.string.detail_folder), data.folderLabel)
+        if (data.isPinned) InfoRow(Tr.s(R.string.detail_pinned), Tr.s(R.string.detail_pinned_yes))
         Spacer(Modifier.height(16.dp))
     }
 }
+
+/** 目标时刻展示文本：24 小时制 HH:mm。 */
+internal fun minuteText(minuteOfDay: Int): String =
+    "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
 
 @Composable
 private fun InfoRow(label: String, value: String) {
@@ -259,9 +319,10 @@ private fun refUnitLabel(unit: String?): String = when (unit) {
 private data class CountdownDisplay(val number: String, val unit: String, val caption: String)
 
 private fun countdownDisplay(
-    e: EventEntity,
+    data: EventDetailData,
     holidayDayN: Int? = null,
-    holidayRemaining: Int? = null
+    holidayRemaining: Int? = null,
+    now: LocalDateTime = LocalDateTime.now()
 ): CountdownDisplay {
     // 假期段内（跟随节日）：大数字即假期第几天，caption 同文案（不显示「今天/已过去」）；
     // 「假期显示总长」开启且假期还有多于 1 天时，附加「· 剩余X天」
@@ -278,23 +339,28 @@ private fun countdownDisplay(
             caption = cap
         )
     }
-    val today = LocalDate.now()
-    val diffDays = e.targetDateEpochDay - today.toEpochDay()
+    // 按时间倒数：走精确到分的分段逻辑（天+小时 → 分钟 → 秒），已过一侧镜像
+    data.endMinuteOfDay?.let { minute ->
+        val t = CountdownCalculator.timedCountdown(data.targetDateEpochDay, minute, now)
+        return CountdownDisplay(number = t.number, unit = t.unit, caption = t.caption)
+    }
+    val today = now.toLocalDate()
+    val diffDays = data.targetDateEpochDay - today.toEpochDay()
     val isFuture = diffDays >= 0
     val period = if (isFuture) {
-        Period.between(today, LocalDate.ofEpochDay(e.targetDateEpochDay))
+        Period.between(today, LocalDate.ofEpochDay(data.targetDateEpochDay))
     } else {
-        Period.between(LocalDate.ofEpochDay(e.targetDateEpochDay), today)
+        Period.between(LocalDate.ofEpochDay(data.targetDateEpochDay), today)
     }
     val totalMonths = period.years * 12L + period.months
-    val hasRef = e.refDays != null && e.refDays > 0
+    val hasRef = data.refDays != null && data.refDays > 0
 
     // 主数字：优先按显示单位取整，不足一个单位退回更小单位
     // 统一显示正数：天按绝对值，月/年因 Period 已按过去方向计算本就为正；
     // 是否已过由下方 caption（距离目标日期 / 目标日期已过去）明确提示
     var n = if (isFuture) diffDays else -diffDays
     var u = Tr.s(R.string.unit_days)
-    when (e.displayUnit) {
+    when (data.displayUnit) {
         CountdownCalculator.UNIT_YEAR -> when {
             period.years > 0 -> { n = period.years.toLong(); u = Tr.s(R.string.unit_years) }
             totalMonths > 0 -> { n = totalMonths; u = Tr.s(R.string.unit_months) }
@@ -302,7 +368,7 @@ private fun countdownDisplay(
         CountdownCalculator.UNIT_MONTH -> if (totalMonths > 0) { n = totalMonths; u = Tr.s(R.string.unit_months) }
     }
     // 已过且有对照值时数字区显示 X/N（对照值单位跟随显示单位）
-    val number = if (!isFuture && hasRef) "$n / ${e.refDays}" else "$n"
+    val number = if (!isFuture && hasRef) "$n / ${data.refDays}" else "$n"
     val caption = when {
         diffDays == 0L -> Tr.s(R.string.detail_today)
         isFuture -> Tr.s(R.string.detail_until)

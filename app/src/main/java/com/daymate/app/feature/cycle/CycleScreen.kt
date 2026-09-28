@@ -1280,14 +1280,7 @@ private fun CycleSettingsScreen(
             val showPredictionSetting by container.settingsRepository.cycleShowPrediction.collectAsState(initial = false)
             Text(stringResource(R.string.cycle_detail_display), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
-            ToggleRow(
-                title = stringResource(R.string.cycle_show_notes_title),
-                subtitle = stringResource(R.string.cycle_show_notes_desc),
-                checked = showNotesSetting,
-                enabled = true
-            ) { want ->
-                scope.launch { container.settingsRepository.setCycleShowNotes(want) }
-            }
+            // 顺序：先「显示经期信息」（决定整个经期语义是否外露），再「显示自定义记录」（更细一层）
             ToggleRow(
                 title = stringResource(R.string.cycle_show_prediction_title),
                 subtitle = stringResource(R.string.cycle_show_prediction_desc),
@@ -1295,6 +1288,14 @@ private fun CycleSettingsScreen(
                 enabled = true
             ) { want ->
                 scope.launch { container.settingsRepository.setCycleShowPrediction(want) }
+            }
+            ToggleRow(
+                title = stringResource(R.string.cycle_show_notes_title),
+                subtitle = stringResource(R.string.cycle_show_notes_desc),
+                checked = showNotesSetting,
+                enabled = true
+            ) { want ->
+                scope.launch { container.settingsRepository.setCycleShowNotes(want) }
             }
 
             Spacer(Modifier.height(20.dp))
