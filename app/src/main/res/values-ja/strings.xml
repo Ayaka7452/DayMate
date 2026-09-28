@@ -823,15 +823,20 @@
     <string name="settings_span_total_mode">休暇の総日数を表示</string>
 
     <string name="settings_span_total_mode_desc">休暇中は総日数と残り日数の両方を表示します。オフにすると残り日数のみ表示します</string>
-    <string name="home_calendar_preview">カレンダープレビュー</string>
-    <string name="calendar_preview_title">カレンダープレビュー</string>
+    <string name="home_calendar_preview">カレンダーノート</string>
+    <string name="calendar_preview_title">カレンダーノート</string>
     <string name="calendar_today">今日</string>
     <string name="calendar_legend_off">休</string>
     <string name="calendar_legend_makeup">出勤</string>
     <string name="calendar_legend_event">カウントダウン</string>
+    <string name="cycle_detail_display">詳細バーの表示</string>
+    <string name="cycle_show_notes_title">記録タグを表示</string>
+    <string name="cycle_show_notes_desc">日付詳細バーにその日登録した記録タグを表示します。</string>
+    <string name="cycle_show_prediction_title">生理予測を表示</string>
+    <string name="cycle_show_prediction_desc">日付詳細バーに周期の段階と生理予測情報を表示します。</string>
     <string name="calendar_no_festival_data">今年の祝日データは未ダウンロードです。設定からダウンロードできます。</string>
     <string name="cycle_tip_frequent_body">性生活が3日連続で記録されました。体を大切に、しっかり休んでくださいね。</string>
     <string name="cycle_tip_ovulation_body">排卵日に性生活の記録があります。有効な避妊をしていない場合、妊娠のリスクが高まります。体調の変化にご注意ください。</string>
     <string name="settings_calendar_long_press">長押しで「＋」を展開</string>
-    <string name="settings_calendar_long_press_desc">ホーム画面の追加ボタンを長押ししたとき、展開パネルにカレンダープレビューの項目を表示します。</string>
+    <string name="settings_calendar_long_press_desc">ホーム画面の追加ボタンを長押ししたとき、展開パネルにカレンダーノートの項目を表示します。</string>
 </resources>

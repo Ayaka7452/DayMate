@@ -1,5 +1,14 @@
 package com.ayaka7452.daymate.feature.calendar
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,14 +47,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.i18n.LocaleWrap
 import com.ayaka7452.daymate.core.util.CycleCalculator
+import com.ayaka7452.daymate.core.util.LunarCalendar
 import com.ayaka7452.daymate.feature.cycle.AddNoteDialog
 import com.ayaka7452.daymate.feature.cycle.CycleDayDetail
 import com.ayaka7452.daymate.feature.cycle.DeleteNotesDialog
@@ -58,10 +71,11 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 
 /**
- * 日历预览（主页菜单入口）：
- *  - 整月日历，一格一意：日号 + 法定节假日/调休补班底色（与节日卡、小组件同一套绿=休/橙=班）
- *    + 底部小圆点标倒数日目标日期（颜色跟随事件自身颜色）；
- *  - 点击任意一天展开详情区，备注管理完全复用周期管家那一套（CycleDayDetail + 三个记录弹窗）；
+ * 日历记事（主页菜单入口）：
+ *  - 整月日历，一格一意：日号 + 农历/节日次行小字 + 法定节假日/调休补班底色（绿=休/橙=班）
+ *    + 数字下一枚倒数日点（一天只一枚，颜色跟事件）+ 右上角小点标当天有周期管家记录；
+ *  - 详情栏常驻：未选中任何一天时显示今天的信息，选中后显示选中日（左右换天带方向滑动动画），
+ *    备注管理完全复用周期管家那一套（CycleDayDetail + 三个记录弹窗）；
  *  - 倒数日只取主表 events（Vault 是独立私密空间，不上墙）。循环/节日跟随事件的
  *    targetDateEpochDay 已由 rollForwardRepeating 在启动/跨天时滚到当前显示目标日，这里直接取用。
  */
@@ -86,6 +100,9 @@ fun CalendarPreviewScreen(
         .collectAsState(initial = CycleCalculator.DEFAULT_CYCLE_DAYS)
     val cycleAuto by container.settingsRepository.cycleCycleAuto.collectAsState(initial = true)
     val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
+    // 详情栏显示开关：与周期管家共用同一组设置
+    val showNoteTags by container.settingsRepository.cycleShowNotes.collectAsState(initial = false)
+    val showPrediction by container.settingsRepository.cycleShowPrediction.collectAsState(initial = true)
 
     // 节假日数据：remember 里同步读一次缓存（就近预载，防首帧跳动——铁律 13）。
     // 年份缺缓存时整月无角标，底部图例区给出「数据未下载」提示。
@@ -99,23 +116,28 @@ fun CalendarPreviewScreen(
         container.festivalRepository.cachedYears().contains(month.year)
     }
 
-    // 选中日（null = 未选中）；弹窗状态与周期管家同构
+    // 选中日（null = 未选中，详情栏显示今天）；弹窗状态与周期管家同构
     var selectedDay by remember { mutableStateOf<Long?>(null) }
     var showAddNote by remember { mutableStateOf(false) }
     var deletingNote by remember { mutableStateOf<Long?>(null) } // 删除确认针对的日期
     var editingNote by remember { mutableStateOf<com.ayaka7452.daymate.data.db.CycleNoteEntity?>(null) }
 
-    // 当月每天的目标日期 → 事件颜色列表（一圈最多画 3 颗点，再多也算「有」）
-    val dotsByDay = remember(events, month) {
-        val map = mutableMapOf<Long, MutableList<Int?>>()
+    // 当月每天的目标日期 → 第一枚倒数日点的颜色（一天只显示一枚点，多了也不堆）
+    val dotColorByDay = remember(events, month) {
+        val map = mutableMapOf<Long, Color?>()
         for (e in events) {
             val d = e.targetDateEpochDay
-            if (YearMonth.from(LocalDate.ofEpochDay(d)) == month) {
-                map.getOrPut(d) { mutableListOf() }.add(e.color)
+            if (YearMonth.from(LocalDate.ofEpochDay(d)) == month && !map.containsKey(d)) {
+                map[d] = e.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
             }
         }
         map
     }
+    // 有周期管家日常记录的日期（右上角一枚小点，与周期管家日历同一套视觉语言）
+    val noteDays = remember(notes) { notes.map { it.dateEpochDay }.toSet() }
+
+    // 农历只在中文环境下显示（农历本身没有自然的外语译法，其他语言留白更干净）
+    val showLunar = remember { LocaleWrap.locale().language == "zh" }
 
     Scaffold(
         topBar = {
@@ -133,9 +155,9 @@ fun CalendarPreviewScreen(
                     TextButton(
                         onClick = {
                             monthOffset = 0
-                            selectedDay = today
+                            selectedDay = null
                         },
-                        enabled = monthOffset != 0 || selectedDay != today
+                        enabled = monthOffset != 0 || selectedDay != null
                     ) { Text(stringResource(R.string.calendar_today)) }
                 }
             )
@@ -206,19 +228,23 @@ fun CalendarPreviewScreen(
                             ) {
                             val dayNum = idx - leading + 1
                                 if (dayNum in 1..daysInMonth) {
-                                    val epochDay = month.atDay(dayNum).toEpochDay()
+                                    val date = month.atDay(dayNum)
+                                    val epochDay = date.toEpochDay()
                                     val festival = festivalByDate[epochDay]
-                                    val dow = month.atDay(dayNum).dayOfWeek
+                                    val dow = date.dayOfWeek
                                     val isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY
                                     val isToday = epochDay == today
                                     val isSelected = selectedDay == epochDay
-                                    val dots = dotsByDay[epochDay].orEmpty()
+                                    val dotColor = dotColorByDay[epochDay]
+                                    val hasNote = noteDays.contains(epochDay)
 
+                                    val offGreen = Color(0xFF1E8E3E)
+                                    val makeupOrange = Color(0xFFE8710A)
                                     val bg = when {
                                         // 休/班底色与角标同源（绿=休 / 橙=班），淡底不抢日号
-                                        festival?.isOffDay == true -> androidx.compose.ui.graphics.Color(0xFF1E8E3E).copy(alpha = 0.10f)
-                                        festival != null -> androidx.compose.ui.graphics.Color(0xFFE8710A).copy(alpha = 0.10f)
-                                        else -> androidx.compose.ui.graphics.Color.Transparent
+                                        festival?.isOffDay == true -> offGreen.copy(alpha = 0.10f)
+                                        festival != null -> makeupOrange.copy(alpha = 0.10f)
+                                        else -> Color.Transparent
                                     }
                                     Box(
                                         modifier = Modifier
@@ -248,28 +274,54 @@ fun CalendarPreviewScreen(
                                                     alpha = if (isWeekend && !isToday) 0.55f else 1f
                                                 )
                                             )
-                                            Spacer(Modifier.height(3.dp))
-                                            // 倒数日目标点：最多 3 颗，颜色跟随事件
-                                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                if (dots.isEmpty()) {
-                                                    Spacer(Modifier.height(4.dp))
-                                                } else {
-                                                    dots.take(3).forEach { argb ->
-                                                        Box(
-                                                            Modifier
-                                                                .size(5.dp)
-                                                                .background(
-                                                                    argb?.let { androidx.compose.ui.graphics.Color(it) }
-                                                                        ?: MaterialTheme.colorScheme.primary,
-                                                                    CircleShape
-                                                                )
-                                                        )
-                                                    }
-                                                }
+                                            // 次行小字：法定节日名（随休/班配色）→ 农历节日名 → 农历日。
+                                            // 没有农历需求（非中文环境）且当天无节日时用空位补齐，点行高不跳动
+                                            if (festival != null) {
+                                                Text(
+                                                    festival.name,
+                                                    fontSize = 8.sp,
+                                                    lineHeight = 9.sp,
+                                                    maxLines = 1,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = if (festival.isOffDay) offGreen else makeupOrange
+                                                )
+                                            } else if (showLunar) {
+                                                Text(
+                                                    LunarCalendar.labelText(date),
+                                                    fontSize = 8.sp,
+                                                    lineHeight = 9.sp,
+                                                    maxLines = 1,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                                )
+                                            } else {
+                                                Spacer(Modifier.height(9.dp))
                                             }
-                                            Spacer(Modifier.height(3.dp))
+                                            // 倒数日目标点：一天只一枚，颜色跟随首个事件
+                                            if (dotColor != null) {
+                                                Box(
+                                                    Modifier
+                                                        .size(5.dp)
+                                                        .background(dotColor, CircleShape)
+                                                )
+                                            } else {
+                                                Spacer(Modifier.height(5.dp))
+                                            }
                                         }
-                                        // 休/班角标压在格子右上角（与节日卡、小组件同一套配色）
+                                        // 当天有周期管家记录：右上角一枚小点（与周期管家日历同款）
+                                        if (hasNote) {
+                                            Box(
+                                                Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(top = 3.dp, end = 3.dp)
+                                                    .size(4.dp)
+                                                    .background(
+                                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                                                        CircleShape
+                                                    )
+                                            )
+                                        }
+                                        // 休/班角标压在格子右上角（与节日卡、小组件同一套配色）；
+                                        // 有记录小点时角标内收让位，避免叠在一起
                                         if (festival != null) {
                                             Box(Modifier.align(Alignment.TopEnd).padding(2.dp)) {
                                                 FestivalBadge(isOffDay = festival.isOffDay)
@@ -290,14 +342,14 @@ fun CalendarPreviewScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                LegendDot(androidx.compose.ui.graphics.Color(0xFF1E8E3E))
+                LegendDot(Color(0xFF1E8E3E))
                 Text(
                     stringResource(R.string.calendar_legend_off),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
                 Spacer(Modifier.width(12.dp))
-                LegendDot(androidx.compose.ui.graphics.Color(0xFFE8710A))
+                LegendDot(Color(0xFFE8710A))
                 Text(
                     stringResource(R.string.calendar_legend_makeup),
                     style = MaterialTheme.typography.labelSmall,
@@ -323,28 +375,44 @@ fun CalendarPreviewScreen(
                 )
             }
 
-            // 选中日详情：备注管理完全复用周期管家那一套
-            val detail = selectedDay
-            if (detail != null) {
-                Spacer(Modifier.height(10.dp))
+            // 详情栏常驻：未选中显示今天，选中显示选中日；换天走方向滑动动画
+            val detailDay = selectedDay ?: today
+            AnimatedContent(
+                targetState = detailDay,
+                transitionSpec = {
+                    val spec = tween<IntOffset>(260, easing = FastOutSlowInEasing)
+                    val fade = tween(180, easing = FastOutSlowInEasing)
+                    // 新日期在旧日期右边（更晚）→ 内容从右滑入、旧内容向左滑出；更早则反向
+                    val forward = targetState > initialState
+                    if (forward) {
+                        (slideInHorizontally(spec) { it } + fadeIn(fade)) togetherWith
+                            (slideOutHorizontally(spec) { -it } + fadeOut(fade))
+                    } else {
+                        (slideInHorizontally(spec) { -it } + fadeIn(fade)) togetherWith
+                            (slideOutHorizontally(spec) { it } + fadeOut(fade))
+                    }
+                },
+                label = "calendar_detail_slide"
+            ) { day ->
                 CycleDayDetail(
-                    day = detail,
+                    day = day,
                     logs = logs,
-                    dayNotes = notes.filter { it.dateEpochDay == detail },
+                    dayNotes = notes.filter { it.dateEpochDay == day },
                     cycleDays = cycleDays,
                     today = today,
-                    onCollapse = { selectedDay = null },
+                    showNoteTags = showNoteTags,
+                    showPrediction = showPrediction,
                     onAdd = { showAddNote = true },
                     onEdit = { editingNote = it },
-                    onDelete = { deletingNote = detail }
+                    onDelete = { deletingNote = day }
                 )
             }
         }
     }
 
-    // ===== 弹窗（与周期管家同构） =====
-    val day = selectedDay
-    if (showAddNote && day != null) {
+    // ===== 弹窗（与周期管家同构）；未选中任何一天时登记/删除都落在今天 =====
+    val day = selectedDay ?: today
+    if (showAddNote) {
         AddNoteDialog(
             day = day,
             onDismiss = { showAddNote = false },
@@ -379,7 +447,7 @@ fun CalendarPreviewScreen(
 
 /** 图例小圆点。 */
 @Composable
-private fun LegendDot(color: androidx.compose.ui.graphics.Color) {
+private fun LegendDot(color: Color) {
     Box(
         Modifier
             .padding(end = 4.dp)

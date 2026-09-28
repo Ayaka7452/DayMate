@@ -823,15 +823,20 @@
     <string name="settings_span_total_mode">假期顯示總長</string>
 
     <string name="settings_span_total_mode_desc">假期中段同時顯示假期總長與剩餘天數；關閉後只顯示剩餘天數</string>
-    <string name="home_calendar_preview">日曆預覽</string>
-    <string name="calendar_preview_title">日曆預覽</string>
+    <string name="home_calendar_preview">日曆記事</string>
+    <string name="calendar_preview_title">日曆記事</string>
     <string name="calendar_today">今天</string>
     <string name="calendar_legend_off">休</string>
     <string name="calendar_legend_makeup">補班</string>
     <string name="calendar_legend_event">倒數日</string>
+    <string name="cycle_detail_display">詳情欄顯示</string>
+    <string name="cycle_show_notes_title">顯示日常記錄標籤</string>
+    <string name="cycle_show_notes_desc">在日期詳情欄中顯示當天登記的記錄標籤。</string>
+    <string name="cycle_show_prediction_title">顯示經期預測</string>
+    <string name="cycle_show_prediction_desc">在日期詳情欄中顯示週期階段與經期預測資訊。</string>
     <string name="calendar_no_festival_data">當年假日資料尚未下載，可在設定中下載。</string>
     <string name="cycle_tip_frequent_body">您已連續三天進行了性行為，請注意身體，適當休息哦。</string>
     <string name="cycle_tip_ovulation_body">您在排卵期進行了性行為，若在排卵期未採取有效避孕措施，則懷孕風險較大，請隨時留意身體情況。</string>
     <string name="settings_calendar_long_press">長按加號入口</string>
-    <string name="settings_calendar_long_press_desc">長按主頁加號時，在展開面板中顯示「日曆預覽」入口。</string>
+    <string name="settings_calendar_long_press_desc">長按主頁加號時，在展開面板中顯示「日曆記事」入口。</string>
 </resources>

@@ -551,17 +551,17 @@ fun HomeScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.home_cycle_tracker)) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onNavigate(Routes.CYCLE)
-                                    }
-                                )
-                                DropdownMenuItem(
                                     text = { Text(stringResource(R.string.home_calendar_preview)) },
                                     onClick = {
                                         menuExpanded = false
                                         onNavigate(Routes.CALENDAR_PREVIEW)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_cycle_tracker)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigate(Routes.CYCLE)
                                     }
                                 )
                                 DropdownMenuItem(

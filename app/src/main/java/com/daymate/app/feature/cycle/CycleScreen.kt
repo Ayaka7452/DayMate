@@ -5,6 +5,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.Canvas
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
@@ -15,6 +16,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -101,6 +105,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.ayaka7452.daymate.R
@@ -223,6 +228,9 @@ private fun CycleOverviewScreen(
     val periodManual by container.settingsRepository.cyclePeriodDays.collectAsState(initial = CycleCalculator.DEFAULT_PERIOD_DAYS)
     val cycleAuto by container.settingsRepository.cycleCycleAuto.collectAsState(initial = true)
     val periodAuto by container.settingsRepository.cyclePeriodAuto.collectAsState(initial = true)
+    // 详情栏显示开关：记录标签默认不显示（性行为等隐私标签不上墙），经期预测默认显示
+    val showNoteTags by container.settingsRepository.cycleShowNotes.collectAsState(initial = false)
+    val showPrediction by container.settingsRepository.cycleShowPrediction.collectAsState(initial = true)
     // 生效参数：自动开启且数据足够时按近 3 次记录均值推算，否则回落到手动设置值
     val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
     val periodDays = container.cycleRepository.effectivePeriodDays(logs, periodManual, periodAuto)
@@ -296,12 +304,8 @@ private fun CycleOverviewScreen(
     val todayIsPeriodEnd =
         activeLog != null && today == activeLog.startDateEpochDay + activeLog.periodDays - 1
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
-    // 日历点选的日期（null = 未选中，展示今天的信息）。点同一天可取消选中，与「今日」高亮互不干扰。
+    // 日历点选的日期（null = 未选中，详情栏展示今天的信息）。点同一天可取消选中，与「今日」高亮互不干扰。
     var selectedDay by remember { mutableStateOf<Long?>(null) }
-    // 收起动画期间 selectedDay 已被置 null，用「最后一次选中日」兜底渲染详情内容——
-    // 否则内容会先跳成今天的资料、再随卡片一起滑走，看起来像闪了一下。
-    // 只在点击回调里更新（不在组合期写状态），保持单向数据流。
-    var lastDetailDay by remember { mutableStateOf<Long?>(null) }
     var showAddNote by remember { mutableStateOf(false) }
     var showDeleteNote by remember { mutableStateOf(false) }
     // 正在修改的那条日常记录（null = 未打开修改弹窗）。修改入口挂在选中日详情区的每一行右侧。
@@ -393,10 +397,9 @@ private fun CycleOverviewScreen(
                             selectedDay = selectedDay,
                             onSelectDay = { day ->
                                 if (selectedDay == day) {
-                                    selectedDay = null          // 再点同一天 = 收起
+                                    selectedDay = null          // 再点同一天 = 取消选中（详情栏回到今天）
                                 } else {
                                     selectedDay = day
-                                    lastDetailDay = day
                                 }
                             }
                         )
@@ -433,15 +436,14 @@ private fun CycleOverviewScreen(
                 }
             }
 
-            // ===== 选中日详情区（仅日历视图、仅在有选中时出现）=====
+            // ===== 选中日详情区（日历视图常驻：未选中任何一天时展示今天的信息）=====
             // 位置紧贴日历下方：点选的即时反馈要离被点的格子近，不能等滚到页面底部才看见。
+            // 未选中就显示今天——说明栏不再留一大块空白，也让「点一天看什么」有现成的示范。
             // 展开/收起走纵向滑动而非瞬间出现——高度突变会让下方那排按钮整块跳一下，看着像页面重排。
-            // 内嵌 animateContentSize：换一天时记录条数不同导致高度变化，也让它平滑过渡而不是硬切。
-            // 时长刻意偏长（展开 300ms / 收起 360ms）并配 FastOutSlowIn：这块卡片是「点一下才出现」
-            // 的提示区，速度一快就像页面重排闪了一下；缓出曲线让收尾变慢，收起时是被"送走"而不是"被抽走"。
-            // 淡入淡出比滑动略快且先结束——几何动画还在收尾时文字已经化开，不会出现文字被压扁的过程。
+            // 换一天时走横向滑动：新日期在旧日期右边（更晚）→ 内容从右滑入旧内容向左滑出，反之反向，
+            // 与翻页手势的直觉一致；纵向高度差由 animateContentSize 吸收。
             AnimatedVisibility(
-                visible = showCalendar && selectedDay != null,
+                visible = showCalendar,
                 enter = expandVertically(
                     expandFrom = Alignment.Top,
                     animationSpec = tween(300, easing = FastOutSlowInEasing)
@@ -451,21 +453,38 @@ private fun CycleOverviewScreen(
                     animationSpec = tween(360, easing = FastOutSlowInEasing)
                 ) + fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
             ) {
-                // 退出动画期间 selectedDay 已置 null，用「最后一次选中日」兜底渲染，避免内容中途跳变
-                val detailDay = selectedDay ?: lastDetailDay ?: today
-                Column(Modifier.animateContentSize()) {
-                    Spacer(Modifier.height(16.dp))
-                    CycleDayDetail(
-                        day = detailDay,
-                        logs = logs,
-                        dayNotes = notes.filter { it.dateEpochDay == detailDay },
-                        cycleDays = cycleDays,
-                        today = today,
-                        onCollapse = { selectedDay = null },
-                        onAdd = { showAddNote = true },
-                        onEdit = { editingNote = it },
-                        onDelete = { showDeleteNote = true }
-                    )
+                val detailDay = selectedDay ?: today
+                AnimatedContent(
+                    targetState = detailDay,
+                    transitionSpec = {
+                        val spec = tween<IntOffset>(260, easing = FastOutSlowInEasing)
+                        val fade = tween(180, easing = FastOutSlowInEasing)
+                        val forward = targetState > initialState
+                        if (forward) {
+                            (slideInHorizontally(spec) { it } + fadeIn(fade)) togetherWith
+                                (slideOutHorizontally(spec) { -it } + fadeOut(fade))
+                        } else {
+                            (slideInHorizontally(spec) { -it } + fadeIn(fade)) togetherWith
+                                (slideOutHorizontally(spec) { it } + fadeOut(fade))
+                        }
+                    },
+                    label = "cycle_detail_slide"
+                ) { day ->
+                    Column(Modifier.animateContentSize()) {
+                        Spacer(Modifier.height(16.dp))
+                        CycleDayDetail(
+                            day = day,
+                            logs = logs,
+                            dayNotes = notes.filter { it.dateEpochDay == day },
+                            cycleDays = cycleDays,
+                            today = today,
+                            showNoteTags = showNoteTags,
+                            showPrediction = showPrediction,
+                            onAdd = { showAddNote = true },
+                            onEdit = { editingNote = it },
+                            onDelete = { showDeleteNote = true }
+                        )
+                    }
                 }
             }
 
@@ -888,8 +907,8 @@ private fun CycleOverviewScreen(
         )
     }
 
-    // 添加记录弹窗（仅从选中日详情区唤起；选中日即记录日）
-    val detailDay = selectedDay
+    // 添加记录弹窗（从详情栏唤起；未选中任何一天时登记到今天）
+    val detailDay = selectedDay ?: today
     if (showAddNote && detailDay != null) {
         AddNoteDialog(
             day = detailDay,
@@ -1258,6 +1277,30 @@ private fun CycleSettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
             )
+
+            Spacer(Modifier.height(20.dp))
+
+            // ===== 详情栏显示 =====
+            val showNotesSetting by container.settingsRepository.cycleShowNotes.collectAsState(initial = false)
+            val showPredictionSetting by container.settingsRepository.cycleShowPrediction.collectAsState(initial = true)
+            Text(stringResource(R.string.cycle_detail_display), style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(4.dp))
+            ToggleRow(
+                title = stringResource(R.string.cycle_show_notes_title),
+                subtitle = stringResource(R.string.cycle_show_notes_desc),
+                checked = showNotesSetting,
+                enabled = true
+            ) { want ->
+                scope.launch { container.settingsRepository.setCycleShowNotes(want) }
+            }
+            ToggleRow(
+                title = stringResource(R.string.cycle_show_prediction_title),
+                subtitle = stringResource(R.string.cycle_show_prediction_desc),
+                checked = showPredictionSetting,
+                enabled = true
+            ) { want ->
+                scope.launch { container.settingsRepository.setCycleShowPrediction(want) }
+            }
 
             Spacer(Modifier.height(20.dp))
 
@@ -2358,6 +2401,12 @@ internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
  *
  * 位置紧贴日历下方——点某天之后的即时反馈必须离被点的格子足够近，否则用户不知道点中了什么。
  * 本区只做展示与入口，不含任何推算副作用：日常记录永远不参与周期计算（见 CycleNoteEntity）。
+ *
+ * 显示开关（周期管家设置里调）：
+ *  - [showNoteTags]：当天登记的记录标签（默认关——性行为等隐私标签不主动上墙）；
+ *  - [showPrediction]：周期阶段 chip 与经期预测副文案（默认开）。
+ *
+ * 详情栏常驻（未选中显示今天），因此不设「收起」按钮；想看别的日期直接点格子即可。
  */
 @Composable
 internal fun CycleDayDetail(
@@ -2366,8 +2415,8 @@ internal fun CycleDayDetail(
     dayNotes: List<CycleNoteEntity>,
     cycleDays: Int,
     today: Long,
-    /** 收起详情区（＝取消选中）。点「今天」同样会展开详情，所以这个按钮的语义是「收起」，不是「回到今天」。 */
-    onCollapse: () -> Unit,
+    showNoteTags: Boolean = true,
+    showPrediction: Boolean = true,
     onAdd: () -> Unit,
     /** 修改某一条已有记录（入口就挂在那一行右侧）。 */
     onEdit: (CycleNoteEntity) -> Unit,
@@ -2397,60 +2446,63 @@ internal fun CycleDayDetail(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        sub,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+                    if (showPrediction) {
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            sub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
                 }
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(chipBg)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(phaseLabel, style = MaterialTheme.typography.labelSmall, color = chipFg)
+                if (showPrediction) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(chipBg)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(phaseLabel, style = MaterialTheme.typography.labelSmall, color = chipFg)
+                    }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-            Spacer(Modifier.height(10.dp))
+            if (showNoteTags) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                Spacer(Modifier.height(10.dp))
 
-            Text(
-                stringResource(R.string.cycle_day_records),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-            Spacer(Modifier.height(4.dp))
-            if (dayNotes.isEmpty()) {
                 Text(
-                    stringResource(R.string.cycle_no_record),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                    stringResource(R.string.cycle_day_records),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
-            } else {
-                dayNotes.forEach { n -> NoteRow(n, onEdit = { onEdit(n) }) }
+                Spacer(Modifier.height(4.dp))
+                if (dayNotes.isEmpty()) {
+                    Text(
+                        stringResource(R.string.cycle_no_record),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                    )
+                } else {
+                    dayNotes.forEach { n -> NoteRow(n, onEdit = { onEdit(n) }) }
+                }
             }
 
             Spacer(Modifier.height(12.dp))
-            // 层级约定：实心 = 会动数据的执行动作；空心 = 次级/破坏性动作
+            // 层级约定：实心 = 会动数据的执行动作；空心 = 次级/破坏性动作。
+            // 标签隐藏时删除入口一并置灰——看不见自己在删什么，就先别删
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.cycle_add_record), maxLines = 1)
                 }
                 OutlinedButton(
                     onClick = onDelete,
-                    enabled = dayNotes.isNotEmpty(),
+                    enabled = showNoteTags && dayNotes.isNotEmpty(),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.cycle_delete_record), maxLines = 1)
                 }
-            }
-            // 始终显示：点「今天」也会展开详情，此时同样需要一条收起的出口（原先只在非今天时显示，是个死路）
-            TextButton(onClick = onCollapse, modifier = Modifier.align(Alignment.End)) {
-                Text(stringResource(R.string.common_collapse))
             }
         }
     }
