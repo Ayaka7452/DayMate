@@ -493,6 +493,11 @@ private fun CycleOverviewScreen(
                 val detailDay = selectedDay ?: lastDetailDay ?: today
                 AnimatedContent(
                     targetState = detailDay,
+                    // ⚠️ animateContentSize 必须挂在 AnimatedContent 的 **modifier**（外层）上，
+                    // 不能塞进内容里的 Column——否则每帧「外层收缩 + 内层测量」双重触发，
+                    // 收敛不下来就是掉帧（v1.18.2 引入 AnimatedContent 时留错了位置，v1.19.9 修）。
+                    // 日历记事那边一直是正确写法，两处现已对齐。
+                    modifier = Modifier.animateContentSize(),
                     transitionSpec = {
                         val spec = tween<IntOffset>(260, easing = FastOutSlowInEasing)
                         val fade = tween<Float>(180, easing = FastOutSlowInEasing)
@@ -507,7 +512,7 @@ private fun CycleOverviewScreen(
                     },
                     label = "cycle_detail_slide"
                 ) { day ->
-                    Column(Modifier.animateContentSize()) {
+                    Column {
                         Spacer(Modifier.height(16.dp))
                         CycleDayDetail(
                             day = day,

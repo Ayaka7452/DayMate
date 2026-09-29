@@ -382,9 +382,36 @@ fun CalendarPreviewScreen(
                                                         alpha = if (isWeekend && !isToday) 0.55f else 1f
                                                     )
                                                 )
-                                                // 圆点行：紧贴日期下方（留 2dp 呼吸），与周期管家同一位置。
-                                                // 原设计把农历小字夹在日期和圆点之间，圆点被挤到格子底部，
-                                                // 两边并排看会觉得格子大小不一（用户 2026-09-29 提出）。
+                                                // 次行小字：农历 / 法定节假日名 / 补班（放在圆点**上方**）。
+                                                // ⚠️ 补班日（橙底）不能显示节日名——那会读成「这天是国庆节」，
+                                                // 与「今天要上班」的橙色语义正好相反（用户 2026-09-29 截图指出）。
+                                                // 补班日固定显示「补班」，节日名只留给放假日（绿底）。
+                                                val sub = when {
+                                                    festival != null && festival.isOffDay -> festival.name
+                                                    festival != null -> stringResource(R.string.calendar_cell_makeup)
+                                                    showLunar -> LunarCalendar.labelText(date)
+                                                    else -> null
+                                                }
+                                                // 行序（用户 2026-09-30 指定）：日期 → 小字 → 圆点。
+                                                // 小字紧贴日期下沿（1dp 呼吸），圆点落最底，两种点都不再被字挤走位置。
+                                                Spacer(Modifier.height(1.dp))
+                                                if (sub != null) {
+                                                    Text(
+                                                        sub,
+                                                        fontSize = 8.sp,
+                                                        lineHeight = 9.sp,
+                                                        maxLines = 1,
+                                                        fontWeight = if (festival != null) FontWeight.Medium else FontWeight.Normal,
+                                                        color = when {
+                                                            festival?.isOffDay == true -> OFF_GREEN
+                                                            festival != null -> MAKEUP_ORANGE
+                                                            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                                        }
+                                                    )
+                                                } else {
+                                                    Spacer(Modifier.height(9.dp))
+                                                }
+                                                // 圆点行：落在格子最底部（小字下方），与周期管家同一位置。
                                                 // 经期首日（雾蓝紫 CycleColors.Period）+ 排卵期首日（灰粉 CycleColors.Ovulation）
                                                 // + 倒数事件目标日（主题青蓝，一天只一枚，多了也不堆），三种点统一 4dp。
                                                 Spacer(Modifier.height(2.dp))
@@ -419,33 +446,6 @@ fun CalendarPreviewScreen(
                                                 } else {
                                                     // 无点也占 4dp：三态（有点/无点）格子总高一致，网格不会高低不一
                                                     Spacer(Modifier.height(4.dp))
-                                                }
-                                                // 次行小字：法定节假日名 / 补班 / 农历（放在圆点下方）。
-                                                // ⚠️ 补班日（橙底）不能显示节日名——那会读成「这天是国庆节」，
-                                                // 与「今天要上班」的橙色语义正好相反（用户 2026-09-29 截图指出）。
-                                                // 补班日固定显示「补班」，节日名只留给放假日（绿底）。
-                                                val sub = when {
-                                                    festival != null && festival.isOffDay -> festival.name
-                                                    festival != null -> stringResource(R.string.calendar_cell_makeup)
-                                                    showLunar -> LunarCalendar.labelText(date)
-                                                    else -> null
-                                                }
-                                                Spacer(Modifier.height(1.dp))
-                                                if (sub != null) {
-                                                    Text(
-                                                        sub,
-                                                        fontSize = 8.sp,
-                                                        lineHeight = 9.sp,
-                                                        maxLines = 1,
-                                                        fontWeight = if (festival != null) FontWeight.Medium else FontWeight.Normal,
-                                                        color = when {
-                                                            festival?.isOffDay == true -> OFF_GREEN
-                                                            festival != null -> MAKEUP_ORANGE
-                                                            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-                                                        }
-                                                    )
-                                                } else {
-                                                    Spacer(Modifier.height(9.dp))
                                                 }
                                             }
                                             // 当天有记录：右上角一枚小点。自己写的记事用主色，
