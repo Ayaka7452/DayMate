@@ -21,18 +21,6 @@
 
 日常更新以体验优化和问题修复为主，具体变更见各版本的 Release 说明。
 
-## 技术栈
-
-| 维度 | 选型 |
-| --- | --- |
-| 语言 | Kotlin |
-| UI | Jetpack Compose (Material 3) |
-| 架构 | MVVM + Repository |
-| 存储 | Room（主空间 / Vault 双库）+ DataStore |
-| 安全 | PBKDF2 密码哈希 + BiometricPrompt + FLAG_SECURE |
-| 构建 | Gradle Kotlin DSL + Version Catalog |
-| CI | GitHub Actions |
-
 ## 构建
 
 ```bash
