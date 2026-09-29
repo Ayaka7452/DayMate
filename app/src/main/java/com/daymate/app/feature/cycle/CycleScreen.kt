@@ -2040,7 +2040,7 @@ private fun CycleCalendarMonth(
 
     // 颜色在 Composable 体内解析
     // 经期/排卵用固定阶段色（不跟 accent 走）：见 CycleColors 的说明——
-    // 用了 primary/tertiary 的话，切到 purple accent 时会与经期紫自撞。
+    // 阶段是语义，用 primary 的话切 accent 会与事件点等元素撞色。
     val periodColor = CycleColors.Period
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
     val follicularColor = MaterialTheme.colorScheme.secondaryContainer
@@ -2219,12 +2219,14 @@ private fun CycleCalendarMonth(
                                 }
                                 // 选中优先：粗框＝「我正在看的这天」。收起详情区后 selectedDay 归 null，
                                 // 粗框随之消失，只留今天的细框——框表达的是「当前正在查看」，不是永久标注。
+                                // ⚠️ 框用**主题色**而非 periodColor：框是交互态，不该跟着阶段语义色走
+                                // （v1.18.9 曾误用 periodColor，经期改成紫/蓝后选中框也跟着变色了）。
                                 if (isSelected) {
-                                    // 选中：粗主色框 + 白衬（白衬保证在排卵期紫红底上也清晰）
+                                    // 选中：粗主色框 + 白衬（白衬保证在排卵期彩色底上也清晰）
                                     Box(
                                         Modifier
                                             .matchParentSize()
-                                            .border(3.dp, periodColor, RoundedCornerShape(9.dp))
+                                            .border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(9.dp))
                                     )
                                     Box(
                                         Modifier
@@ -2237,7 +2239,7 @@ private fun CycleCalendarMonth(
                                     Box(
                                         Modifier
                                             .matchParentSize()
-                                            .border(1.5.dp, periodColor, RoundedCornerShape(9.dp))
+                                            .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(9.dp))
                                     )
                                     Box(
                                         Modifier

@@ -7,13 +7,17 @@ import androidx.compose.ui.graphics.Color
  *
  * 为什么不用主题色：主题 primary 会随 accent 切换（蓝/绿/橙/紫），
  * 一旦用户选到 purple，经期点就会和「倒数事件点」（主题青蓝）撞色。
- * 阶段色是**语义色**（经期=紫、排卵=红），必须跨主题稳定，故写死。
+ * 阶段色是**语义色**（经期=蓝、排卵=灰红），必须跨主题稳定，故写死。
  *
- * - [Period] 经期灰紫 #8E6FA8：莫兰迪灰调，比 Material Purple 700（#8E24AA）压饱和降明度，
- *   原本那个在小圆点上像荧光紫、太扎眼（用户 2026-09-29 反馈「好丑」）。
- * - [Ovulation] 排卵红 #B3261E：沿用「排卵=红」的既定语义（M3 error 红，与紫/青蓝都拉得开）。
+ * ⚠️ 这两个色**只用于阶段本身**（圆环分段、日历格子底色、点位、图例、阶段标签底色）。
+ * 选中框/今日框等**交互态**属于界面语言，一律用主题 primary，不要从这里取色
+ * （v1.18.9 曾误用 periodColor 画选中框，框会跟着阶段色变形变色）。
+ *
+ * - [Period] 经期雾蓝 #5C7CBA：灰调蓝，与 [Ovulation] 灰红配成一套莫兰迪；
+ *   避开主题青蓝（#00668C）以免与事件点混淆。
+ * - [Ovulation] 排卵灰红 #B3554E：原正红 #B3261E 压饱和加灰调后的结果（用户嫌太红）。
  */
 object CycleColors {
-    val Period = Color(0xFF8E6FA8)
-    val Ovulation = Color(0xFFB3261E)
+    val Period = Color(0xFF5C7CBA)
+    val Ovulation = Color(0xFFB3554E)
 }

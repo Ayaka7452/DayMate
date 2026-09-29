@@ -377,7 +377,7 @@ fun CalendarPreviewScreen(
                                                 // 圆点行：紧贴日期下方（留 2dp 呼吸），与周期管家同一位置。
                                                 // 原设计把农历小字夹在日期和圆点之间，圆点被挤到格子底部，
                                                 // 两边并排看会觉得格子大小不一（用户 2026-09-29 提出）。
-                                                // 经期首日（紫 CycleColors.Period）+ 排卵期首日（红 CycleColors.Ovulation）
+                                                // 经期首日（雾蓝 CycleColors.Period）+ 排卵期首日（灰红 CycleColors.Ovulation）
                                                 // + 倒数事件目标日（主题青蓝，一天只一枚，多了也不堆），三种点统一 4dp。
                                                 Spacer(Modifier.height(2.dp))
                                                 if (periodStart || ovulationStart || hasEventDot) {
