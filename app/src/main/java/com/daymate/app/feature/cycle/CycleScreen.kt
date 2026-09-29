@@ -418,13 +418,15 @@ private fun CycleOverviewScreen(
                             onConsumePendingMonth = { monthPickerPending = null },
                             onSelectDay = { day ->
                                 if (selectedDay == day && detailExpanded) {
-                                    // 再点同一天 = 取消选中（详情栏回到今天）；收起状态下点回该天则重新展开
+                                    // 再点同一天 = 取消选中，**并把详情区一并收起**
+                                    // （v1.18.2 改常驻时丢了这一步，v1.19.7 找回）
                                     selectedDay = null
+                                    detailExpanded = false
                                 } else {
                                     selectedDay = day
                                     lastDetailDay = day
+                                    detailExpanded = true   // 点任意一天都把详情区带回来
                                 }
-                                detailExpanded = true   // 点任意一天都把详情区带回来
                             },
                             onPickMonth = { ym ->
                                 monthPickerTarget = ym
@@ -2230,19 +2232,23 @@ private fun CycleCalendarMonth(
                         if (dayNum in 1..daysInMonth) {
                             val epochDay = month.withDayOfMonth(dayNum).toEpochDay()
                             val phase = CycleCalculator.phaseOfAnyDay(epochDay, logEntries, cycleDays)
-                            // 未来经期日不点亮：预测的下次经期，或已登记但尚未到来的区间尾部——
-                            // 统一浅蓝底 + 空心圆点，与已到来（实心点亮）和卵泡期区分
-                            val futurePeriod =
-                                phase == CycleCalculator.Phase.PERIOD && epochDay > today
+                            // 未到来（今天之后）的日期一律**浅底**：预测经期沿用原浅蓝紫，
+                            // 卵泡/排卵/黄体也各自降到 0.18 透明度——同一屏里「已过/未到」一眼可分
+                            // （用户 2026-09-29 要求；此前只有未来经期日做浅底）。
+                            val isFuture = epochDay > today
                             val bg = when {
-                                futurePeriod -> periodColor.copy(alpha = 0.18f)
-                                phase == CycleCalculator.Phase.PERIOD -> periodColor
-                                phase == CycleCalculator.Phase.FOLLICULAR -> follicularColor
-                                phase == CycleCalculator.Phase.OVULATION -> ovulationColor
-                                else -> lutealColor
+                                phase == CycleCalculator.Phase.PERIOD ->
+                                    if (isFuture) periodColor.copy(alpha = 0.18f) else periodColor
+                                phase == CycleCalculator.Phase.FOLLICULAR ->
+                                    if (isFuture) follicularColor.copy(alpha = 0.18f) else follicularColor
+                                phase == CycleCalculator.Phase.OVULATION ->
+                                    if (isFuture) ovulationColor.copy(alpha = 0.18f) else ovulationColor
+                                else ->
+                                    if (isFuture) lutealColor.copy(alpha = 0.18f) else lutealColor
                             }
+                            // 底色浅了，文字也跟着换成深墨，否则白字压在浅底上看不见
                             val fg = when {
-                                futurePeriod -> plainTextColor
+                                isFuture -> plainTextColor
                                 phase == CycleCalculator.Phase.PERIOD -> onPeriodColor
                                 phase == CycleCalculator.Phase.FOLLICULAR -> onFollicularColor
                                 phase == CycleCalculator.Phase.OVULATION -> onOvulationColor
@@ -2274,8 +2280,9 @@ private fun CycleCalendarMonth(
                                     when {
                                         loggedDays.contains(epochDay) ->
                                             Box(Modifier.size(4.dp).background(fg, CircleShape))
-                                        futurePeriod ->
+                                        isFuture && phase == CycleCalculator.Phase.PERIOD ->
                                             // 空心圆点：尚未到来的经期日（到来/登记确认后变实心）。
+                                            // 只给经期——卵泡/排卵等未来日只管底色变浅，不额外画点。
                                             // 尺寸与实心点、与日历记事同一套 4dp（原 6dp 比同行其它点大一圈）
                                             Box(
                                                 Modifier
