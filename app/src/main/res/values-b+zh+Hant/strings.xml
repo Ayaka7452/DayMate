@@ -857,6 +857,8 @@
     <string name="cycle_show_notes_desc">開啟後，週期管家登記的自訂記錄（如症狀、性生活等）會一並在日曆記事中顯示。預設關閉。</string>
     <string name="cycle_show_prediction_title">顯示經期資訊</string>
     <string name="cycle_show_prediction_desc">開啟後，週期階段與經期預測會一並在日曆記事中顯示。預設關閉。</string>
+    <string name="cycle_show_legend_title">顯示圖例</string>
+    <string name="cycle_show_legend_desc">開啟後，日曆記事中日曆下方的顏色圖例會保留。關閉則只隱藏圖例，下方的日期詳情不受影響。</string>
     <string name="calendar_detail_holiday">法定節假日：%1$s</string>
     <string name="calendar_detail_makeup">補班：%1$s調休</string>
     <string name="calendar_no_festival_data">當年假日資料尚未下載，可在設定中下載。</string>

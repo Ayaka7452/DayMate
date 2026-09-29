@@ -857,6 +857,8 @@
     <string name="cycle_show_notes_desc">オンにすると、周期管家に記録したカスタム記録（症状・性生活など）がカレンダーノートにも表示されます。既定ではオフ。</string>
     <string name="cycle_show_prediction_title">周期情報を表示</string>
     <string name="cycle_show_prediction_desc">オンにすると、周期の段階と生理予測がカレンダーノートにも表示されます。既定ではオフ。</string>
+    <string name="cycle_show_legend_title">凡例を表示</string>
+    <string name="cycle_show_legend_desc">オンにすると、カレンダーノートのカレンダー下にある色の凡例を表示します。オフにすると凡例だけが隠れ、下の日付の詳細は変わりません。</string>
     <string name="calendar_detail_holiday">祝日：%1$s</string>
     <string name="calendar_detail_makeup">振替出勤：%1$s</string>
     <string name="calendar_no_festival_data">今年の祝日データは未ダウンロードです。設定からダウンロードできます。</string>

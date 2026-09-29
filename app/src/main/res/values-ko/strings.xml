@@ -857,6 +857,8 @@
     <string name="cycle_show_notes_desc">켜면 주기 관리자에 기록한 사용자 정의 기록(증상, 성생활 등)이 캘린더 노트에도 함께 표시됩니다. 기본값은 꺼짐.</string>
     <string name="cycle_show_prediction_title">주기 정보 표시</string>
     <string name="cycle_show_prediction_desc">켜면 주기 단계와 생리 예측이 캘린더 노트에도 함께 표시됩니다. 기본값은 꺼짐.</string>
+    <string name="cycle_show_legend_title">범례 표시</string>
+    <string name="cycle_show_legend_desc">켜면 캘린더 노트의 달력 아래에 있는 색상 범례를 표시합니다. 끄면 범례만 숨겨지고 아래의 날짜 상세는 그대로 유지됩니다.</string>
     <string name="calendar_detail_holiday">공휴일: %1$s</string>
     <string name="calendar_detail_makeup">대체 근무일: %1$s</string>
     <string name="calendar_no_festival_data">올해 공휴일 데이터가 아직 다운로드되지 않았습니다. 설정에서 다운로드할 수 있습니다.</string>

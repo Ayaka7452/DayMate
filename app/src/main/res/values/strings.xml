@@ -857,6 +857,8 @@
     <string name="cycle_show_notes_desc">When on, notes logged in the cycle tracker (symptoms, sex life, etc.) also show in Calendar notes. Off by default.</string>
     <string name="cycle_show_prediction_title">Show period info</string>
     <string name="cycle_show_prediction_desc">When on, cycle phase and period prediction also show in Calendar notes. Off by default.</string>
+    <string name="cycle_show_legend_title">Show legend</string>
+    <string name="cycle_show_legend_desc">When on, the color legend stays under the calendar in Calendar notes. Turn off to hide just the legend; the day details below are unaffected.</string>
     <string name="calendar_detail_holiday">Public holiday: %1$s</string>
     <string name="calendar_detail_makeup">Makeup workday: %1$s</string>
     <string name="calendar_no_festival_data">Holiday data for this year is not downloaded yet. You can download it in Settings.</string>

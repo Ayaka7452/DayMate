@@ -38,6 +38,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val CYCLE_PERIOD_AUTO = booleanPreferencesKey("cycle_period_auto")   // 经期天数自动按记录均值推算（默认开；手改即固定）
         private val CYCLE_SHOW_NOTES = booleanPreferencesKey("cycle_show_notes")       // 日期详情栏显示日常记录标签（默认关）
         private val CYCLE_SHOW_PREDICTION = booleanPreferencesKey("cycle_show_prediction") // 日历记事详情栏显示经期预测（默认关）
+        private val CYCLE_SHOW_LEGEND = booleanPreferencesKey("cycle_show_legend")     // 日历记事的图例行（默认显示）
         private val ALLOW_SCREENSHOT_CYCLE = booleanPreferencesKey("allow_screenshot_cycle") // 周期管家允许截屏（默认关＝阻止）
         private val ALLOW_SCREENSHOT_VAULT = booleanPreferencesKey("allow_screenshot_vault") // 保险箱允许截屏（默认关＝阻止）
         private val UPDATE_CHECK = booleanPreferencesKey("update_check_enabled")             // 启动时检查新版本（默认开）
@@ -217,6 +218,12 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
      * 只作用于日历记事；周期管家自己的界面永远完整显示。
      */
     val cycleShowPrediction: Flow<Boolean> = dataStore.data.map { it[CYCLE_SHOW_PREDICTION] ?: false }
+    /**
+     * 日历记事日历下方的图例行（休/班/倒数日/经期/排卵）是否显示（**默认显示**）。
+     * 只作用于日历记事的图例行；详情栏与格子上的标记完全不受影响。
+     * 只有在「显示经期信息」开启时这个开关才有意义（关掉经期信息后图例里的经期两项本来就不出现）。
+     */
+    val cycleShowLegend: Flow<Boolean> = dataStore.data.map { it[CYCLE_SHOW_LEGEND] ?: true }
 
     /** 长按主页加号时，展开面板中是否显示「日历预览」入口（默认开）。 */
     val calendarLongPressEnabled: Flow<Boolean> =
@@ -244,6 +251,10 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setCycleShowPrediction(enabled: Boolean) {
         dataStore.edit { it[CYCLE_SHOW_PREDICTION] = enabled }
+    }
+
+    suspend fun setCycleShowLegend(enabled: Boolean) {
+        dataStore.edit { it[CYCLE_SHOW_LEGEND] = enabled }
     }
 
     suspend fun setCyclePasswordEnabled(enabled: Boolean) {

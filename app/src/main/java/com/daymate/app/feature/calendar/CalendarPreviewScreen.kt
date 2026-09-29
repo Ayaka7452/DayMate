@@ -131,6 +131,8 @@ fun CalendarPreviewScreen(
     // 经期信息外露开关（周期管家设置里调，默认都关）
     val showCycleNotes by container.settingsRepository.cycleShowNotes.collectAsState(initial = false)
     val showPeriod by container.settingsRepository.cycleShowPrediction.collectAsState(initial = false)
+    // 图例行是否显示（默认显示）。只控制日历脚下那一行图例，详情栏与格子标记都不受影响。
+    val showLegend by container.settingsRepository.cycleShowLegend.collectAsState(initial = true)
 
     // 节假日数据：remember 里同步读一次缓存（就近预载，防首帧跳动——铁律 13）
     val festivalByDate = remember(month) {
@@ -503,28 +505,33 @@ fun CalendarPreviewScreen(
             //（早先经期/排卵另起一行，用户觉得两行割裂；且两种圆点大小不一很难看，
             //  现统一取 LEGEND_DOT_DP，空心/实心的差异交给颜色区分）。
             // 经期与排卵两项只在「显示经期信息」打开时出现——解释了不存在的颜色反而让人困惑。
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                LegendSwatch(OFF_GREEN)
-                LegendLabel(stringResource(R.string.calendar_legend_off))
-                Spacer(Modifier.width(10.dp))
-                LegendSwatch(MAKEUP_ORANGE)
-                LegendLabel(stringResource(R.string.calendar_legend_makeup))
-                Spacer(Modifier.width(10.dp))
-                LegendDot(MaterialTheme.colorScheme.primary)
-                LegendLabel(stringResource(R.string.calendar_legend_event))
-                if (showPeriod) {
+            // 整行还受「显示图例」开关控制（周期管家设置里可关）：关了就连休/班/倒数日一起收走，
+            // 但**详情栏照常显示**，不受影响。
+            if (showLegend) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LegendSwatch(OFF_GREEN)
+                    LegendLabel(stringResource(R.string.calendar_legend_off))
                     Spacer(Modifier.width(10.dp))
-                    LegendDot(CycleColors.Period)
-                    LegendLabel(stringResource(R.string.calendar_legend_period))
+                    LegendSwatch(MAKEUP_ORANGE)
+                    LegendLabel(stringResource(R.string.calendar_legend_makeup))
                     Spacer(Modifier.width(10.dp))
-                    LegendDot(CycleColors.Ovulation)
-                    LegendLabel(stringResource(R.string.calendar_legend_ovulation))
-                }            }
+                    LegendDot(MaterialTheme.colorScheme.primary)
+                    LegendLabel(stringResource(R.string.calendar_legend_event))
+                    if (showPeriod) {
+                        Spacer(Modifier.width(10.dp))
+                        LegendDot(CycleColors.Period)
+                        LegendLabel(stringResource(R.string.calendar_legend_period))
+                        Spacer(Modifier.width(10.dp))
+                        LegendDot(CycleColors.Ovulation)
+                        LegendLabel(stringResource(R.string.calendar_legend_ovulation))
+                    }
+                }
+            }
             if (!hasFestivalData) {
                 Text(
                     stringResource(R.string.calendar_no_festival_data),

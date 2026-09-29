@@ -1313,9 +1313,11 @@ private fun CycleSettingsScreen(
             // ===== 详情栏显示 =====
             val showNotesSetting by container.settingsRepository.cycleShowNotes.collectAsState(initial = false)
             val showPredictionSetting by container.settingsRepository.cycleShowPrediction.collectAsState(initial = false)
+            val showLegendSetting by container.settingsRepository.cycleShowLegend.collectAsState(initial = true)
             Text(stringResource(R.string.cycle_detail_display), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
-            // 顺序：先「显示经期信息」（决定整个经期语义是否外露），再「显示自定义记录」（更细一层）
+            // 顺序：先「显示经期信息」（决定整个经期语义是否外露），再「显示自定义记录」（更细一层），
+            // 最后「显示图例」（只抹掉日历脚下的图例行，属于纯视觉收尾）。
             ToggleRow(
                 title = stringResource(R.string.cycle_show_prediction_title),
                 subtitle = stringResource(R.string.cycle_show_prediction_desc),
@@ -1331,6 +1333,16 @@ private fun CycleSettingsScreen(
                 enabled = true
             ) { want ->
                 scope.launch { container.settingsRepository.setCycleShowNotes(want) }
+            }
+            // 「显示图例」沿用「显示经期信息」的守门：经期信息关着时日历里根本没有经期标记，
+            // 图例也就无例可图，此时把开关一并置灰（避免用户对着灰开关来回点没反应）。
+            ToggleRow(
+                title = stringResource(R.string.cycle_show_legend_title),
+                subtitle = stringResource(R.string.cycle_show_legend_desc),
+                checked = showLegendSetting,
+                enabled = showPredictionSetting
+            ) { want ->
+                scope.launch { container.settingsRepository.setCycleShowLegend(want) }
             }
 
             Spacer(Modifier.height(20.dp))

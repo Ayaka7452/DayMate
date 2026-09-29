@@ -857,6 +857,8 @@
     <string name="cycle_show_notes_desc">开启后，经期管家登记的自定义记录（如症状、性生活等）会一并在日历记事中显示。默认关闭。</string>
     <string name="cycle_show_prediction_title">显示经期信息</string>
     <string name="cycle_show_prediction_desc">开启后，周期阶段与经期预测会一并在日历记事中显示。默认关闭。</string>
+    <string name="cycle_show_legend_title">显示图例</string>
+    <string name="cycle_show_legend_desc">开启后，日历记事中日历下方的颜色图例会保留。关闭则只隐藏图例，下方的日期详情不受影响。</string>
     <string name="calendar_detail_holiday">法定节假日：%1$s</string>
     <string name="calendar_detail_makeup">补班：%1$s调休</string>
     <string name="calendar_no_festival_data">当年节假日数据尚未下载，可在设置中下载。</string>
