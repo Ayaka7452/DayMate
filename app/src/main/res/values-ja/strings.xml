@@ -122,8 +122,8 @@
     <string name="settings_theme_section">テーマ</string>
     <string name="settings_color_section">カラー</string>
     <string name="settings_default_sort_section">デフォルトの並べ替え</string>
-    <string name="settings_home_top_card_section">ホーム上部カード</string>
-    <string name="settings_home_top_card_desc">ホームリストの上部カードに表示する内容。</string>
+    <string name="settings_home_top_card_desc">主页节日卡片显示的内容。</string>
+    <string name="settings_festival_card_section">祝日カード</string>
     <string name="settings_restore_default">デフォルトに戻す</string>
     <string name="settings_badge_emoji">祝日カードのバッジ</string>
     <string name="settings_badge_emoji_desc">カード右側に表示される絵文字</string>
@@ -781,11 +781,13 @@
     <string name="timed_past_hm">%1$d 時間 %2$d 分経過</string>
     <string name="timed_past_ms">%1$d 分 %2$d 秒経過</string>
     <string name="timed_past_s">%1$d 秒経過</string>
+    <string name="unit_seconds_short">秒</string>
+    <string name="unit_minutes_short">分</string>
+    <string name="unit_hours_short">時間</string>
     <string name="detail_until_time">目標時刻まで</string>
     <string name="detail_past_time">目標時刻を過ぎました</string>
-    <string name="detail_target_time">目標時刻</string>
     <string name="form_timed_row">時刻でカウントダウン</string>
-    <string name="form_timed_info">オンにすると目標日の終了時刻を設定できます。残り 1 時間未満は分、3 分未満は秒で表示します。</string>
+    <string name="form_timed_info">开启后可设置目标日期的结束时刻，倒计时精确到时分秒。</string>
     <string name="form_target_time_row">目標時刻</string>
     <string name="form_time_dialog_title">時刻を選択</string>
     <string name="calendar_legend_period">生理</string>
@@ -865,6 +867,7 @@
     <string name="calendar_note_content">メモ（任意）</string>
     <string name="calendar_note_content_ph">補足説明</string>
     <string name="calendar_notes_section">メモ</string>
+    <string name="calendar_detail_event">カウントダウン：%1$s</string>
     <string name="calendar_no_note">この日のメモはまだありません</string>
     <string name="cycle_tip_frequent_body">性生活が3日連続で記録されました。体を大切に、しっかり休んでくださいね。</string>
     <string name="cycle_tip_ovulation_body">排卵日に性生活の記録があります。有効な避妊をしていない場合、妊娠のリスクが高まります。体調の変化にご注意ください。</string>

@@ -122,8 +122,8 @@
     <string name="settings_theme_section">테마</string>
     <string name="settings_color_section">색상</string>
     <string name="settings_default_sort_section">기본 정렬</string>
-    <string name="settings_home_top_card_section">홈 상단 카드</string>
-    <string name="settings_home_top_card_desc">홈 목록 상단 카드에 표시되는 내용입니다.</string>
+    <string name="settings_home_top_card_desc">主页节日卡片显示的内容。</string>
+    <string name="settings_festival_card_section">기념일 카드</string>
     <string name="settings_restore_default">기본값 복원</string>
     <string name="settings_badge_emoji">명절 카드 배지</string>
     <string name="settings_badge_emoji_desc">카드 오른쪽에 표시되는 이모지</string>
@@ -781,11 +781,13 @@
     <string name="timed_past_hm">%1$d시간 %2$d분 지남</string>
     <string name="timed_past_ms">%1$d분 %2$d초 지남</string>
     <string name="timed_past_s">%1$d초 지남</string>
+    <string name="unit_seconds_short">초</string>
+    <string name="unit_minutes_short">분</string>
+    <string name="unit_hours_short">시간</string>
     <string name="detail_until_time">목표 시각까지</string>
     <string name="detail_past_time">목표 시각이 지남</string>
-    <string name="detail_target_time">목표 시각</string>
     <string name="form_timed_row">시간 기준 카운트다운</string>
-    <string name="form_timed_info">켜면 목표 날짜의 종료 시각을 설정할 수 있습니다. 남은 시간이 1시간 미만이면 분, 3분 미만이면 초로 표시합니다.</string>
+    <string name="form_timed_info">开启后可设置目标日期的结束时刻，倒计时精确到时分秒。</string>
     <string name="form_target_time_row">목표 시각</string>
     <string name="form_time_dialog_title">시간 선택</string>
     <string name="calendar_legend_period">생리</string>
@@ -865,6 +867,7 @@
     <string name="calendar_note_content">메모 (선택)</string>
     <string name="calendar_note_content_ph">추가 설명</string>
     <string name="calendar_notes_section">메모</string>
+    <string name="calendar_detail_event">카운트다운: %1$s</string>
     <string name="calendar_no_note">이날 메모가 아직 없습니다</string>
     <string name="cycle_tip_frequent_body">3일 연속으로 성관계가 기록되었습니다. 몸을 잘 돌보고 충분히 쉬어 주세요.</string>
     <string name="cycle_tip_ovulation_body">배란기에 성관계가 기록되었습니다. 효과적인 피임을 하지 않았다면 임신 위험이 높습니다. 몸 상태에 유의해 주세요.</string>

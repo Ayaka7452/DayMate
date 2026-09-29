@@ -331,6 +331,36 @@ fun EventFormScreen(
 
                 Spacer(Modifier.height(10.dp))
 
+                // ---- 按时间进行倒数：开关紧跟在日期块下面，打开后时间选择器原地出现，不用去「更多设置」里翻 ----
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { timedMode = !timedMode }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(Tr.s(R.string.form_timed_row), style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(4.dp))
+                    InfoHint(Tr.s(R.string.form_timed_info))
+                    Spacer(Modifier.weight(1f))
+                    Switch(checked = timedMode, onCheckedChange = { timedMode = it })
+                }
+                if (timedMode) {
+                    SettingRow(
+                        label = Tr.s(R.string.form_target_time_row),
+                        value = {
+                            Text(
+                                timeText(targetMinute),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        onClick = { showTimePicker = true }
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+
                 // ---- 重复：跟随节日时不可选（节日每年日期不同，锚定优先） ----
                 Text(Tr.s(R.string.repeat_label), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
@@ -475,33 +505,7 @@ fun EventFormScreen(
                         },
                         onClick = { showRefDialog = true }
                     )
-                    // ---- 按时间进行倒数：打开后倒计时精确到分（不足 1 小时按分、不足 3 分钟按秒） ----
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { timedMode = !timedMode }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(Tr.s(R.string.form_timed_row), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.width(4.dp))
-                        InfoHint(Tr.s(R.string.form_timed_info))
-                        Spacer(Modifier.weight(1f))
-                        Switch(checked = timedMode, onCheckedChange = { timedMode = it })
-                    }
-                    if (timedMode) {
-                        SettingRow(
-                            label = Tr.s(R.string.form_target_time_row),
-                            value = {
-                                Text(
-                                    timeText(targetMinute),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            },
-                            onClick = { showTimePicker = true }
-                        )
-                    }
+                    // ---- 按时间进行倒数：已移至「时间」卡片日期块下方（主入口，不再埋在更多设置里） ----
                 }
             }
         }

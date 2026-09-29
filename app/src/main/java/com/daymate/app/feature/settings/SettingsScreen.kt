@@ -443,9 +443,9 @@ fun SettingsScreen(
             Spacer(Modifier.padding(vertical = 8.dp))
             HorizontalDivider()
 
-            // ===== 主页顶部卡片 =====
+            // ===== 节日卡片 =====
             Text(
-                stringResource(R.string.settings_home_top_card_section),
+                stringResource(R.string.settings_festival_card_section),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
@@ -499,7 +499,16 @@ fun SettingsScreen(
                 Text(homeBadgeEmoji, style = MaterialTheme.typography.titleLarge)
             }
 
-            // 长按主页加号的展开面板中是否显示「日历预览」入口（默认开）
+            Spacer(Modifier.padding(vertical = 8.dp))
+            HorizontalDivider()
+
+            // ===== 日历记事（独立分组：长按加号面板里的入口属于这个功能，不跟节日卡片混在一堆） =====
+            Text(
+                stringResource(R.string.calendar_preview_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            // 长按主页加号的展开面板中是否显示「日历记事」入口（默认开）
             val calendarLongPressEnabled by container.settingsRepository.calendarLongPressEnabled
                 .collectAsState(initial = true)
             Row(

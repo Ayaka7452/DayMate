@@ -158,11 +158,17 @@ fun CalendarPreviewScreen(
     // 当月有倒数事件的目标日（一天只显示一枚点，多了也不堆）。
     // 颜色统一用默认主题色（青蓝），不再跟随事件自定义配色——日历格子里颜色已经要承担
     // 休/班/经期/排卵四种语义，再让事件自带颜色会彻底看花。
-    val eventDotDays = remember(events, month) {
-        events.filter { YearMonth.from(LocalDate.ofEpochDay(it.targetDateEpochDay)) == month }
-            .map { it.targetDateEpochDay }
-            .toSet()
+    //
+    // ⚠️ 周期管家「在主页显示快捷事件」派生的事件（specialType = "cycle"）必须排除：
+    // 它的日期就是下一次预测经期首日，以普通倒数日的身份出现在这里等于绕过
+    // 「显示经期信息」开关把预测经期直接摊在日历上。
+    val eventByDay = remember(events, month) {
+        events.filter { it.specialType != "cycle" }
+            .filter { YearMonth.from(LocalDate.ofEpochDay(it.targetDateEpochDay)) == month }
+            .groupBy { it.targetDateEpochDay }
+            .mapValues { (_, list) -> list.map { it.title } }
     }
+    val eventDotDays = eventByDay.keys
     // 经期/排卵推算用的登记条目（与周期管家日历同一口径）
     val logEntries = remember(logs) { logs.map { it.startDateEpochDay to it.periodDays } }
 
@@ -389,9 +395,10 @@ fun CalendarPreviewScreen(
                                                 } else {
                                                     Spacer(Modifier.height(9.dp))
                                                 }
-                                                // 圆点行（农历小字正下方）：
+                                                // 圆点行（农历小字下方留 2dp 呼吸，贴着字很难看）：
                                                 // 经期首日（青蓝，同管家 periodColor）+ 排卵期首日（红，同管家 ovulationColor）
                                                 // + 倒数事件目标日（主题青蓝，一天只一枚，多了也不堆）
+                                                Spacer(Modifier.height(2.dp))
                                                 if (periodStart || ovulationStart || hasEventDot) {
                                                     Row(
                                                         horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -421,7 +428,7 @@ fun CalendarPreviewScreen(
                                                         }
                                                     }
                                                 } else {
-                                                    Spacer(Modifier.height(6.dp))
+                                                    Spacer(Modifier.height(8.dp))
                                                 }
                                             }
                                             // 当天有记录：右上角一枚小点。自己写的记事用主色，
@@ -553,6 +560,9 @@ fun CalendarPreviewScreen(
                     },
                     notes = ownNotes.filter { it.dateEpochDay == day } +
                         (if (showCycleNotes) trackerNotes.filter { it.dateEpochDay == day } else emptyList()),
+                    // 当天倒数事件的标题：格子里那枚青蓝圆点得有个出处，
+                    // 否则点开一片空白，用户只会觉得「怎么有个点什么都没有」。
+                    eventTitles = eventByDay[day].orEmpty(),
                     canDelete = ownNotes.any { it.dateEpochDay == day },
                     onAdd = { showAddNote = true },
                     onEdit = { editingNote = it },
@@ -632,6 +642,8 @@ private fun CalendarDayDetail(
     phase: Pair<String, String>?,
     /** 节日说明（法定节假日 / 调休补班）及其配色；null = 普通日子。 */
     festival: Pair<String, Color>?,
+    /** 当天到期的倒数事件标题（对应格子里那枚青蓝圆点）。 */
+    eventTitles: List<String>,
     notes: List<CycleNoteEntity>,
     /** 删除按钮是否可用（只删自己写的记事）。 */
     canDelete: Boolean,
@@ -705,6 +717,27 @@ private fun CalendarDayDetail(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                     )
+                }
+            }
+            // 倒数事件：格子里那枚青蓝圆点的出处（一天可能有多条，逐条列出）
+            if (eventTitles.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                eventTitles.forEach { t ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier
+                                .size(8.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.calendar_detail_event, t),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 

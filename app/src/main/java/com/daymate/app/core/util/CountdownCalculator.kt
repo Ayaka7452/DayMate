@@ -117,6 +117,30 @@ object CountdownCalculator {
     )
 
     /**
+     * 「天 + 时 + 分 + 秒」四段独立数值（时间模式详情页用）。
+     *
+     * 为什么不给拼好的整串：详情页要把「天」用主题大字、「时分秒」用淡蓝小字分两行渲染，
+     * 拼成一串就得再拆回来。数值只取整（不补零），标签由调用方按语言取。
+     */
+    data class TimedParts4(
+        val days: Long,
+        val hours: Long,
+        val minutes: Long,
+        val seconds: Long,
+        val isFuture: Boolean
+    )
+
+    /** 取「天/时/分/秒」四段（已过一侧同样返回正数，方向看 [TimedParts4.isFuture]）。 */
+    fun timedParts4(
+        targetEpochDay: Long,
+        endMinuteOfDay: Int,
+        now: java.time.LocalDateTime = java.time.LocalDateTime.now()
+    ): TimedParts4 {
+        val p = timedParts(targetEpochDay, endMinuteOfDay, now)
+        return TimedParts4(p.days, p.hours, p.minutes, p.seconds, p.isFuture)
+    }
+
+    /**
      * 按「目标日期 + 目标时刻（当天分钟数）」计算倒计时。
      *
      * 分段规则（用户定）：有整天就看天+小时，不足 1 小时看分钟，不足 3 分钟看秒；
@@ -160,7 +184,7 @@ object CountdownCalculator {
     }
 
     /** 时间模式的分解结果：天/小时/分/秒 + 是否还没到点。 */
-    private data class TimedParts(
+    data class TimedParts(
         val days: Long,
         val hours: Long,
         val minutes: Long,

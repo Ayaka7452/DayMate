@@ -122,8 +122,8 @@
     <string name="settings_theme_section">Theme</string>
     <string name="settings_color_section">Color Scheme</string>
     <string name="settings_default_sort_section">Default Sort</string>
-    <string name="settings_home_top_card_section">Home Top Card</string>
-    <string name="settings_home_top_card_desc">Content shown on the card at the top of the home list.</string>
+    <string name="settings_home_top_card_desc">What the card at the top of the home list shows.</string>
+    <string name="settings_festival_card_section">Festival card</string>
     <string name="settings_restore_default">Restore Defaults</string>
     <string name="settings_badge_emoji">Festival Card Badge</string>
     <string name="settings_badge_emoji_desc">Emoji shown on the right side of the card</string>
@@ -781,11 +781,13 @@
     <string name="timed_past_hm">%1$d hours %2$d minutes elapsed</string>
     <string name="timed_past_ms">%1$d minutes %2$d seconds elapsed</string>
     <string name="timed_past_s">%1$d seconds elapsed</string>
+    <string name="unit_seconds_short">s</string>
+    <string name="unit_minutes_short">m</string>
+    <string name="unit_hours_short">h</string>
     <string name="detail_until_time">Until target time</string>
     <string name="detail_past_time">Target time has passed</string>
-    <string name="detail_target_time">Target time</string>
     <string name="form_timed_row">Count down by time</string>
-    <string name="form_timed_info">Turn on to set an end time on the target date. The countdown then shows days and hours, switches to minutes under 1 hour, and to seconds under 3 minutes.</string>
+    <string name="form_timed_info">Turn on to set an end time on the target date. The countdown then shows hours, minutes and seconds.</string>
     <string name="form_target_time_row">Target time</string>
     <string name="form_time_dialog_title">Pick a time</string>
     <string name="calendar_legend_period">Period</string>
@@ -865,6 +867,7 @@
     <string name="calendar_note_content">Note (optional)</string>
     <string name="calendar_note_content_ph">Add details</string>
     <string name="calendar_notes_section">Notes</string>
+    <string name="calendar_detail_event">Countdown: %1$s</string>
     <string name="calendar_no_note">No notes for this day yet</string>
     <string name="cycle_tip_frequent_body">You have logged sexual activity three days in a row. Please take care of your body and get proper rest.</string>
     <string name="cycle_tip_ovulation_body">You had sexual activity during your ovulation window. If effective contraception was not used, the risk of pregnancy is higher. Please stay alert to how your body feels.</string>

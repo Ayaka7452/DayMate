@@ -122,8 +122,8 @@
     <string name="settings_theme_section">主題</string>
     <string name="settings_color_section">配色</string>
     <string name="settings_default_sort_section">預設排序</string>
-    <string name="settings_home_top_card_section">主頁頂部卡片</string>
-    <string name="settings_home_top_card_desc">主頁列表頂部卡片顯示嘅內容。</string>
+    <string name="settings_home_top_card_desc">主页节日卡片显示的内容。</string>
+    <string name="settings_festival_card_section">節日卡片</string>
     <string name="settings_restore_default">還原預設</string>
     <string name="settings_badge_emoji">節日卡片角標</string>
     <string name="settings_badge_emoji_desc">卡片右側顯示嘅表情符號</string>
@@ -781,11 +781,13 @@
     <string name="timed_past_hm">過咗 %1$d 小時 %2$d 分</string>
     <string name="timed_past_ms">過咗 %1$d 分 %2$d 秒</string>
     <string name="timed_past_s">過咗 %1$d 秒</string>
+    <string name="unit_seconds_short">秒</string>
+    <string name="unit_minutes_short">分</string>
+    <string name="unit_hours_short">小時</string>
     <string name="detail_until_time">距離目標時間</string>
     <string name="detail_past_time">目標時間已經過咗</string>
-    <string name="detail_target_time">目標時間</string>
     <string name="form_timed_row">按時間倒數</string>
-    <string name="form_timed_info">開咗之後可以設定目標日期嘅結束時刻，倒數準到分鐘：剩低唔夠 1 個鐘顯示分鐘，唔夠 3 分鐘顯示秒。</string>
+    <string name="form_timed_info">开启后可设置目标日期的结束时刻，倒计时精确到时分秒。</string>
     <string name="form_target_time_row">目標時間</string>
     <string name="form_time_dialog_title">揀時間</string>
     <string name="calendar_legend_period">經期</string>
@@ -865,6 +867,7 @@
     <string name="calendar_note_content">備註（選填）</string>
     <string name="calendar_note_content_ph">補充說明</string>
     <string name="calendar_notes_section">記事</string>
+    <string name="calendar_detail_event">倒數事件：%1$s</string>
     <string name="calendar_no_note">呢一日仲未記事</string>
     <string name="cycle_tip_frequent_body">您已連續三日進行了性行為，請注意身體，適當休息吓。</string>
     <string name="cycle_tip_ovulation_body">您喺排卵期進行了性行為，如果排卵期冇採取有效避孕措施，懷孕風險會比較大，請隨時留意身體情況。</string>

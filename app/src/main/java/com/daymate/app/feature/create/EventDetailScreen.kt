@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -222,43 +223,82 @@ fun EventDetailBody(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(verticalAlignment = Alignment.Bottom) {
+            if (data.endMinuteOfDay != null && holidayDayN == null) {
+                // 按时间倒数：把「天」和「时/分/秒」拆成两行——上面是主题色大字，下面是淡蓝色小一号的字。
+                // （原来大数字取「天」、副行再写「还剩 x 时 x 分」，看着像两套并列的读数，其实是拼起来才算完。）
+                val p4 = CountdownCalculator.timedParts4(data.targetEpochDay, data.endMinuteOfDay, now)
+                val timeText = "${p4.hours}${stringResource(R.string.unit_hours_short)}" +
+                    "${p4.minutes}${stringResource(R.string.unit_minutes_short)}" +
+                    "${p4.seconds}${stringResource(R.string.unit_seconds_short)}"
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        cd.number,
+                        fontSize = 64.sp,
+                        lineHeight = 68.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        cd.unit,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
+                // 淡蓝稍大：primary 的浅色变体在浅底上既有颜色倾向又足够跳，
+                // 小字号（bodyMedium）在 64sp 大数字下面几乎看不见。
                 Text(
-                    cd.number,
-                    fontSize = 64.sp,
-                    lineHeight = 68.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    timeText,
+                    fontSize = 26.sp,
+                    lineHeight = 30.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    cd.unit,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 14.dp)
+                    cd.caption,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            } else {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        cd.number,
+                        fontSize = 64.sp,
+                        lineHeight = 68.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        cd.unit,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    cd.caption,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                cd.caption,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
         }
 
         Spacer(Modifier.height(28.dp))
 
         // ===== 信息行 =====
         val date = LocalDate.ofEpochDay(data.targetDateEpochDay)
+        // 按时间倒数时日期与时刻拼成一行（两个独立信息行会读成两件不相干的事）
+        val dateText = date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd))) +
+            " · " + date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.forLanguageTag(Tr.s(R.string.locale_tag)))
         InfoRow(
             Tr.s(R.string.detail_target_date),
-            date.format(DateTimeFormatter.ofPattern(Tr.s(R.string.date_pattern_ymd))) +
-                " · " + date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.forLanguageTag(Tr.s(R.string.locale_tag)))
+            data.endMinuteOfDay?.let { "$dateText ${minuteText(it)}" } ?: dateText
         )
-        // 按时间倒数时目标日期还带一个时刻，单列一行才看得清（并进日期行会被读漏）
-        if (data.endMinuteOfDay != null) {
-            InfoRow(Tr.s(R.string.detail_target_time), minuteText(data.endMinuteOfDay))
-        }
         InfoRow(
             Tr.s(R.string.repeat_label),
             when {
