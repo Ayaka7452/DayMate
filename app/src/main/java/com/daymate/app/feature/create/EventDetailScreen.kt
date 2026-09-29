@@ -226,7 +226,7 @@ fun EventDetailBody(
             if (data.endMinuteOfDay != null && holidayDayN == null) {
                 // 按时间倒数：把「天」和「时/分/秒」拆成两行——上面是主题色大字，下面是淡蓝色小一号的字。
                 // （原来大数字取「天」、副行再写「还剩 x 时 x 分」，看着像两套并列的读数，其实是拼起来才算完。）
-                val p4 = CountdownCalculator.timedParts4(data.targetEpochDay, data.endMinuteOfDay, now)
+                val p4 = CountdownCalculator.timedParts4(data.targetDateEpochDay, data.endMinuteOfDay, now)
                 val timeText = "${p4.hours}${stringResource(R.string.unit_hours_short)}" +
                     "${p4.minutes}${stringResource(R.string.unit_minutes_short)}" +
                     "${p4.seconds}${stringResource(R.string.unit_seconds_short)}"
