@@ -11,6 +11,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -473,16 +474,20 @@ private fun CycleOverviewScreen(
             // 展开/收起走纵向滑动而非瞬间出现——高度突变会让下方那排按钮整块跳一下，看着像页面重排。
             // 换一天时走横向滑动：新日期在旧日期右边（更晚）→ 内容从右滑入旧内容向左滑出，反之反向，
             // 与翻页手势的直觉一致；纵向高度差由 animateContentSize 吸收。
+            // 「收起」的节奏（v1.19.8 调优）：展开要跟手，起步快；收起要优雅，
+            // 用 LinearOutSlowInEasing（匀速起步、收尾极柔）并把时长拉到 420ms。
+            // ⚠️ 淡出 380ms **几乎与收缩同步收尾**——原 220ms 会先于高度收缩结束，
+            // 内容早早消失、只剩空卡在缩，观感就是「啪一下没了」（用户反馈「有点快」）。
             AnimatedVisibility(
                 visible = showCalendar && detailExpanded,
                 enter = expandVertically(
                     expandFrom = Alignment.Top,
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)),
+                    animationSpec = tween(320, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)),
                 exit = shrinkVertically(
                     shrinkTowards = Alignment.Top,
-                    animationSpec = tween(360, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
+                    animationSpec = tween(420, easing = LinearOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(380, easing = LinearOutSlowInEasing))
             ) {
                 // 退出动画期间 detailExpanded 已置 false，用「最后一次看的日期」兜底渲染，避免内容中途跳变
                 val detailDay = selectedDay ?: lastDetailDay ?: today

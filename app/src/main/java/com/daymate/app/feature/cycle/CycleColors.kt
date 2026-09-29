@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
  *  经期  蓝紫  #6E85AE   hue ≈ 220°
  *  卵泡  灰蓝  #A8B5C4   hue ≈ 213°（明度抬高、饱和度压低，与经期同族但更淡）
  *  排卵  灰粉  #C08798   hue ≈ 350°（唯一暖色相，天然成为「峰值」锚点）
- *  黄体  米灰  #D5CFC6   hue ≈ 40° （最淡，收尾用）
+ *  黄体  冷米灰 #DAD9D4  hue ≈ 60° 但饱和度极低（最淡、收尾用；原 #D5CFC6 偏黄被嫌「土」）
  *
  * ⚠️ 这些色**只用于阶段本身**（圆环分段、日历格子底色、点位、图例、阶段标签底色）。
  * 选中框/今日框等**交互态**属于界面语言，一律用主题 primary，不要从这里取色
@@ -24,7 +24,7 @@ import androidx.compose.ui.graphics.Color
  *
  * **格子/标签上的文字色只看底色深浅，与深浅模式无关**（底色是固定色、不随主题漂移）：
  *  - 经期 `#6E85AE`、排卵 `#C08798` → 较深，恒用**纯白**（对比度 3.73 / 2.93）
- *  - 卵泡 `#A8B5C4`、黄体 `#D5CFC6` → 浅底，恒用 [OnLight] 深墨（对比度 5.44 / 7.33）
+ *  - 卵泡 `#A8B5C4`、黄体 `#DAD9D4` → 浅底，恒用 [OnLight] 深墨（对比度 5.44 / 6.75）
  * 绝不要从 `colorScheme` 取 onPrimary / onTertiary / onSurface 当这里的文字色——
  * 深色模式下 onPrimary 是深蓝，压在深蓝紫格底上等于隐形（v1.19.5 修）。
  */
@@ -35,8 +35,8 @@ object CycleColors {
     val Follicular = Color(0xFFA8B5C4)
     /** 排卵期：灰粉（整套里唯一的暖色相，作为周期峰值锚点）。 */
     val Ovulation = Color(0xFFC08798)
-    /** 黄体期：米灰。 */
-    val Luteal = Color(0xFFD5CFC6)
+    /** 黄体期：冷米灰（原 #D5CFC6 偏暖黄，用户 2026-09-29 反馈「土」，去黄提亮一档）。 */
+    val Luteal = Color(0xFFDAD9D4)
 
     /**
      * 浅底格子（卵泡/黄体）里的文字与圆点色：深墨，压深一级保证对比度。
