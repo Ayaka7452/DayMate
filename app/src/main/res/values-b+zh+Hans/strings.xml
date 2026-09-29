@@ -330,6 +330,11 @@
     <string name="cycle_delete_day_records">删除该日记录</string>
     <string name="cycle_prev_month">上个月</string>
     <string name="cycle_next_month">下个月</string>
+    <string name="month_picker_title">选择年月</string>
+    <string name="month_picker_year">%1$d年</string>
+    <string name="month_picker_month">%1$d月</string>
+    <string name="month_picker_prev_year">上一年</string>
+    <string name="month_picker_next_year">下一年</string>
     <string name="cycle_today_prefix">今天 · %1$s</string>
     <string name="cycle_day_records">当日记录</string>
     <string name="cycle_add_record">添加记录</string>

@@ -330,6 +330,11 @@
     <string name="cycle_delete_day_records">Delete that day\'s records</string>
     <string name="cycle_prev_month">Previous month</string>
     <string name="cycle_next_month">Next month</string>
+    <string name="month_picker_title">Year &amp; month</string>
+    <string name="month_picker_year">Year %1$d</string>
+    <string name="month_picker_month">%1$d</string>
+    <string name="month_picker_prev_year">Previous year</string>
+    <string name="month_picker_next_year">Next year</string>
     <string name="cycle_today_prefix">Today · %1$s</string>
     <string name="cycle_day_records">Today\'s records</string>
     <string name="cycle_add_record">Add record</string>

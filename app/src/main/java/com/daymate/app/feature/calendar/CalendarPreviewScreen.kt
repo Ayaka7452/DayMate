@@ -82,6 +82,7 @@ import com.ayaka7452.daymate.feature.cycle.CycleColors
 import com.ayaka7452.daymate.feature.cycle.DeleteNotesDialog
 import com.ayaka7452.daymate.feature.cycle.describeDay
 import com.ayaka7452.daymate.feature.cycle.phaseChipColors
+import com.ayaka7452.daymate.feature.common.MonthPickerDialog
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -156,6 +157,8 @@ fun CalendarPreviewScreen(
     var showAddNote by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf<CycleNoteEntity?>(null) }
     var deletingDay by remember { mutableStateOf<Long?>(null) }
+    // 点顶部「xxxx年xx月」展开的年月选择器
+    var showMonthPicker by remember { mutableStateOf(false) }
 
     // 当月有倒数事件的目标日（一天只显示一枚点，多了也不堆）。
     // 颜色统一用默认主题色（青蓝），不再跟随事件自定义配色——日历格子里颜色已经要承担
@@ -233,11 +236,15 @@ fun CalendarPreviewScreen(
                     )
                 }
                 Text(
+                    // 点年月标题可直接跳到任意年月（与周期管家日历同一入口）
                     month.format(LocaleWrap.dateFormatter(R.string.date_pattern_ym)),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showMonthPicker = true }
                 )
                 IconButton(onClick = { if (!flipping) monthOffset += 1 }) {
                     Icon(
@@ -633,6 +640,20 @@ fun CalendarPreviewScreen(
             onConfirm = { ids ->
                 scope.launch { container.cycleNoteRepository.deleteByIds(ids) }
                 deletingDay = null
+            }
+        )
+    }
+
+    // ===== 年月选择：点顶部标题展开，选完直接显示该月 =====
+    if (showMonthPicker) {
+        MonthPickerDialog(
+            selected = month,
+            onDismiss = { showMonthPicker = false },
+            onPick = { ym ->
+                // 月份偏移由目标年月反推，与翻月箭头共用同一状态
+                val now = YearMonth.now()
+                monthOffset = (ym.year - now.year) * 12 + (ym.monthValue - now.monthValue)
+                showMonthPicker = false
             }
         )
     }

@@ -453,53 +453,47 @@ fun EventFormScreen(
                 }
                 if (moreExpanded) {
                     Spacer(Modifier.height(4.dp))
-                    // ---- 跟随节日：行式入口；ⓘ 气泡后跟「取消跟随」内联操作，压缩纵向空间 ----
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                // 打开弹窗时加载可快选的节日：跨年取各节日下一次日期，
-                                // 数据源还没发布新年份的（如明年春节）按「+1年」预估并标注「约」
-                                festivalOptions = container.festivalRepository.pickerFestivals(LocalDate.now())
-                                showFestivalDialog = true
-                            }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(Tr.s(R.string.form_festival_row), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.width(4.dp))
-                        InfoHint(Tr.s(R.string.form_festival_info))
-                        if (linkedFestival != null) {
-                            Spacer(Modifier.width(8.dp))
+                    // ---- ① 跟随节日：行式入口；ⓘ 气泡后跟「取消跟随」内联操作 ----
+                    SettingRow(
+                        label = Tr.s(R.string.form_festival_row),
+                        info = Tr.s(R.string.form_festival_info),
+                        value = {
                             Text(
-                                Tr.s(
-                                    R.string.event_unfollow,
-                                    com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linkedFestival.orEmpty())
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable { linkedFestival = null }
+                                linkedFestival?.let {
+                                    com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(it)
+                                } ?: Tr.s(R.string.form_not_set),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (linkedFestival != null) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
+                        },
+                        trailing = linkedFestival?.let { linked ->
+                            {
+                                Text(
+                                    Tr.s(
+                                        R.string.event_unfollow,
+                                        com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(linked)
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clickable { linkedFestival = null }
+                                )
+                            }
+                        },
+                        onClick = {
+                            // 打开弹窗时加载可快选的节日：跨年取各节日下一次日期，
+                            // 数据源还没发布新年份的（如明年春节）按「+1年」预估并标注「约」
+                            festivalOptions = container.festivalRepository.pickerFestivals(LocalDate.now())
+                            showFestivalDialog = true
                         }
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            linkedFestival?.let {
-                                com.ayaka7452.daymate.data.festival.HolidayNames.displayLinked(it)
-                            } ?: Tr.s(R.string.form_not_set),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (linkedFestival != null) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("›", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
-                    }
-                    // ---- 倒计时显示单位 ----
+                    )
+                    // ---- ② 倒计时显示单位 ----
                     SettingRow(
                         label = Tr.s(R.string.event_display_unit),
                         value = { Text(refUnitLabel, style = MaterialTheme.typography.bodyMedium) },
                         onClick = { showUnitDialog = true }
                     )
-                    // ---- 对照值（可选）：过期后卡片显示「已过 X/N」中的 N ----
+                    // ---- ③ 对照值（可选）：过期后卡片显示「已过 X/N」中的 N ----
                     SettingRow(
                         label = Tr.s(R.string.form_ref_row),
                         info = Tr.s(R.string.form_ref_info),
@@ -965,13 +959,20 @@ private fun solidSelectedChipColors() = FilterChipDefaults.filterChipColors(
     selectedLabelColor = MaterialTheme.colorScheme.onPrimary
 )
 
-/** 设置行：左标签（可带 ⓘ），右值 + ›，整行可点。 */
+/**
+ * 设置行：左标签（可带 ⓘ）+ 可选内联操作 [trailing]（如「取消跟随」），
+ * 右侧值 + ›，整行可点。
+ *
+ * 行内统一 `padding(vertical = 12.dp)`：所有设置行共用同一实现，间隔自然一致
+ * （此前「跟随节日」是手写 Row 用 6dp，导致同卡片里行距一宽一窄）。
+ */
 @Composable
 private fun SettingRow(
     label: String,
     value: @Composable () -> Unit,
     onClick: () -> Unit,
-    info: String? = null
+    info: String? = null,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -984,6 +985,10 @@ private fun SettingRow(
         if (info != null) {
             Spacer(Modifier.width(4.dp))
             InfoHint(info)
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            trailing()
         }
         Spacer(Modifier.weight(1f))
         value()

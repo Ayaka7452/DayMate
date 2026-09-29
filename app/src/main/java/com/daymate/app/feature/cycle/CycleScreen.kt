@@ -118,6 +118,7 @@ import com.ayaka7452.daymate.core.util.CycleCalculator
 import com.ayaka7452.daymate.core.util.NoteCatalog
 import com.ayaka7452.daymate.data.db.CycleLogEntity
 import com.ayaka7452.daymate.data.db.CycleNoteEntity
+import com.ayaka7452.daymate.feature.common.MonthPickerDialog
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -310,6 +311,14 @@ private fun CycleOverviewScreen(
     // 温馨提示队列：①连续三天性生活 ②排卵期无保护。两个都触发时先弹①、关掉再弹②，避免打架
     var showTipFrequent by remember { mutableStateOf(false) }
     var showTipOvulation by remember { mutableStateOf(false) }
+    // 点顶部「xxxx年xx月」展开的年月选择器（弹窗里的选择经此回填到日历）
+    var showMonthPicker by remember { mutableStateOf(false) }
+    // 弹窗打开瞬间锚定的当前日历月份，避免弹窗自己的年份步进被日历状态反噬
+    var monthPickerTarget by remember { mutableStateOf(java.time.YearMonth.now()) }
+    // 弹窗选定的年月：转交给日历消费（消费后置空，避免重进日历被重复跳转）
+    var monthPickerPending by remember { mutableStateOf<java.time.YearMonth?>(null) }
+    // 「今天」按钮的请求序号：每点一次 +1，日历收到变化就回本月并选中今天
+    var todayRequest by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -321,6 +330,11 @@ private fun CycleOverviewScreen(
                     }
                 },
                 actions = {
+                    // 与日历记事同一入口：翻月后一键回本月，并选中今天
+                    TextButton(
+                        onClick = { todayRequest += 1 },
+                        enabled = showCalendar
+                    ) { Text(stringResource(R.string.calendar_today)) }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.common_settings))
                     }
@@ -392,12 +406,19 @@ private fun CycleOverviewScreen(
                             cycleDays = cycleDays,
                             today = today,
                             selectedDay = selectedDay,
+                            todayRequest = todayRequest,
+                            pendingMonth = monthPickerPending,
+                            onConsumePendingMonth = { monthPickerPending = null },
                             onSelectDay = { day ->
                                 if (selectedDay == day) {
                                     selectedDay = null          // 再点同一天 = 取消选中（详情栏回到今天）
                                 } else {
                                     selectedDay = day
                                 }
+                            },
+                            onPickMonth = { ym ->
+                                monthPickerTarget = ym
+                                showMonthPicker = true
                             }
                         )
                     } else {
@@ -632,6 +653,19 @@ private fun CycleOverviewScreen(
             )
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    // 年月选择弹窗（主视图日历顶部标题入口）——选完由 CycleCalendarMonth 回填 monthOffset
+    if (showMonthPicker) {
+        MonthPickerDialog(
+            selected = monthPickerTarget,
+            onDismiss = { showMonthPicker = false },
+            onPick = { ym ->
+                monthPickerTarget = ym
+                monthPickerPending = ym
+                showMonthPicker = false
+            }
+        )
     }
 
     // 登记 / 开始新经期弹窗（主视图直达，默认选中今天）
@@ -2023,10 +2057,33 @@ private fun CycleCalendarMonth(
     cycleDays: Int,
     today: Long,
     selectedDay: Long?,
-    onSelectDay: (Long) -> Unit
+    onSelectDay: (Long) -> Unit,
+    /** 顶栏「今天」的请求序号：值变化即回本月（见下方 LaunchedEffect）。 */
+    todayRequest: Int = 0,
+    /** 宿主年月选择器的结果（非 null 即跳转到该年月）；由本组件消费后回调置空。 */
+    pendingMonth: java.time.YearMonth? = null,
+    onConsumePendingMonth: () -> Unit = {},
+    /** 点年月标题时把当前月份抛给宿主打开选择器。 */
+    onPickMonth: (java.time.YearMonth) -> Unit = {}
 ) {
     var monthOffset by remember { mutableStateOf(0) }
     val month = LocalDate.now().plusMonths(monthOffset.toLong())
+
+    // 主视图顶栏「今天」：回本月 + 选中今天（选中动作由宿主注入，这里只负责归零偏移）
+    LaunchedEffect(todayRequest) {
+        if (todayRequest > 0) {
+            monthOffset = 0
+            onSelectDay(today)
+        }
+    }
+    // 宿主年月选择器的结果：把目标年月换算成相对本月的偏移，再置空 pending
+    LaunchedEffect(pendingMonth) {
+        pendingMonth?.let { ym ->
+            val now = LocalDate.now()
+            monthOffset = (ym.year - now.year) * 12 + (ym.monthValue - now.monthValue)
+            onConsumePendingMonth()
+        }
+    }
 
     // ===== 左右滑动切月 =====
     // 跟手：拖动时整块月历随手指平移（graphicsLayer 只走绘制层，不触发重新布局）。
@@ -2107,11 +2164,15 @@ private fun CycleCalendarMonth(
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.cycle_prev_month))
             }
             Text(
+                // 点年月标题可直接跳到任意年月（与日历记事同一入口）
                 month.format(LocaleWrap.dateFormatter(R.string.date_pattern_ym)),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onPickMonth(java.time.YearMonth.from(month)) }
             )
             IconButton(onClick = { monthOffset += 1 }) {
                 Icon(Icons.Default.KeyboardArrowRight, contentDescription = stringResource(R.string.cycle_next_month))
