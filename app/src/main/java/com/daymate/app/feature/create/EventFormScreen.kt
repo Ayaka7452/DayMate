@@ -124,7 +124,9 @@ fun EventFormScreen(
                 note = e.note ?: ""
                 epochDay = e.targetDateEpochDay
                 refDaysText = e.refDays?.toString() ?: ""
-                displayUnit = e.displayUnit ?: CountdownCalculator.UNIT_DAY
+                // 时间模式恒为「天」：单位对话框里月/年会被灰掉，加载脏值（历史数据）也一并纠正
+                displayUnit = if (e.endMinuteOfDay != null) CountdownCalculator.UNIT_DAY
+                else e.displayUnit ?: CountdownCalculator.UNIT_DAY
                 repeatRule = e.repeatRule
                 linkedFestival = e.linkedFestival
                 folderIdSel = e.folderId
@@ -377,11 +379,16 @@ fun EventFormScreen(
                 )
 
                 // ---- 精确到时刻：日期之外再指定当天的结束时刻，打开后时间选择器原地出现 ----
-                // 紧跟在循环下面（用户指定位置），垂直留白收窄，与上面一段提示语贴成一组
+                // 紧跟在循环下面（用户指定位置），垂直留白收窄，与上面一段提示语贴成一组。
+                // 打开时把显示单位强制回落到「天」：时间模式只能按天倒数（月/年没有「几点」的概念），
+                // 选项会在单位对话框里被灰掉，若不回落就会停在一个已失效的选项上。
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { timedMode = !timedMode }
+                        .clickable {
+                            timedMode = !timedMode
+                            if (timedMode) displayUnit = CountdownCalculator.UNIT_DAY
+                        }
                         .padding(top = 6.dp, bottom = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -389,7 +396,10 @@ fun EventFormScreen(
                     Spacer(Modifier.width(4.dp))
                     InfoHint(Tr.s(R.string.form_timed_info))
                     Spacer(Modifier.weight(1f))
-                    Switch(checked = timedMode, onCheckedChange = { timedMode = it })
+                    Switch(checked = timedMode, onCheckedChange = {
+                        timedMode = it
+                        if (it) displayUnit = CountdownCalculator.UNIT_DAY
+                    })
                 }
                 if (timedMode) {
                     SettingRow(
@@ -701,20 +711,37 @@ fun EventFormScreen(
                         CountdownCalculator.UNIT_MONTH to Tr.s(R.string.form_unit_months),
                         CountdownCalculator.UNIT_YEAR to Tr.s(R.string.form_unit_years)
                     ).forEach { (unit, label) ->
+                        // 「精确到时刻」打开时只能按天倒数（月/年没有「几点几分」的落点），
+                        // 其余单位置灰不可选——继续可点会让人选了却不生效。
+                        val enabled = !timedMode || unit == CountdownCalculator.UNIT_DAY
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .clickable(enabled = enabled) {
                                     displayUnit = unit
                                     showUnitDialog = false
                                 }
                                 .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            RadioButton(selected = displayUnit == unit, onClick = null)
+                            RadioButton(selected = displayUnit == unit, onClick = null, enabled = enabled)
                             Spacer(Modifier.width(8.dp))
-                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (enabled) MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
                         }
+                    }
+                    // 时间模式下把「为什么只剩天可选」讲清楚，否则会以为是界面出问题
+                    if (timedMode) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            Tr.s(R.string.form_unit_timed_locked),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(

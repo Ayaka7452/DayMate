@@ -648,6 +648,7 @@
     <string name="form_ref_dialog_title">設定對照日期</string>
     <string name="form_ref_clear">清除</string>
     <string name="form_unit_dialog_title">顯示單位</string>
+    <string name="form_unit_timed_locked">開啟精確到時刻之後，淨係可以用日嚟顯示</string>
     <string name="form_ref_info">開啟對照日期之後，會喺目前倒數日數旁邊顯示對照日數，倒數時可以用嚟對照。</string>
     <string name="form_festival_info">跟隨節日之後，每年會自動倒數該節日，就算該節日每年可能處於唔同嘅日期。</string>
     <string name="form_festival_row">跟住假期</string>

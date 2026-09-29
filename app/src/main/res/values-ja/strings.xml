@@ -648,6 +648,7 @@
     <string name="form_ref_dialog_title">基準日を設定</string>
     <string name="form_ref_clear">クリア</string>
     <string name="form_unit_dialog_title">表示単位</string>
+    <string name="form_unit_timed_locked">時刻まで指定すると、日単位でのみ表示されます</string>
     <string name="form_ref_info">有効にすると、現在のカウントダウンの横に比較用の日数が表示されます。</string>
     <string name="form_festival_info">祝日に連動させると、日付が毎年変わっても、毎年自動的にその祝日までのカウントダウンになります。</string>
     <string name="form_festival_row">祝日に連動</string>

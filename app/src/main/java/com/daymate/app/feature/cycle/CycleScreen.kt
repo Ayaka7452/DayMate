@@ -2197,11 +2197,12 @@ private fun CycleCalendarMonth(
                                         loggedDays.contains(epochDay) ->
                                             Box(Modifier.size(4.dp).background(fg, CircleShape))
                                         futurePeriod ->
-                                            // 空心圆点：尚未到来的经期日（到来/登记确认后变实心）
+                                            // 空心圆点：尚未到来的经期日（到来/登记确认后变实心）。
+                                            // 尺寸与实心点、与日历记事同一套 4dp（原 6dp 比同行其它点大一圈）
                                             Box(
                                                 Modifier
-                                                    .size(6.dp)
-                                                    .border(1.2.dp, periodColor, CircleShape)
+                                                    .size(4.dp)
+                                                    .border(1.dp, periodColor, CircleShape)
                                             )
                                         else -> Spacer(Modifier.height(4.dp))
                                     }

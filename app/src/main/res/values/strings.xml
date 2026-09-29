@@ -648,6 +648,7 @@
     <string name="form_ref_dialog_title">Set reference date</string>
     <string name="form_ref_clear">Clear</string>
     <string name="form_unit_dialog_title">Countdown unit</string>
+    <string name="form_unit_timed_locked">Only day is available when an exact time is set.</string>
     <string name="form_ref_info">When enabled, the reference days are shown next to the current countdown days, for comparison while counting down.</string>
     <string name="form_festival_info">Once you follow a holiday, the countdown to it updates automatically every year, even though the holiday may fall on a different date each year.</string>
     <string name="form_festival_row">Follow holiday</string>
