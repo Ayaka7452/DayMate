@@ -786,8 +786,8 @@
     <string name="unit_hours_short">시간</string>
     <string name="detail_until_time">목표 시각까지</string>
     <string name="detail_past_time">목표 시각이 지남</string>
-    <string name="form_timed_row">시간 기준 카운트다운</string>
-    <string name="form_timed_info">开启后可设置目标日期的结束时刻，倒计时精确到时分秒。</string>
+    <string name="form_timed_row">시각까지 지정</string>
+    <string name="form_timed_info">켜면 목표 날짜의 종료 시각을 설정할 수 있습니다. 카운트다운은 시·분·초로 표시됩니다.</string>
     <string name="form_target_time_row">목표 시각</string>
     <string name="form_time_dialog_title">시간 선택</string>
     <string name="calendar_legend_period">생리</string>

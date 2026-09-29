@@ -331,36 +331,6 @@ fun EventFormScreen(
 
                 Spacer(Modifier.height(10.dp))
 
-                // ---- 按时间进行倒数：开关紧跟在日期块下面，打开后时间选择器原地出现，不用去「更多设置」里翻 ----
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { timedMode = !timedMode }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(Tr.s(R.string.form_timed_row), style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.width(4.dp))
-                    InfoHint(Tr.s(R.string.form_timed_info))
-                    Spacer(Modifier.weight(1f))
-                    Switch(checked = timedMode, onCheckedChange = { timedMode = it })
-                }
-                if (timedMode) {
-                    SettingRow(
-                        label = Tr.s(R.string.form_target_time_row),
-                        value = {
-                            Text(
-                                timeText(targetMinute),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        },
-                        onClick = { showTimePicker = true }
-                    )
-                }
-
-                Spacer(Modifier.height(10.dp))
-
                 // ---- 重复：跟随节日时不可选（节日每年日期不同，锚定优先） ----
                 Text(Tr.s(R.string.repeat_label), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
@@ -405,6 +375,35 @@ fun EventFormScreen(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
+
+                // ---- 精确到时刻：日期之外再指定当天的结束时刻，打开后时间选择器原地出现 ----
+                // 紧跟在循环下面（用户指定位置），垂直留白收窄，与上面一段提示语贴成一组
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { timedMode = !timedMode }
+                        .padding(top = 6.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(Tr.s(R.string.form_timed_row), style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(4.dp))
+                    InfoHint(Tr.s(R.string.form_timed_info))
+                    Spacer(Modifier.weight(1f))
+                    Switch(checked = timedMode, onCheckedChange = { timedMode = it })
+                }
+                if (timedMode) {
+                    SettingRow(
+                        label = Tr.s(R.string.form_target_time_row),
+                        value = {
+                            Text(
+                                timeText(targetMinute),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        onClick = { showTimePicker = true }
+                    )
+                }
             }
 
             Spacer(Modifier.height(10.dp))

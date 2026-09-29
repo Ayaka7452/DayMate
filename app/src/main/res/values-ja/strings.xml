@@ -786,8 +786,8 @@
     <string name="unit_hours_short">時間</string>
     <string name="detail_until_time">目標時刻まで</string>
     <string name="detail_past_time">目標時刻を過ぎました</string>
-    <string name="form_timed_row">時刻でカウントダウン</string>
-    <string name="form_timed_info">开启后可设置目标日期的结束时刻，倒计时精确到时分秒。</string>
+    <string name="form_timed_row">時刻まで指定</string>
+    <string name="form_timed_info">オンにすると目標日の終了時刻を設定できます。カウントダウンは時・分・秒で表示されます。</string>
     <string name="form_target_time_row">目標時刻</string>
     <string name="form_time_dialog_title">時刻を選択</string>
     <string name="calendar_legend_period">生理</string>

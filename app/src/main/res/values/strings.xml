@@ -786,7 +786,7 @@
     <string name="unit_hours_short">h</string>
     <string name="detail_until_time">Until target time</string>
     <string name="detail_past_time">Target time has passed</string>
-    <string name="form_timed_row">Count down by time</string>
+    <string name="form_timed_row">Exact time</string>
     <string name="form_timed_info">Turn on to set an end time on the target date. The countdown then shows hours, minutes and seconds.</string>
     <string name="form_target_time_row">Target time</string>
     <string name="form_time_dialog_title">Pick a time</string>

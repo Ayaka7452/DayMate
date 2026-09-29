@@ -786,8 +786,8 @@
     <string name="unit_hours_short">小時</string>
     <string name="detail_until_time">距離目標時間</string>
     <string name="detail_past_time">目標時間已經過咗</string>
-    <string name="form_timed_row">按時間倒數</string>
-    <string name="form_timed_info">开启后可设置目标日期的结束时刻，倒计时精确到时分秒。</string>
+    <string name="form_timed_row">精確到時刻</string>
+    <string name="form_timed_info">開啟後可設定目標日期嘅結束時刻，倒數精確到時分秒。</string>
     <string name="form_target_time_row">目標時間</string>
     <string name="form_time_dialog_title">揀時間</string>
     <string name="calendar_legend_period">經期</string>

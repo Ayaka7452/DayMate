@@ -249,18 +249,14 @@ fun EventDetailBody(
                 Spacer(Modifier.height(2.dp))
                 // 淡蓝稍大：primary 的浅色变体在浅底上既有颜色倾向又足够跳，
                 // 小字号（bodyMedium）在 64sp 大数字下面几乎看不见。
+                // 这里**不再**补一行「还剩 x 小时 x 分」——上面「天」+「时/分/秒」已经是完整读数，
+                // 再来一行会读成两套并列的数值（用户明确要求删掉）。
                 Text(
                     timeText,
                     fontSize = 26.sp,
                     lineHeight = 30.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    cd.caption,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             } else {
                 Row(verticalAlignment = Alignment.Bottom) {
