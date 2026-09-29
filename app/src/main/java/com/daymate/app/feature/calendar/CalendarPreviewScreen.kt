@@ -68,7 +68,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,6 +92,8 @@ import java.time.format.TextStyle
 private val OFF_GREEN = Color(0xFF1E8E3E)
 /** 班（调休补班）底色，与节日卡/小组件同一套橙。 */
 private val MAKEUP_ORANGE = Color(0xFFE8710A)
+/** 图例小圆点直径：倒数日 / 经期 / 排卵三色**共用一个值**，避免并排时大小不齐。 */
+private val LEGEND_DOT_DP = 7.dp
 
 /**
  * 日历记事（主页菜单入口）：整月一格一格，与周期管家同一套方块语言——
@@ -487,32 +488,31 @@ fun CalendarPreviewScreen(
                 }
             }
 
-            // 图例：休 / 班 / 倒数日（休班用小方块呼应底色，倒数日用圆点呼应格内圆点）；
+            // 图例：休 / 班 / 倒数日 / 经期 / 排卵，全部排在**同一行**
+            //（早先经期/排卵另起一行，用户觉得两行割裂；且两种圆点大小不一很难看，
+            //  现统一取 LEGEND_DOT_DP，空心/实心的差异交给颜色区分）。
             // 经期与排卵两项只在「显示经期信息」打开时出现——解释了不存在的颜色反而让人困惑。
             Spacer(Modifier.height(12.dp))
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    LegendSwatch(OFF_GREEN)
-                    LegendLabel(stringResource(R.string.calendar_legend_off))
-                    Spacer(Modifier.width(12.dp))
-                    LegendSwatch(MAKEUP_ORANGE)
-                    LegendLabel(stringResource(R.string.calendar_legend_makeup))
-                    Spacer(Modifier.width(12.dp))
-                    LegendDot(MaterialTheme.colorScheme.primary)
-                    LegendLabel(stringResource(R.string.calendar_legend_event))
-                }
+                LegendSwatch(OFF_GREEN)
+                LegendLabel(stringResource(R.string.calendar_legend_off))
+                Spacer(Modifier.width(10.dp))
+                LegendSwatch(MAKEUP_ORANGE)
+                LegendLabel(stringResource(R.string.calendar_legend_makeup))
+                Spacer(Modifier.width(10.dp))
+                LegendDot(MaterialTheme.colorScheme.primary)
+                LegendLabel(stringResource(R.string.calendar_legend_event))
                 if (showPeriod) {
-                    Spacer(Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        LegendDot(MaterialTheme.colorScheme.primary, size = 7.dp)
-                        LegendLabel(stringResource(R.string.calendar_legend_period))
-                        Spacer(Modifier.width(12.dp))
-                        LegendDot(MaterialTheme.colorScheme.tertiary, size = 7.dp)
-                        LegendLabel(stringResource(R.string.calendar_legend_ovulation))
-                    }
+                    Spacer(Modifier.width(10.dp))
+                    LegendDot(CycleColors.Period)
+                    LegendLabel(stringResource(R.string.calendar_legend_period))
+                    Spacer(Modifier.width(10.dp))
+                    LegendDot(CycleColors.Ovulation)
+                    LegendLabel(stringResource(R.string.calendar_legend_ovulation))
                 }
             }
             if (!hasFestivalData) {
@@ -560,9 +560,10 @@ fun CalendarPreviewScreen(
                         if (it.isOffDay) {
                             stringResource(R.string.calendar_detail_holiday, it.name) to OFF_GREEN
                         } else {
-                            // 补班日只写「调休补班」不带节名：橙色的意义是「这天要上班」，
-                            // 挂上「国庆节」反而让人以为在放假（用户 2026-09-29 明确要求）。
-                            stringResource(R.string.calendar_detail_makeup) to MAKEUP_ORANGE
+                            // 补班日：主语义「补班」在前，节名跟在冒号后（补班：国庆节调休）。
+                            // 用户 2026-09-29 定稿——保留节名（否则看不出补哪个节的班），
+                            // 但不能让节名抢在「补班」前面，那样像在放假。
+                            stringResource(R.string.calendar_detail_makeup, it.name) to MAKEUP_ORANGE
                         }
                     },
                     notes = ownNotes.filter { it.dateEpochDay == day } +
@@ -943,13 +944,18 @@ private fun LegendSwatch(color: Color) {
     )
 }
 
-/** 图例小圆点（格内圆点同款，颜色由调用方给）。 */
+/**
+ * 图例小圆点（格内圆点同款，颜色由调用方给）。
+ *
+ * 尺寸**固定一处**（LEGEND_DOT_DP）：倒数日 / 经期 / 排卵三种点必须同大小，
+ * 早先倒数日 8dp、经期排卵 7dp，并排一眼就能看出不齐（用户 2026-09-29 指出）。
+ */
 @Composable
-private fun LegendDot(color: Color, size: Dp = 8.dp) {
+private fun LegendDot(color: Color) {
     Box(
         Modifier
             .padding(end = 4.dp)
-            .size(size)
+            .size(LEGEND_DOT_DP)
             .background(color, CircleShape)
     )
 }

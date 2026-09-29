@@ -91,10 +91,6 @@ class DbRepair(
         /** 空闲页占比，0f~1f。 */
         val freeRatio: Float get() = if (pageCount > 0) freePages.toFloat() / pageCount else 0f
 
-        /** 用户数据总行数（不含回收站）。 */
-        val liveRows: Long
-            get() = tables.sumOf { if (it.rows < 0) 0L else it.rows - it.inRecycleBin }
-
         /** 悬空文件夹引用总数（读不出来时按 0 计）。 */
         val danglingRefs: Long
             get() = tables.sumOf { if (it.danglingRefs < 0) 0L else it.danglingRefs }

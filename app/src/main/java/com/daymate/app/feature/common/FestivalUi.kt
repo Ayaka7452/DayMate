@@ -369,6 +369,9 @@ private fun festivalStatusBar(
             else -> Tr.s(R.string.festival_ui_span_days, spanDays)
         }
     )
+    // 橙色「班」条：主语义是把「补班」放前面，节名跟在冒号后（今日补班：国庆节调休）。
+    // 早先写成「今日国庆节调休补班」，节名插在中间会读成「今天国庆节·在补班」，
+    // 反而像在放假（用户 2026-09-29 澄清：要保留节名，但要让「补班」当主语义）。
     today != null -> FestivalStatus(
         false, false, Tr.s(R.string.festival_banner_makeup, HolidayNames.display(today))
     )
