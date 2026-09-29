@@ -5,21 +5,16 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.Canvas
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -106,7 +101,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.ayaka7452.daymate.R
@@ -472,61 +466,38 @@ private fun CycleOverviewScreen(
             // 位置紧贴日历下方：点选的即时反馈要离被点的格子近，不能等滚到页面底部才看见。
             // 未选中就显示今天——说明栏不再留一大块空白，也让「点一天看什么」有现成的示范。
             // 展开/收起走纵向滑动而非瞬间出现——高度突变会让下方那排按钮整块跳一下，看着像页面重排。
-            // 换一天时走横向滑动：新日期在旧日期右边（更晚）→ 内容从右滑入旧内容向左滑出，反之反向，
-            // 与翻页手势的直觉一致；纵向高度差由 animateContentSize 吸收。
-            // 「收起」的节奏（v1.19.8 调优）：展开要跟手，起步快；收起要优雅，
-            // 用 LinearOutSlowInEasing（匀速起步、收尾极柔）并把时长拉到 420ms。
-            // ⚠️ 淡出 380ms **几乎与收缩同步收尾**——原 220ms 会先于高度收缩结束，
-            // 内容早早消失、只剩空卡在缩，观感就是「啪一下没了」（用户反馈「有点快」）。
+            // 换一天时内容直接替换，纵向高度差由 animateContentSize 平滑吸收（不再做横向滑入）。
+            // ⚠️ 这里**刻意不套 AnimatedContent**（换天横滑已取消）：那层会在切换时同时组合
+            // 新旧两份 CycleDayDetail，与外层 AnimatedVisibility 的收缩叠加，每帧多重测量 → 掉帧。
+            // 回到 v1.8.2 的轻量结构：AnimatedVisibility + Column(animateContentSize) 两层。
+            // 节奏也一并回收：层数少了不必靠长时间掩盖卡顿，收尾给 260ms 即可，顺滑且不拖。
             AnimatedVisibility(
                 visible = showCalendar && detailExpanded,
                 enter = expandVertically(
                     expandFrom = Alignment.Top,
-                    animationSpec = tween(320, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)),
+                    animationSpec = tween(260, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)),
                 exit = shrinkVertically(
                     shrinkTowards = Alignment.Top,
-                    animationSpec = tween(420, easing = LinearOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(380, easing = LinearOutSlowInEasing))
+                    animationSpec = tween(260, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
             ) {
                 // 退出动画期间 detailExpanded 已置 false，用「最后一次看的日期」兜底渲染，避免内容中途跳变
                 val detailDay = selectedDay ?: lastDetailDay ?: today
-                AnimatedContent(
-                    targetState = detailDay,
-                    // ⚠️ animateContentSize 必须挂在 AnimatedContent 的 **modifier**（外层）上，
-                    // 不能塞进内容里的 Column——否则每帧「外层收缩 + 内层测量」双重触发，
-                    // 收敛不下来就是掉帧（v1.18.2 引入 AnimatedContent 时留错了位置，v1.19.9 修）。
-                    // 日历记事那边一直是正确写法，两处现已对齐。
-                    modifier = Modifier.animateContentSize(),
-                    transitionSpec = {
-                        val spec = tween<IntOffset>(260, easing = FastOutSlowInEasing)
-                        val fade = tween<Float>(180, easing = FastOutSlowInEasing)
-                        val forward = targetState > initialState
-                        if (forward) {
-                            (slideInHorizontally(spec) { it } + fadeIn(fade)) togetherWith
-                                (slideOutHorizontally(spec) { -it } + fadeOut(fade))
-                        } else {
-                            (slideInHorizontally(spec) { -it } + fadeIn(fade)) togetherWith
-                                (slideOutHorizontally(spec) { it } + fadeOut(fade))
-                        }
-                    },
-                    label = "cycle_detail_slide"
-                ) { day ->
-                    Column {
-                        Spacer(Modifier.height(16.dp))
-                        CycleDayDetail(
-                            day = day,
-                            logs = logs,
-                            dayNotes = notes.trackerNotes().filter { it.dateEpochDay == day },
-                            cycleDays = cycleDays,
-                            today = today,
-                            // 管家的详情区完整显示（不外露开关在这里不生效），并给出「收起」出口
-                            onCollapse = { detailExpanded = false },
-                            onAdd = { showAddNote = true },
-                            onEdit = { editingNote = it },
-                            onDelete = { showDeleteNote = true }
-                        )
-                    }
+                Column(Modifier.animateContentSize()) {
+                    Spacer(Modifier.height(16.dp))
+                    CycleDayDetail(
+                        day = detailDay,
+                        logs = logs,
+                        dayNotes = notes.trackerNotes().filter { it.dateEpochDay == detailDay },
+                        cycleDays = cycleDays,
+                        today = today,
+                        // 管家的详情区完整显示（不外露开关在这里不生效），并给出「收起」出口
+                        onCollapse = { detailExpanded = false },
+                        onAdd = { showAddNote = true },
+                        onEdit = { editingNote = it },
+                        onDelete = { showDeleteNote = true }
+                    )
                 }
             }
 
