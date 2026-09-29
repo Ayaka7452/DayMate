@@ -857,7 +857,7 @@
     <string name="cycle_show_prediction_title">顯示經期資訊</string>
     <string name="cycle_show_prediction_desc">開咗之後，週期階段與經期預測會一並喺日曆記事度顯示。預設關閉。</string>
     <string name="calendar_detail_holiday">法定節假日：%1$s</string>
-    <string name="calendar_detail_makeup">調休補班：%1$s</string>
+    <string name="calendar_detail_makeup">調休補班</string>
     <string name="calendar_no_festival_data">當年假期資料尚未下載，可以喺設定度下載。</string>
     <string name="calendar_add_note">新增記事</string>
     <string name="calendar_delete_note">刪除記事</string>

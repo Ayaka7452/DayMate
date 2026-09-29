@@ -857,7 +857,7 @@
     <string name="cycle_show_prediction_title">Show period info</string>
     <string name="cycle_show_prediction_desc">When on, cycle phase and period prediction also show in Calendar notes. Off by default.</string>
     <string name="calendar_detail_holiday">Public holiday: %1$s</string>
-    <string name="calendar_detail_makeup">Makeup workday: %1$s</string>
+    <string name="calendar_detail_makeup">Makeup workday</string>
     <string name="calendar_no_festival_data">Holiday data for this year is not downloaded yet. You can download it in Settings.</string>
     <string name="calendar_add_note">Add note</string>
     <string name="calendar_delete_note">Delete note</string>

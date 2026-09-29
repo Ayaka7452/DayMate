@@ -857,7 +857,7 @@
     <string name="cycle_show_prediction_title">周期情報を表示</string>
     <string name="cycle_show_prediction_desc">オンにすると、周期の段階と生理予測がカレンダーノートにも表示されます。既定ではオフ。</string>
     <string name="calendar_detail_holiday">祝日：%1$s</string>
-    <string name="calendar_detail_makeup">振り替え出勤：%1$s</string>
+    <string name="calendar_detail_makeup">振り替え出勤</string>
     <string name="calendar_no_festival_data">今年の祝日データは未ダウンロードです。設定からダウンロードできます。</string>
     <string name="calendar_add_note">メモを追加</string>
     <string name="calendar_delete_note">メモを削除</string>

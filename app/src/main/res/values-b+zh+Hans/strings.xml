@@ -857,7 +857,7 @@
     <string name="cycle_show_prediction_title">显示经期信息</string>
     <string name="cycle_show_prediction_desc">开启后，周期阶段与经期预测会一并在日历记事中显示。默认关闭。</string>
     <string name="calendar_detail_holiday">法定节假日：%1$s</string>
-    <string name="calendar_detail_makeup">调休补班：%1$s</string>
+    <string name="calendar_detail_makeup">调休补班</string>
     <string name="calendar_no_festival_data">当年节假日数据尚未下载，可在设置中下载。</string>
     <string name="calendar_add_note">添加记事</string>
     <string name="calendar_delete_note">删除记事</string>

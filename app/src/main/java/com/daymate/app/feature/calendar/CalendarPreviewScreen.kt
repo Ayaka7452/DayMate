@@ -555,7 +555,9 @@ fun CalendarPreviewScreen(
                         if (it.isOffDay) {
                             stringResource(R.string.calendar_detail_holiday, it.name) to OFF_GREEN
                         } else {
-                            stringResource(R.string.calendar_detail_makeup, it.name) to MAKEUP_ORANGE
+                            // 补班日只写「调休补班」不带节名：橙色的意义是「这天要上班」，
+                            // 挂上「国庆节」反而让人以为在放假（用户 2026-09-29 明确要求）。
+                            stringResource(R.string.calendar_detail_makeup) to MAKEUP_ORANGE
                         }
                     },
                     notes = ownNotes.filter { it.dateEpochDay == day } +
