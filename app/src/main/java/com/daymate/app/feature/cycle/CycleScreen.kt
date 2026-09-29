@@ -304,6 +304,13 @@ private fun CycleOverviewScreen(
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
     // 日历点选的日期（null = 未选中，详情栏展示今天的信息）。点同一天可取消选中，与「今日」高亮互不干扰。
     var selectedDay by remember { mutableStateOf<Long?>(null) }
+    // 详情区是否展开：点了「收起」就整体隐去（选中与未选中都能收）。
+    // 与 selectedDay 解耦——收起只影响显示，不抹掉「正在看哪天」的选中态。
+    var detailExpanded by remember { mutableStateOf(true) }
+    // 收起动画期间 detailExpanded 已置 false，用「最后一次看的日期」兜底渲染详情内容——
+    // 否则内容会先跳成今天的资料、再随卡片一起滑走，看起来像闪了一下。
+    // 只在点击回调里更新（不在组合期写状态），保持单向数据流。
+    var lastDetailDay by remember { mutableStateOf<Long?>(null) }
     var showAddNote by remember { mutableStateOf(false) }
     var showDeleteNote by remember { mutableStateOf(false) }
     // 正在修改的那条日常记录（null = 未打开修改弹窗）。修改入口挂在选中日详情区的每一行右侧。
@@ -410,11 +417,14 @@ private fun CycleOverviewScreen(
                             pendingMonth = monthPickerPending,
                             onConsumePendingMonth = { monthPickerPending = null },
                             onSelectDay = { day ->
-                                if (selectedDay == day) {
-                                    selectedDay = null          // 再点同一天 = 取消选中（详情栏回到今天）
+                                if (selectedDay == day && detailExpanded) {
+                                    // 再点同一天 = 取消选中（详情栏回到今天）；收起状态下点回该天则重新展开
+                                    selectedDay = null
                                 } else {
                                     selectedDay = day
+                                    lastDetailDay = day
                                 }
+                                detailExpanded = true   // 点任意一天都把详情区带回来
                             },
                             onPickMonth = { ym ->
                                 monthPickerTarget = ym
@@ -454,14 +464,15 @@ private fun CycleOverviewScreen(
                 }
             }
 
-            // ===== 选中日详情区（日历视图常驻：未选中任何一天时展示今天的信息）=====
+            // ===== 选中日详情区（日历视图常驻：未选中任何一天时展示今天的信息；
+            //       管家可点「收起」隐去，日历记事不传该回调即为常驻）=====
             // 位置紧贴日历下方：点选的即时反馈要离被点的格子近，不能等滚到页面底部才看见。
             // 未选中就显示今天——说明栏不再留一大块空白，也让「点一天看什么」有现成的示范。
             // 展开/收起走纵向滑动而非瞬间出现——高度突变会让下方那排按钮整块跳一下，看着像页面重排。
             // 换一天时走横向滑动：新日期在旧日期右边（更晚）→ 内容从右滑入旧内容向左滑出，反之反向，
             // 与翻页手势的直觉一致；纵向高度差由 animateContentSize 吸收。
             AnimatedVisibility(
-                visible = showCalendar,
+                visible = showCalendar && detailExpanded,
                 enter = expandVertically(
                     expandFrom = Alignment.Top,
                     animationSpec = tween(300, easing = FastOutSlowInEasing)
@@ -471,7 +482,8 @@ private fun CycleOverviewScreen(
                     animationSpec = tween(360, easing = FastOutSlowInEasing)
                 ) + fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
             ) {
-                val detailDay = selectedDay ?: today
+                // 退出动画期间 detailExpanded 已置 false，用「最后一次看的日期」兜底渲染，避免内容中途跳变
+                val detailDay = selectedDay ?: lastDetailDay ?: today
                 AnimatedContent(
                     targetState = detailDay,
                     transitionSpec = {
@@ -496,6 +508,8 @@ private fun CycleOverviewScreen(
                             dayNotes = notes.trackerNotes().filter { it.dateEpochDay == day },
                             cycleDays = cycleDays,
                             today = today,
+                            // 管家的详情区完整显示（不外露开关在这里不生效），并给出「收起」出口
+                            onCollapse = { detailExpanded = false },
                             onAdd = { showAddNote = true },
                             onEdit = { editingNote = it },
                             onDelete = { showDeleteNote = true }
@@ -576,12 +590,11 @@ private fun CycleOverviewScreen(
             Spacer(Modifier.height(16.dp))
 
             // ===== 图例 =====
-            // 经期/排卵用固定阶段色（与日历网格、日历记事点位一致）
+            // 四段与日历网格、圆环、日历记事点位**同一套固定色**（CycleColors）
             val legendPeriod = CycleColors.Period
-            val legendFollicular = MaterialTheme.colorScheme.secondaryContainer
+            val legendFollicular = CycleColors.Follicular
             val legendOvulation = CycleColors.Ovulation
-            // 深色模式下用 onSurface 透明度（半透明白）而非固定半透明黑
-            val legendLuteal = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+            val legendLuteal = CycleColors.Luteal
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
@@ -1014,12 +1027,12 @@ private fun CycleRing(
     todayIsPeriodEnd: Boolean = false
 ) {
     // 颜色在 Composable 体内解析（Canvas 绘制闭包里不能调用 composable）
-    // 经期/排卵用固定阶段色，理由同 CycleColors 注释（不随 accent 漂移）
+    // 四段一律用 CycleColors 的固定阶段色，**不借主题容器色**——否则切 accent 时
+    // 卵泡会跟着变（用户 2026-09-29 反馈四段不成套）。
     val periodColor = CycleColors.Period
-    val follicularColor = MaterialTheme.colorScheme.secondaryContainer
+    val follicularColor = CycleColors.Follicular
     val ovulationColor = CycleColors.Ovulation
-    // 黄体期/底环用 onSurface 透明度：浅色=半透明黑，深色=半透明白，两种模式都可见
-    val lutealColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+    val lutealColor = CycleColors.Luteal
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
@@ -2048,7 +2061,7 @@ private fun InfoCard(
  *  - **有记录**：右上角一枚小圆点。位置与「圆点在数字下方」的经期语义天然分开，不会与实心/空心圆点混淆。
  *
  * 同一格既是选中又是今日时，**只画粗的那道**（选中优先）。
- * 详情区收起后 [selectedDay] 归 null，粗框随之消失——框表达的是「当前正在查看这天」，而不是给那天永久盖戳。
+ * 点「收起」隐去详情区后粗框随之消失——框表达的是「当前正在查看这天」，而不是给那天永久盖戳。
  */
 @Composable
 private fun CycleCalendarMonth(
@@ -2096,15 +2109,19 @@ private fun CycleCalendarMonth(
     var flipping by remember { mutableStateOf(false) }
 
     // 颜色在 Composable 体内解析
-    // 经期/排卵用固定阶段色（不跟 accent 走）：见 CycleColors 的说明——
-    // 阶段是语义，用 primary 的话切 accent 会与事件点等元素撞色。
+    // 四段一律用 CycleColors 的固定阶段色（不跟 accent 走）：见 CycleColors 的说明——
+    // 阶段是语义，用 primary 的话切 accent 会与事件点等元素撞色，且四段不成套。
+    // 文字色：只看**格子底色深浅**，与深浅模式无关——底色是固定阶段色，
+    // 所以经期/排卵（较深）恒用纯白，卵泡/黄体（浅底）恒用 OnLight 深墨。
+    // ⚠️ 不能取 onPrimary：深色模式的 onPrimary 是深蓝，压在深蓝紫格底上几乎看不清。
     val periodColor = CycleColors.Period
-    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
-    val follicularColor = MaterialTheme.colorScheme.secondaryContainer
-    val onFollicularColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val onPeriodColor = CycleColors.OnDark
+    val follicularColor = CycleColors.Follicular
+    val onFollicularColor = CycleColors.OnLight
     val ovulationColor = CycleColors.Ovulation
-    val onOvulationColor = MaterialTheme.colorScheme.onTertiary
-    val lutealColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+    val onOvulationColor = CycleColors.OnDark
+    val lutealColor = CycleColors.Luteal
+    val onLutealColor = CycleColors.OnLight
     val plainTextColor = MaterialTheme.colorScheme.onSurface
 
     val logEntries = logs.map { it.startDateEpochDay to it.periodDays }
@@ -2226,10 +2243,10 @@ private fun CycleCalendarMonth(
                             }
                             val fg = when {
                                 futurePeriod -> plainTextColor
-                                phase == CycleCalculator.Phase.PERIOD -> onPrimaryColor
+                                phase == CycleCalculator.Phase.PERIOD -> onPeriodColor
                                 phase == CycleCalculator.Phase.FOLLICULAR -> onFollicularColor
                                 phase == CycleCalculator.Phase.OVULATION -> onOvulationColor
-                                else -> plainTextColor
+                                else -> onLutealColor
                             }
                             val isToday = epochDay == today
                             val isSelected = selectedDay == epochDay
@@ -2386,19 +2403,26 @@ internal fun describeDay(
     }
 }
 
-/** 阶段标签的配色（与圆环/日历同一套色板，保证三处说法一致）。 */
+/**
+ * 阶段标签的配色（与圆环/日历同一套色板，保证三处说法一致）。
+ *
+ * 前景色只取决于**底色深浅**、与深浅模式无关：底色是固定阶段色（不随主题漂移），
+ * 所以经期/排卵（较深）恒用纯白，卵泡/黄体（浅底）恒用 [CycleColors.OnLight]。
+ * 别再从 `colorScheme` 里取 onXxx——深色模式下 onSurface 是浅色，压在浅蓝底上会糊成一片。
+ */
 @Composable
 internal fun phaseChipColors(label: String): Pair<Color, Color> = when (label) {
     stringResource(R.string.cycle_phase_period) ->
-        CycleColors.Period to MaterialTheme.colorScheme.onPrimary
+        CycleColors.Period to CycleColors.OnDark
+    // 预测经期：半透明浅蓝底（比实底更浅）→ 同样用 OnLight 深墨，别用 onSurface
     stringResource(R.string.cycle_predict_period) ->
-        CycleColors.Period.copy(alpha = 0.18f) to MaterialTheme.colorScheme.onSurface
+        CycleColors.Period.copy(alpha = 0.18f) to CycleColors.OnLight
     stringResource(R.string.cycle_ovulation_day), stringResource(R.string.cycle_phase_ovulation) ->
-        CycleColors.Ovulation to MaterialTheme.colorScheme.onTertiary
+        CycleColors.Ovulation to CycleColors.OnDark
     stringResource(R.string.cycle_phase_follicular) ->
-        MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        CycleColors.Follicular to CycleColors.OnLight
     else ->
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f) to MaterialTheme.colorScheme.onSurface
+        CycleColors.Luteal to CycleColors.OnLight
 }
 
 /** 记录大类的色条颜色：用于详情区列表与历史页，让「症状/情绪/性生活」一眼可分。 */
@@ -2478,7 +2502,8 @@ internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
  *  - [showNoteTags]：经期管家登记的自定义记录标签；
  *  - [showPrediction]：周期阶段 chip 与经期预测副文案。
  *
- * 详情栏常驻（未选中显示今天），因此不设「收起」按钮；想看别的日期直接点格子即可。
+ * **收起按钮只在周期管家显示**（传 [onCollapse]）；日历记事的详情栏是常驻的，不传即为无按钮。
+ * 管家侧无论是否选中某天都能收起（收起后详情区整体隐去，点任意格子再展开）。
  */
 @Composable
 internal fun CycleDayDetail(
@@ -2496,6 +2521,8 @@ internal fun CycleDayDetail(
      * 放行进详情栏也只是「看」，不能在日历记事里删掉（那是管家的数据）。
      */
     canDelete: Boolean = true,
+    /** 非空时在右下角显示「收起」——周期管家传，日历记事不传（常驻无按钮）。 */
+    onCollapse: (() -> Unit)? = null,
     onAdd: () -> Unit,
     /** 修改某一条已有记录（入口就挂在那一行右侧）。 */
     onEdit: (CycleNoteEntity) -> Unit,
@@ -2590,6 +2617,13 @@ internal fun CycleDayDetail(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.cycle_delete_record), maxLines = 1)
+                }
+            }
+            // 「收起」只在周期管家出现（日历记事的详情栏常驻，不传该回调）。
+            // 始终显示：即便未选中任何一天（详情展示今天）也留一条收起的出口，否则是死路。
+            if (onCollapse != null) {
+                TextButton(onClick = onCollapse, modifier = Modifier.align(Alignment.End)) {
+                    Text(stringResource(R.string.common_collapse))
                 }
             }
         }
