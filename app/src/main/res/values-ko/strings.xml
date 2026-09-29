@@ -845,6 +845,7 @@
     <string name="calendar_today">오늘</string>
     <string name="calendar_legend_off">휴무</string>
     <string name="calendar_legend_makeup">출근</string>
+    <string name="calendar_cell_makeup">대체 근무일</string>
     <string name="calendar_legend_event">디데이</string>
     <string name="cycle_detail_display">캘린더 노트 표시</string>
     <string name="cycle_show_notes_title">사용자 정의 기록 표시</string>

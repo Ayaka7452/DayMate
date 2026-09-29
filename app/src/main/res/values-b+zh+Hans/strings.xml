@@ -845,6 +845,7 @@
     <string name="calendar_today">今天</string>
     <string name="calendar_legend_off">休</string>
     <string name="calendar_legend_makeup">补班</string>
+    <string name="calendar_cell_makeup">补班日</string>
     <string name="calendar_legend_event">倒数日</string>
     <string name="cycle_detail_display">日历记事显示</string>
     <string name="cycle_show_notes_title">显示自定义记录</string>

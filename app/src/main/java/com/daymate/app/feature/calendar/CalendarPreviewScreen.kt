@@ -413,9 +413,13 @@ fun CalendarPreviewScreen(
                                                     // 无点也占 4dp：三态（有点/无点）格子总高一致，网格不会高低不一
                                                     Spacer(Modifier.height(4.dp))
                                                 }
-                                                // 次行小字：法定节日名（随休绿/班橙）→ 农历（放在圆点下方）
+                                                // 次行小字：法定节假日名 / 补班 / 农历（放在圆点下方）。
+                                                // ⚠️ 补班日（橙底）不能显示节日名——那会读成「这天是国庆节」，
+                                                // 与「今天要上班」的橙色语义正好相反（用户 2026-09-29 截图指出）。
+                                                // 补班日固定显示「补班」，节日名只留给放假日（绿底）。
                                                 val sub = when {
-                                                    festival != null -> festival.name
+                                                    festival != null && festival.isOffDay -> festival.name
+                                                    festival != null -> stringResource(R.string.calendar_cell_makeup)
                                                     showLunar -> LunarCalendar.labelText(date)
                                                     else -> null
                                                 }

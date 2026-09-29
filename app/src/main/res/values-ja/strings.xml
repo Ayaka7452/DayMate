@@ -845,6 +845,7 @@
     <string name="calendar_today">今日</string>
     <string name="calendar_legend_off">休</string>
     <string name="calendar_legend_makeup">出勤</string>
+    <string name="calendar_cell_makeup">振替出勤日</string>
     <string name="calendar_legend_event">カウントダウン</string>
     <string name="cycle_detail_display">カレンダーノートの表示</string>
     <string name="cycle_show_notes_title">カスタム記録を表示</string>

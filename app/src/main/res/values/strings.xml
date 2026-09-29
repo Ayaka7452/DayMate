@@ -845,6 +845,7 @@
     <string name="calendar_today">Today</string>
     <string name="calendar_legend_off">Day off</string>
     <string name="calendar_legend_makeup">Makeup workday</string>
+    <string name="calendar_cell_makeup">Makeup</string>
     <string name="calendar_legend_event">Countdown event</string>
     <string name="cycle_detail_display">Calendar notes display</string>
     <string name="cycle_show_notes_title">Show custom records</string>
