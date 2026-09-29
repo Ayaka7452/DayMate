@@ -484,14 +484,17 @@ private fun CycleOverviewScreen(
             ) {
                 // 退出动画期间 detailExpanded 已置 false，用「最后一次看的日期」兜底渲染，避免内容中途跳变
                 val detailDay = selectedDay ?: lastDetailDay ?: today
+                val detailNotes = notes.trackerNotes().filter { it.dateEpochDay == detailDay }
                 Column(Modifier.animateContentSize()) {
                     Spacer(Modifier.height(16.dp))
                     CycleDayDetail(
                         day = detailDay,
                         logs = logs,
-                        dayNotes = notes.trackerNotes().filter { it.dateEpochDay == detailDay },
+                        dayNotes = detailNotes,
                         cycleDays = cycleDays,
                         today = today,
+                        // 当天没有任何日常记录时「删除记录」置灰——没有可删的东西就不该能点
+                        canDelete = detailNotes.isNotEmpty(),
                         // 管家的详情区完整显示（不外露开关在这里不生效），并给出「收起」出口
                         onCollapse = { detailExpanded = false },
                         onAdd = { showAddNote = true },
