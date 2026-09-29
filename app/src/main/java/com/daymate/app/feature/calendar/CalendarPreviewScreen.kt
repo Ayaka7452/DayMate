@@ -79,6 +79,7 @@ import com.ayaka7452.daymate.core.util.CycleCalculator
 import com.ayaka7452.daymate.core.util.LunarCalendar
 import com.ayaka7452.daymate.core.util.NoteCatalog
 import com.ayaka7452.daymate.data.db.CycleNoteEntity
+import com.ayaka7452.daymate.feature.cycle.CycleColors
 import com.ayaka7452.daymate.feature.cycle.DeleteNotesDialog
 import com.ayaka7452.daymate.feature.cycle.describeDay
 import com.ayaka7452.daymate.feature.cycle.phaseChipColors
@@ -396,8 +397,10 @@ fun CalendarPreviewScreen(
                                                     Spacer(Modifier.height(9.dp))
                                                 }
                                                 // 圆点行（农历小字下方留 2dp 呼吸，贴着字很难看）：
-                                                // 经期首日（青蓝，同管家 periodColor）+ 排卵期首日（红，同管家 ovulationColor）
+                                                // 经期首日（紫，固定阶段色 CycleColors.Period）
+                                                // + 排卵期首日（红，CycleColors.Ovulation）
                                                 // + 倒数事件目标日（主题青蓝，一天只一枚，多了也不堆）
+                                                // 三种点统一 4dp
                                                 Spacer(Modifier.height(2.dp))
                                                 if (periodStart || ovulationStart || hasEventDot) {
                                                     Row(
@@ -406,13 +409,13 @@ fun CalendarPreviewScreen(
                                                     ) {
                                                         if (periodStart) {
                                                             PhaseDot(
-                                                                MaterialTheme.colorScheme.primary,
+                                                                CycleColors.Period,
                                                                 filled = phaseReached
                                                             )
                                                         }
                                                         if (ovulationStart) {
                                                             PhaseDot(
-                                                                MaterialTheme.colorScheme.tertiary,
+                                                                CycleColors.Ovulation,
                                                                 filled = phaseReached
                                                             )
                                                         }
@@ -909,18 +912,19 @@ private fun CalendarNoteDialog(
     )
 }
 
-/** 经期/排卵提示点：已到（含今天）为实心，未来预测为空心圆环。 */
+/** 经期/排卵提示点：已到（含今天）为实心，未来预测为空心圆环。
+ *  尺寸与事件点统一 4dp（原 6dp 比事件点大，两种点并排时很丑）；空心边框同步收细到 1dp。 */
 @Composable
 private fun PhaseDot(color: Color, filled: Boolean) {
     Box(
         if (filled) {
             Modifier
-                .size(6.dp)
+                .size(4.dp)
                 .background(color, CircleShape)
         } else {
             Modifier
-                .size(6.dp)
-                .border(1.2.dp, color, CircleShape)
+                .size(4.dp)
+                .border(1.dp, color, CircleShape)
         }
     )
 }

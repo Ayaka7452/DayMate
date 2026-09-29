@@ -555,9 +555,10 @@ private fun CycleOverviewScreen(
             Spacer(Modifier.height(16.dp))
 
             // ===== 图例 =====
-            val legendPeriod = MaterialTheme.colorScheme.primary
+            // 经期/排卵用固定阶段色（与日历网格、日历记事点位一致）
+            val legendPeriod = CycleColors.Period
             val legendFollicular = MaterialTheme.colorScheme.secondaryContainer
-            val legendOvulation = MaterialTheme.colorScheme.tertiary
+            val legendOvulation = CycleColors.Ovulation
             // 深色模式下用 onSurface 透明度（半透明白）而非固定半透明黑
             val legendLuteal = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
             Row(
@@ -979,9 +980,10 @@ private fun CycleRing(
     todayIsPeriodEnd: Boolean = false
 ) {
     // 颜色在 Composable 体内解析（Canvas 绘制闭包里不能调用 composable）
-    val periodColor = MaterialTheme.colorScheme.primary
+    // 经期/排卵用固定阶段色，理由同 CycleColors 注释（不随 accent 漂移）
+    val periodColor = CycleColors.Period
     val follicularColor = MaterialTheme.colorScheme.secondaryContainer
-    val ovulationColor = MaterialTheme.colorScheme.tertiary
+    val ovulationColor = CycleColors.Ovulation
     // 黄体期/底环用 onSurface 透明度：浅色=半透明黑，深色=半透明白，两种模式都可见
     val lutealColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
@@ -2037,11 +2039,13 @@ private fun CycleCalendarMonth(
     var flipping by remember { mutableStateOf(false) }
 
     // 颜色在 Composable 体内解析
-    val periodColor = MaterialTheme.colorScheme.primary
+    // 经期/排卵用固定阶段色（不跟 accent 走）：见 CycleColors 的说明——
+    // 用了 primary/tertiary 的话，切到 purple accent 时会与经期紫自撞。
+    val periodColor = CycleColors.Period
     val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
     val follicularColor = MaterialTheme.colorScheme.secondaryContainer
     val onFollicularColor = MaterialTheme.colorScheme.onSecondaryContainer
-    val ovulationColor = MaterialTheme.colorScheme.tertiary
+    val ovulationColor = CycleColors.Ovulation
     val onOvulationColor = MaterialTheme.colorScheme.onTertiary
     val lutealColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
     val plainTextColor = MaterialTheme.colorScheme.onSurface
@@ -2322,11 +2326,11 @@ internal fun describeDay(
 @Composable
 internal fun phaseChipColors(label: String): Pair<Color, Color> = when (label) {
     stringResource(R.string.cycle_phase_period) ->
-        MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+        CycleColors.Period to MaterialTheme.colorScheme.onPrimary
     stringResource(R.string.cycle_predict_period) ->
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) to MaterialTheme.colorScheme.onSurface
+        CycleColors.Period.copy(alpha = 0.18f) to MaterialTheme.colorScheme.onSurface
     stringResource(R.string.cycle_ovulation_day), stringResource(R.string.cycle_phase_ovulation) ->
-        MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.onTertiary
+        CycleColors.Ovulation to MaterialTheme.colorScheme.onTertiary
     stringResource(R.string.cycle_phase_follicular) ->
         MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
     else ->
