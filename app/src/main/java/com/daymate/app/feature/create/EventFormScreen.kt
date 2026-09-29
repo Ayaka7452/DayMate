@@ -424,7 +424,9 @@ fun EventFormScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { moreExpanded = !moreExpanded }
-                        .padding(vertical = 2.dp),
+                        // 下 12dp、上 0dp：展开后「标题→首行」间距 = 12 + 首行自身 12 = 24dp，
+                        // 与行与行之间的 12+12=24dp 一致（用户 2026-09-29 反馈标题下空隙偏大）。
+                        .padding(top = 0.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -452,8 +454,14 @@ fun EventFormScreen(
                     )
                 }
                 if (moreExpanded) {
-                    Spacer(Modifier.height(4.dp))
-                    // ---- ① 跟随节日：行式入口；ⓘ 气泡后跟「取消跟随」内联操作 ----
+                    // 不额外加 Spacer：标题行的 6dp + 首行的 12dp 已经给出与行间一致的视觉间隔
+                    // ---- ① 倒计时显示单位 ----
+                    SettingRow(
+                        label = Tr.s(R.string.event_display_unit),
+                        value = { Text(refUnitLabel, style = MaterialTheme.typography.bodyMedium) },
+                        onClick = { showUnitDialog = true }
+                    )
+                    // ---- ② 跟随节日：ⓘ 气泡后跟「取消跟随」内联操作 ----
                     SettingRow(
                         label = Tr.s(R.string.form_festival_row),
                         info = Tr.s(R.string.form_festival_info),
@@ -486,12 +494,6 @@ fun EventFormScreen(
                             festivalOptions = container.festivalRepository.pickerFestivals(LocalDate.now())
                             showFestivalDialog = true
                         }
-                    )
-                    // ---- ② 倒计时显示单位 ----
-                    SettingRow(
-                        label = Tr.s(R.string.event_display_unit),
-                        value = { Text(refUnitLabel, style = MaterialTheme.typography.bodyMedium) },
-                        onClick = { showUnitDialog = true }
                     )
                     // ---- ③ 对照值（可选）：过期后卡片显示「已过 X/N」中的 N ----
                     SettingRow(
