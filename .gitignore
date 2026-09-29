@@ -33,3 +33,6 @@ dist/
 # Local signing helper (contains plaintext keystore password — never commit)
 apksign.sh
 keystore.properties
+
+# Design scratch (开发计划、手绘设计图) — 本地留存，不进仓库
+design/
