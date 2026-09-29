@@ -99,20 +99,17 @@ object CountdownCalculator {
 
     // ===================== 「按时间倒数」（精确到分，见 EventEntity.endMinuteOfDay） =====================
 
-    /** 秒级刷新阈值：剩余不足 3 分钟时按秒走，否则按分钟刷新就够（省电）。 */
-    const val TIMED_TICK_SECONDS = 3 * 60L
-
     /**
      * 时间模式倒计时的展示结果。
      *
      * [number]/[unit] 给详情页大数字用（取最大的有效单位，逐级退到秒）；
-     * [caption] 是次级说明（「还剩 X 小时 Y 分」这类），列表行与详情页副行共用。
+     * [caption] 是次级说明（「还剩 X 小时 Y 分」这类），列表行与详情页的「非时间模式」副行共用。
      */
     data class TimedCountdown(
         val number: String,
         val unit: String,
         val caption: String,
-        /** 剩余秒数（正=还没到，负=已过），供调用方决定刷新节奏。 */
+        /** 剩余秒数（正=还没到，负=已过）。 */
         val seconds: Long
     )
 

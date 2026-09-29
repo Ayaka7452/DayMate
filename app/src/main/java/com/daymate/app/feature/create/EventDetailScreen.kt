@@ -174,15 +174,17 @@ fun EventDetailBody(
     showSpanTotal: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    // ticker 只在时间模式存在；endMinuteOfDay 变化时重启
+    // ticker 只在时间模式存在；endMinuteOfDay 变化时重启。
+    // 详情页把「天/时/分/秒」四段全摆出来，只要停在这一页就得让秒真的走——
+    // 早先用「剩余不足 3 分钟才 1 秒跳、否则 30 秒一次」的省电策略，
+    // 后果是剩余 6 天时下去，那栏秒数半分钟才动一下，看着就像卡死了（用户以为是坏的）。
+    // 列表页不显示秒，仍走 formatTimedShort 的分钟粒度，不受这里影响。
     var now by remember(data.endMinuteOfDay) { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(data.endMinuteOfDay, data.targetDateEpochDay) {
-        val minute = data.endMinuteOfDay ?: return@LaunchedEffect
+        if (data.endMinuteOfDay == null) return@LaunchedEffect
         while (true) {
             now = LocalDateTime.now()
-            val c = CountdownCalculator.timedCountdown(data.targetDateEpochDay, minute, now)
-            val fast = kotlin.math.abs(c.seconds) < CountdownCalculator.TIMED_TICK_SECONDS
-            kotlinx.coroutines.delay(if (fast) 1_000L else 30_000L)
+            kotlinx.coroutines.delay(1_000L)
         }
     }
 
