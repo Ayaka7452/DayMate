@@ -151,9 +151,13 @@ object CycleCalculator {
 
     /**
      * 推算任意日期所处阶段（日历视图着色用）。logsDesc：(经期首日, 该次持续天数) 列表，按首日降序。
+     *  - **早于最早一次登记经期** → [Phase.NONE]（无数据区，不着色）
      *  - 落在任一已登记经期区间内（按该记录自身的持续天数）→ 月经期
-     *  - 否则以「最后一个不晚于该日的记录」为锚点推算（记录都在未来时，用最早记录按周期向前虚拟推算）
-     *  - 锚点推进保证 nextStart 晚于目标日；逾期未登记的未来日子按预测月经期着色
+     *  - 否则以「最后一个不晚于该日的记录」为锚点按周期向后推算（预测经期/排卵/黄体/卵泡）
+     *
+     * ⚠️ **不再向前虚拟外推**（2026-10-07 修）：早于最早记录的日子若照常推算，会凭空造出一段
+     * 「上一个周期」——用户明明一次都没登记，日历上最早记录之前却整块显示成经期深色，读起来
+     * 就像「那几天来过月经」。没有记录就是没有记录，返回 [Phase.NONE] 交给 UI 画中性灰。
      */
     fun phaseOfAnyDay(
         epochDay: Long,
@@ -161,20 +165,16 @@ object CycleCalculator {
         cycleDays: Int
     ): Phase {
         if (logsDesc.isEmpty()) return Phase.FOLLICULAR
+        // 早于最早一次登记：无数据区。记录都在未来（提前登记）时同样适用。
+        if (epochDay < logsDesc.minOf { it.first }) return Phase.NONE
         for ((s, pd) in logsDesc) {
             if (epochDay in periodRange(s, pd)) return Phase.PERIOD
         }
-        // 锚点 = 最后一个不晚于目标日的记录（含其持续天数）；记录都在未来时向前虚拟推算
-        var anchorStart = logsDesc.lastOrNull { it.first <= epochDay }?.first
-        var anchorPd = logsDesc.lastOrNull { it.first <= epochDay }?.second
-        if (anchorStart == null || anchorPd == null) {
-            val first = logsDesc.last()
-            val k = (first.first - epochDay + cycleDays - 1) / cycleDays
-            anchorStart = first.first - k * cycleDays
-            anchorPd = first.second
-        } else {
-            while (anchorStart + cycleDays <= epochDay) anchorStart += cycleDays
-        }
+        // 锚点 = 最后一个不晚于目标日的记录。目标日已 ≥ 最早记录，故必然存在（兜底走最早一条）。
+        val anchor = logsDesc.lastOrNull { it.first <= epochDay } ?: logsDesc.last()
+        var anchorStart = anchor.first
+        val anchorPd = anchor.second
+        while (anchorStart + cycleDays <= epochDay) anchorStart += cycleDays
         // 锚点推进后的预测周期：目标日落在锚点经期区间内 → 预测的未来经期日
         // （此前漏判，预测经期首日会被渲染成卵泡期/黄体期，日历上从未点亮）
         if (epochDay in periodRange(anchorStart, anchorPd)) return Phase.PERIOD
@@ -204,6 +204,13 @@ object CycleCalculator {
     }
 
     enum class Phase(val labelRes: Int) {
+        /**
+         * 四阶段之外的「无数据」态：该日**早于最早一次登记经期**。
+         *
+         * 这一段是纯向前外推、没有任何记录支撑。照常着色成经期/阶段色会让用户误读成
+         * 「那几天来过月经」（2026-10-07 用户报告）。日历上画中性灰，不参与任何推导。
+         */
+        NONE(R.string.cycle_no_records),
         PERIOD(R.string.cycle_phase_period),
         FOLLICULAR(R.string.cycle_phase_follicular),
         OVULATION(R.string.cycle_phase_ovulation),

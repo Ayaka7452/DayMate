@@ -2121,6 +2121,10 @@ private fun CycleCalendarMonth(
     val lutealColor = CycleColors.Luteal
     val onLutealColor = CycleColors.OnLight
     val plainTextColor = MaterialTheme.colorScheme.onSurface
+    // 无数据区（早于最早一次登记）的格子底色：中性灰，**刻意不用任何阶段色**——
+    // 那一段是纯外推、毫无记录支撑，用经期色会被读成「那几天来过月经」（2026-10-07 用户报告）。
+    // 取 onSurface 5%，与日历记事的「常态格子」同一口径，两个视图观感一致。
+    val noDataBg = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
 
     val logEntries = logs.map { it.startDateEpochDay to it.periodDays }
     val loggedDays = remember(logs) {
@@ -2231,24 +2235,31 @@ private fun CycleCalendarMonth(
                             // 未到来（今天之后）的日期一律**浅底**：预测经期沿用原浅蓝紫，
                             // 卵泡/排卵/黄体也各自降到 0.18 透明度——同一屏里「已过/未到」一眼可分
                             // （用户 2026-09-29 要求；此前只有未来经期日做浅底）。
+                            // 早于最早一次登记的日子 === 无数据（见 phaseOfAnyDay 的说明），
+                            // 画中性灰，**不能**借用经期色——否则第一眼读成「那几天来过月经」。
                             val isFuture = epochDay > today
-                            val bg = when {
-                                phase == CycleCalculator.Phase.PERIOD ->
+                            val bg = when (phase) {
+                                CycleCalculator.Phase.NONE -> noDataBg
+                                CycleCalculator.Phase.PERIOD ->
                                     if (isFuture) periodColor.copy(alpha = 0.18f) else periodColor
-                                phase == CycleCalculator.Phase.FOLLICULAR ->
+                                CycleCalculator.Phase.FOLLICULAR ->
                                     if (isFuture) follicularColor.copy(alpha = 0.18f) else follicularColor
-                                phase == CycleCalculator.Phase.OVULATION ->
+                                CycleCalculator.Phase.OVULATION ->
                                     if (isFuture) ovulationColor.copy(alpha = 0.18f) else ovulationColor
-                                else ->
+                                CycleCalculator.Phase.LUTEAL ->
                                     if (isFuture) lutealColor.copy(alpha = 0.18f) else lutealColor
                             }
                             // 底色浅了，文字也跟着换成深墨，否则白字压在浅底上看不见
-                            val fg = when {
-                                isFuture -> plainTextColor
-                                phase == CycleCalculator.Phase.PERIOD -> onPeriodColor
-                                phase == CycleCalculator.Phase.FOLLICULAR -> onFollicularColor
-                                phase == CycleCalculator.Phase.OVULATION -> onOvulationColor
-                                else -> onLutealColor
+                            val fg = when (phase) {
+                                CycleCalculator.Phase.NONE -> plainTextColor
+                                CycleCalculator.Phase.PERIOD ->
+                                    if (isFuture) plainTextColor else onPeriodColor
+                                CycleCalculator.Phase.FOLLICULAR ->
+                                    if (isFuture) plainTextColor else onFollicularColor
+                                CycleCalculator.Phase.OVULATION ->
+                                    if (isFuture) plainTextColor else onOvulationColor
+                                CycleCalculator.Phase.LUTEAL ->
+                                    if (isFuture) plainTextColor else onLutealColor
                             }
                             val isToday = epochDay == today
                             val isSelected = selectedDay == epochDay
@@ -2346,6 +2357,9 @@ private fun CycleCalendarMonth(
  * 口径必须与 [CycleCalculator.phaseOfAnyDay] 完全一致，否则会出现「日历底色是黄体期、
  * 详情区却写排卵期」这种自相矛盾的展示。锚点推进逻辑与之一一对应：先把锚点推到不晚于该日，
  * 再以「锚点 + 周期天数」为下次经期，避免逾期未登记时算出负的「距下次经期天数」。
+ *
+ * 早于最早一次登记的日子属于无数据区（[CycleCalculator.Phase.NONE]），照「尚无记录」返回，
+ * 不编造阶段——与日历格子画中性灰同一口径。
  */
 internal fun describeDay(
     day: Long,
@@ -2367,18 +2381,17 @@ internal fun describeDay(
     val entries = logs.map { it.startDateEpochDay to it.periodDays }
     val phase = CycleCalculator.phaseOfAnyDay(day, entries, cycleDays)
 
-    // 锚点推进：与 phaseOfAnyDay 同款，保证 nextStart 恒晚于 day。
-    // 两个方向都要覆盖——记录都在未来时要向前虚拟推算，否则 days 早于最早记录时会算出错位的阶段。
-    val base = logs.lastOrNull { it.startDateEpochDay <= day } ?: logs.last()
-    val anchorStart: Long
-    if (base.startDateEpochDay > day) {
-        val k = (base.startDateEpochDay - day + cycleDays - 1) / cycleDays
-        anchorStart = base.startDateEpochDay - k * cycleDays
-    } else {
-        var s = base.startDateEpochDay
-        while (s + cycleDays <= day) s += cycleDays
-        anchorStart = s
+    // 早于最早一次登记 = 无数据区（见 phaseOfAnyDay）。直接照「尚无记录」处理——
+    // 硬推会得出「卵泡期」这种看着煞有介事、其实零依据的结论。
+    if (phase == CycleCalculator.Phase.NONE) {
+        return Tr.s(R.string.cycle_no_records) to Tr.s(R.string.cycle_no_records_hint)
     }
+
+    // 锚点推进：与 phaseOfAnyDay 同款，保证 nextStart 恒晚于 day。
+    // 目标日已 ≥ 最早记录，故锚点必然存在（兜底取最早一条）。
+    var anchorStart = logs.lastOrNull { it.startDateEpochDay <= day }?.startDateEpochDay
+        ?: logs.last().startDateEpochDay
+    while (anchorStart + cycleDays <= day) anchorStart += cycleDays
     val nextStart = anchorStart + cycleDays
     val ovu = CycleCalculator.effectiveOvulationDay(anchorStart, base.periodDays, nextStart)
     val window = CycleCalculator.ovulationWindow(anchorStart, base.periodDays, nextStart)
@@ -2424,6 +2437,10 @@ internal fun phaseChipColors(label: String): Pair<Color, Color> = when (label) {
         CycleColors.Ovulation to CycleColors.OnDark
     stringResource(R.string.cycle_phase_follicular) ->
         CycleColors.Follicular to CycleColors.OnLight
+    // 无数据区（早于最早一次登记）：中性灰 chip，**别借阶段色**——那会暗示一个并不存在的阶段
+    stringResource(R.string.cycle_no_records) ->
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) to
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
     else ->
         CycleColors.Luteal to CycleColors.OnLight
 }
