@@ -306,6 +306,9 @@ private fun CycleOverviewScreen(
     // 否则内容会先跳成今天的资料、再随卡片一起滑走，看起来像闪了一下。
     // 只在点击回调里更新（不在组合期写状态），保持单向数据流。
     var lastDetailDay by remember { mutableStateOf<Long?>(null) }
+    // 从预测经期日的「登记本次经期」进来时预选的日期；顶栏直接点「登记经期」则为 null
+    // （弹窗默认落在今天）。用完即清，免得下次打开还带着上次那个日子。
+    var registerPreset by remember { mutableStateOf<Long?>(null) }
     var showAddNote by remember { mutableStateOf(false) }
     var showDeleteNote by remember { mutableStateOf(false) }
     // 正在修改的那条日常记录（null = 未打开修改弹窗）。修改入口挂在选中日详情区的每一行右侧。
@@ -497,6 +500,8 @@ private fun CycleOverviewScreen(
                         canDelete = detailNotes.isNotEmpty(),
                         // 管家的详情区完整显示（不外露开关在这里不生效），并给出「收起」出口
                         onCollapse = { detailExpanded = false },
+                        // 预测经期日就地补登记：带着那天的日期打开登记弹窗（顶栏按钮则默认今天）
+                        onRegisterPeriod = { d -> registerPreset = d; showRegister = true },
                         onAdd = { showAddNote = true },
                         onEdit = { editingNote = it },
                         onDelete = { showDeleteNote = true }
@@ -667,15 +672,17 @@ private fun CycleOverviewScreen(
         )
     }
 
-    // 登记 / 开始新经期弹窗（主视图直达，默认选中今天）
+    // 登记 / 开始新经期弹窗（主视图直达）。默认选中今天；从预测经期日进来时预选那一天。
     if (showRegister) {
         // 默认选中今天：直接点确定即登记今天，避免不触摸日期选择器时静默无效果
         val registerState = rememberDatePickerState(
-            initialSelectedDateMillis = today * 86400000L,
+            initialSelectedDateMillis = (registerPreset ?: today) * 86400000L,
             selectableDates = pastAndTodayOnly
         )
+        // 关闭时连 preset 一起清掉，免得下次从顶栏打开还预选着上次那个日子
+        val dismissRegister = { showRegister = false; registerPreset = null }
         DatePickerDialog(
-            onDismissRequest = { showRegister = false },
+            onDismissRequest = dismissRegister,
             confirmButton = {
                 TextButton(onClick = {
                     registerState.selectedDateMillis?.let { millis ->
@@ -692,9 +699,10 @@ private fun CycleOverviewScreen(
                         }
                     }
                     showRegister = false
+                    registerPreset = null
                 }) { Text(stringResource(R.string.common_save)) }
             },
-            dismissButton = { TextButton(onClick = { showRegister = false }) { Text(stringResource(R.string.common_cancel)) } }
+            dismissButton = { TextButton(onClick = dismissRegister) { Text(stringResource(R.string.common_cancel)) } }
         ) { DatePicker(state = registerState) }
     }
 
@@ -2238,8 +2246,12 @@ private fun CycleCalendarMonth(
                             // 早于最早一次登记的日子 === 无数据（见 phaseOfAnyDay 的说明），
                             // 画中性灰，**不能**借用经期色——否则第一眼读成「那几天来过月经」。
                             val isFuture = epochDay > today
+                            // 预测经期**一律浅底**，不随「已过/未到」变实心：它不是登记数据，
+                            // 变实心会被读成「已经登记过了」（2026-10-07 用户报告）。
                             val bg = when (phase) {
                                 CycleCalculator.Phase.NONE -> noDataBg
+                                CycleCalculator.Phase.PREDICTED_PERIOD ->
+                                    periodColor.copy(alpha = 0.18f)
                                 CycleCalculator.Phase.PERIOD ->
                                     if (isFuture) periodColor.copy(alpha = 0.18f) else periodColor
                                 CycleCalculator.Phase.FOLLICULAR ->
@@ -2252,6 +2264,9 @@ private fun CycleCalendarMonth(
                             // 底色浅了，文字也跟着换成深墨，否则白字压在浅底上看不见
                             val fg = when (phase) {
                                 CycleCalculator.Phase.NONE -> plainTextColor
+                                // 浅底（预测经期）用**主题**文字色：底色是半透明叠在主题背景上，
+                                // 四种 onXxx 是给固定阶段色配的，套过来在深色模式下会翻车
+                                CycleCalculator.Phase.PREDICTED_PERIOD -> plainTextColor
                                 CycleCalculator.Phase.PERIOD ->
                                     if (isFuture) plainTextColor else onPeriodColor
                                 CycleCalculator.Phase.FOLLICULAR ->
@@ -2287,9 +2302,9 @@ private fun CycleCalendarMonth(
                                     when {
                                         loggedDays.contains(epochDay) ->
                                             Box(Modifier.size(4.dp).background(fg, CircleShape))
-                                        isFuture && phase == CycleCalculator.Phase.PERIOD ->
-                                            // 空心圆点：尚未到来的经期日（到来/登记确认后变实心）。
-                                            // 只给经期——卵泡/排卵等未来日只管底色变浅，不额外画点。
+                                        phase == CycleCalculator.Phase.PREDICTED_PERIOD ->
+                                            // 空心圆点 = 预测但**尚未登记**的经期日。不再要求 isFuture：
+                                            // 逾期未登记的日子同样是「没登记」，画实心点会读成「已登记」。
                                             // 尺寸与实心点、与日历记事同一套 4dp（原 6dp 比同行其它点大一圈）
                                             Box(
                                                 Modifier
@@ -2397,7 +2412,8 @@ internal fun describeDay(
     val window = CycleCalculator.ovulationWindow(anchorStart, base.periodDays, nextStart)
 
     return when {
-        phase == CycleCalculator.Phase.PERIOD ->
+        // 走到这里说明不在任何已登记经期区间内（前面已 return），所以经期只可能是**预测**的
+        phase == CycleCalculator.Phase.PREDICTED_PERIOD ->
             Tr.s(R.string.cycle_predict_period) to Tr.s(
                 R.string.cycle_predict_not_logged,
                 if (day > today) Tr.s(R.string.unit_days_future, day - today)
@@ -2543,6 +2559,12 @@ internal fun CycleDayDetail(
     canDelete: Boolean = true,
     /** 非空时在右下角显示「收起」——周期管家传，日历记事不传（常驻无按钮）。 */
     onCollapse: (() -> Unit)? = null,
+    /**
+     * 补登记经期。非空时，**预测经期日**（且不晚于今天）会多出一条「登记本次经期」——
+     * 预测的那几天正是要问「到底来没来」的时候，就地给补录入，省得回顶栏找按钮。
+     * 日历记事不传：那是管家的数据，日历记事只看不改（与 [canDelete] 同一原则）。
+     */
+    onRegisterPeriod: ((Long) -> Unit)? = null,
     onAdd: () -> Unit,
     /** 修改某一条已有记录（入口就挂在那一行右侧）。 */
     onEdit: (CycleNoteEntity) -> Unit,
@@ -2550,6 +2572,8 @@ internal fun CycleDayDetail(
 ) {
     val (phaseLabel, sub) = describeDay(day, logs, cycleDays, today)
     val (chipBg, chipFg) = phaseChipColors(phaseLabel)
+    // 预测经期的标签文本，供下面判断「要不要给补录入」（describeDay 按同一口径返回这个串）
+    val predictedPeriodLabel = stringResource(R.string.cycle_predict_period)
     val date = LocalDate.ofEpochDay(day)
     val dateText = date.format(LocaleWrap.dateFormatter(R.string.date_pattern_md)) + " " +
         date.dayOfWeek.getDisplayName(TextStyle.FULL, LocaleWrap.locale())
@@ -2600,6 +2624,16 @@ internal fun CycleDayDetail(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
+            }
+
+            // 预测经期 · 已到/已过今天 → 给出「登记本次经期」的补录入。
+            // 未来的预测日不给：还没到，登记它没有意义（用户也无法预知日期）。
+            // 实登记日无需补录、无数据区连推测依据都没有，两者都不出现这个按钮。
+            if (onRegisterPeriod != null && phaseLabel == predictedPeriodLabel && day <= today) {
+                Spacer(Modifier.height(10.dp))
+                Button(onClick = { onRegisterPeriod(day) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.cycle_register_this_period), maxLines = 1)
+                }
             }
 
             if (showNoteTags) {

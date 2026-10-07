@@ -151,9 +151,10 @@ object CycleCalculator {
 
     /**
      * 推算任意日期所处阶段（日历视图着色用）。logsDesc：(经期首日, 该次持续天数) 列表，按首日降序。
-     *  - **早于最早一次登记经期** → [Phase.NONE]（无数据区，不着色）
-     *  - 落在任一已登记经期区间内（按该记录自身的持续天数）→ 月经期
-     *  - 否则以「最后一个不晚于该日的记录」为锚点按周期向后推算（预测经期/排卵/黄体/卵泡）
+     *  - **早于最早一次登记经期** → [Phase.NONE]（无数据区，画中性灰）
+     *  - 落在任一**已登记**经期区间内（按该记录自身的持续天数）→ [Phase.PERIOD]
+     *  - 否则以「最后一个不晚于该日的记录」为锚点按周期向后推算：
+     *    经期区间 → [Phase.PREDICTED_PERIOD]（该来没登记），其余为排卵/黄体/卵泡
      *
      * ⚠️ **不再向前虚拟外推**（2026-10-07 修）：早于最早记录的日子若照常推算，会凭空造出一段
      * 「上一个周期」——用户明明一次都没登记，日历上最早记录之前却整块显示成经期深色，读起来
@@ -175,9 +176,10 @@ object CycleCalculator {
         var anchorStart = anchor.first
         val anchorPd = anchor.second
         while (anchorStart + cycleDays <= epochDay) anchorStart += cycleDays
-        // 锚点推进后的预测周期：目标日落在锚点经期区间内 → 预测的未来经期日
+        // 锚点推进后的预测周期：目标日落在锚点经期区间内 → 预测经期
         // （此前漏判，预测经期首日会被渲染成卵泡期/黄体期，日历上从未点亮）
-        if (epochDay in periodRange(anchorStart, anchorPd)) return Phase.PERIOD
+        // 注意这里返回 PREDICTED_PERIOD 而非 PERIOD：UI 要能区分「实登记」与「预测」用不同颜色。
+        if (epochDay in periodRange(anchorStart, anchorPd)) return Phase.PREDICTED_PERIOD
         val nextStart = anchorStart + cycleDays
         return when {
             epochDay in ovulationWindow(anchorStart, anchorPd, nextStart) -> Phase.OVULATION
@@ -211,7 +213,17 @@ object CycleCalculator {
          * 「那几天来过月经」（2026-10-07 用户报告）。日历上画中性灰，不参与任何推导。
          */
         NONE(R.string.cycle_no_records),
+        /** 已登记经期：该日落在某条记录自身的经期区间内。 */
         PERIOD(R.string.cycle_phase_period),
+        /**
+         * 预测经期：按周期推算「该来但还没登记」的日子。
+         *
+         * 与 [PERIOD] **分开**是为了让日历能用浅色把它和实登记区分开——此前两者都返回 [PERIOD]，
+         * 逾期未登记时这些日子 `epochDay <= today` 就被渲染成实心深色，读起来像「已经登记过了」
+         * （2026-10-07 用户报告）。预测经期**不落库、不参与任何均值计算**，只是提示；
+         * 点它可以就地补登记。
+         */
+        PREDICTED_PERIOD(R.string.cycle_predict_period),
         FOLLICULAR(R.string.cycle_phase_follicular),
         OVULATION(R.string.cycle_phase_ovulation),
         LUTEAL(R.string.cycle_phase_luteal)

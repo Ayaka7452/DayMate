@@ -343,8 +343,14 @@ fun CalendarPreviewScreen(
                                         if (showPeriod) {
                                             val phase = CycleCalculator.phaseOfAnyDay(epochDay, logEntries, cycleDays)
                                             val prevPhase = CycleCalculator.phaseOfAnyDay(epochDay - 1, logEntries, cycleDays)
-                                            periodStart = phase == CycleCalculator.Phase.PERIOD &&
-                                                prevPhase != CycleCalculator.Phase.PERIOD
+                                            // 经期首日：**实登记与预测都算**。phaseOfAnyDay 把两者分成了
+                                            // PERIOD / PREDICTED_PERIOD（管家那边要分色），这里只问
+                                            // 「这天是不是一个新的经期起点」，所以两类合并判。
+                                            val isPeriod = phase == CycleCalculator.Phase.PERIOD ||
+                                                phase == CycleCalculator.Phase.PREDICTED_PERIOD
+                                            val prevIsPeriod = prevPhase == CycleCalculator.Phase.PERIOD ||
+                                                prevPhase == CycleCalculator.Phase.PREDICTED_PERIOD
+                                            periodStart = isPeriod && !prevIsPeriod
                                             ovulationStart = phase == CycleCalculator.Phase.OVULATION &&
                                                 prevPhase != CycleCalculator.Phase.OVULATION
                                         } else {
