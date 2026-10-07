@@ -2621,6 +2621,9 @@ internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
     }
 }
 
+/** 「删除经期首日 / 末日」的确认弹窗目标。 */
+private data class PendingEdgeRemoval(val log: CycleLogEntity, val removeFirst: Boolean)
+
 /**
  * 选中日的详情区：阶段定位 + 当日记录 + 添加/删除入口。
  *
@@ -2636,9 +2639,6 @@ internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
  * 管家侧无论是否选中某天都能收起（收起后详情区整体隐去，点任意格子再展开）。
  */
 @Composable
-/** 「删除经期首日 / 末日」的确认弹窗目标。 */
-private data class PendingEdgeRemoval(val log: CycleLogEntity, val removeFirst: Boolean)
-
 internal fun CycleDayDetail(
     day: Long,
     logs: List<CycleLogEntity>,
