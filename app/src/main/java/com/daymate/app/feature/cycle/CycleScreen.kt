@@ -2404,12 +2404,13 @@ internal fun describeDay(
 
     // 锚点推进：与 phaseOfAnyDay 同款，保证 nextStart 恒晚于 day。
     // 目标日已 ≥ 最早记录，故锚点必然存在（兜底取最早一条）。
-    var anchorStart = logs.lastOrNull { it.startDateEpochDay <= day }?.startDateEpochDay
-        ?: logs.last().startDateEpochDay
+    val anchorLog = logs.lastOrNull { it.startDateEpochDay <= day } ?: logs.last()
+    var anchorStart = anchorLog.startDateEpochDay
+    val anchorPd = anchorLog.periodDays
     while (anchorStart + cycleDays <= day) anchorStart += cycleDays
     val nextStart = anchorStart + cycleDays
-    val ovu = CycleCalculator.effectiveOvulationDay(anchorStart, base.periodDays, nextStart)
-    val window = CycleCalculator.ovulationWindow(anchorStart, base.periodDays, nextStart)
+    val ovu = CycleCalculator.effectiveOvulationDay(anchorStart, anchorPd, nextStart)
+    val window = CycleCalculator.ovulationWindow(anchorStart, anchorPd, nextStart)
 
     return when {
         // 走到这里说明不在任何已登记经期区间内（前面已 return），所以经期只可能是**预测**的
