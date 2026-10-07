@@ -38,26 +38,26 @@ class CycleRepository(
         dao.delete(log).also { onChanged() }
 
     /**
-     * 近 3 次实测周期均值（天）；不足 2 次记录返回 null。
+     * 近 3 次实测周期均值（天）+ 实际样本数；不足 2 次记录返回 null。
      * 特殊情况记录（带备注的单日出血标记）不参与推算，只做日历标记。
      */
-    fun averageCycleDays(logs: List<CycleLogEntity>): Int? =
-        CycleCalculator.averageCycleDays(
+    fun cycleAverage(logs: List<CycleLogEntity>): CycleCalculator.Average? =
+        CycleCalculator.cycleAverage(
             logs.filter { it.note == null }.map { it.startDateEpochDay }.sortedDescending()
         )
 
-    /** 近 3 次记录的经期持续天数均值（天）；不足 2 条记录视为数据不足，返回 null。特殊记录不参与。 */
-    fun averagePeriodDays(logs: List<CycleLogEntity>): Int? =
-        CycleCalculator.averagePeriodDays(logs.filter { it.note == null }.map { it.periodDays })
+    /** 近 3 次记录的经期持续天数均值（天）+ 实际样本数；不足 2 条记录视为数据不足，返回 null。特殊记录不参与。 */
+    fun periodAverage(logs: List<CycleLogEntity>): CycleCalculator.Average? =
+        CycleCalculator.periodAverage(logs.filter { it.note == null }.map { it.periodDays })
 
     /**
      * 生效周期天数：自动开启且能算出均值（≥2 条有效记录）时用近 3 次均值，
      * 否则回落到手动设置值（数据不足时的种子）。
      */
     fun effectiveCycleDays(logs: List<CycleLogEntity>, manual: Int, auto: Boolean): Int =
-        if (auto) averageCycleDays(logs) ?: manual else manual
+        if (auto) cycleAverage(logs)?.days ?: manual else manual
 
     /** 生效经期天数：自动开启且能算出均值（≥2 条记录）时用近 3 次均值，否则用手动设置值。 */
     fun effectivePeriodDays(logs: List<CycleLogEntity>, manual: Int, auto: Boolean): Int =
-        if (auto) averagePeriodDays(logs) ?: manual else manual
+        if (auto) periodAverage(logs)?.days ?: manual else manual
 }

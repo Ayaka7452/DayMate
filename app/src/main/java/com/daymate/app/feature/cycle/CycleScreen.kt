@@ -1184,8 +1184,10 @@ private fun CycleSettingsScreen(
     // 生效参数：自动开启且数据足够时按近 3 次记录均值推算，否则回落到手动设置值
     val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
     val periodDays = container.cycleRepository.effectivePeriodDays(logs, periodManual, periodAuto)
-    val avg = container.cycleRepository.averageCycleDays(logs)
-    val periodAvg = container.cycleRepository.averagePeriodDays(logs)
+    // 均值结果带「实际样本数」，供副标题动态显示「近 N 次」——不足 3 次就显示不足的次数，
+    // 不再一律写死 AVG_WINDOW（否则只登记 2 期也显示「近 3 次」，与实际不符）
+    val avg = container.cycleRepository.cycleAverage(logs)
+    val periodAvg = container.cycleRepository.periodAverage(logs)
     val nextStart = lastLog?.let { CycleCalculator.nextStartAfter(it.startDateEpochDay, cycleDays) }
     val overdue = nextStart != null && today >= nextStart
 
@@ -1231,7 +1233,7 @@ private fun CycleSettingsScreen(
             ToggleRow(
                 title = stringResource(R.string.cycle_auto_cycle_days),
                 subtitle = when {
-                    cycleAuto && avg != null -> stringResource(R.string.cycle_auto_cycle_sub_calc, CycleCalculator.AVG_WINDOW, avg)
+                    cycleAuto && avg != null -> stringResource(R.string.cycle_auto_cycle_sub_calc, avg.sampleCount, avg.days)
                     cycleAuto -> stringResource(R.string.cycle_auto_insufficient)
                     else -> stringResource(R.string.cycle_auto_off_manual)
                 },
@@ -1259,7 +1261,7 @@ private fun CycleSettingsScreen(
             ToggleRow(
                 title = stringResource(R.string.cycle_auto_period_days),
                 subtitle = when {
-                    periodAuto && periodAvg != null -> stringResource(R.string.cycle_auto_period_sub_calc, CycleCalculator.AVG_WINDOW, periodAvg)
+                    periodAuto && periodAvg != null -> stringResource(R.string.cycle_auto_period_sub_calc, periodAvg.sampleCount, periodAvg.days)
                     periodAuto -> stringResource(R.string.cycle_auto_period_insufficient)
                     else -> stringResource(R.string.cycle_auto_off_manual)
                 },

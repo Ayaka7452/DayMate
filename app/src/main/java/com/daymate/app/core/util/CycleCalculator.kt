@@ -64,10 +64,22 @@ object CycleCalculator {
     }
 
     /**
+     * 均值结果：**天数** + **实际参与计算的样本数**。
+     *
+     * [sampleCount] 供设置页动态显示「近 N 次平均」——此前直接把 [AVG_WINDOW]（写死的 3）
+     * 塞进文案，用户只登记 2 期时也显示「近 3 次」，与实际不符（2026-10-07 用户报告）。
+     *
+     * ⚠️ 两个口径的样本含义**不同**，别混：
+     *  - [cycleAverage]：样本 = **相邻两期的间隔数**（登记 2 期 → 1 个周期 → 显示「近 1 次」）
+     *  - [periodAverage]：样本 = **登记条数**（登记 2 期 → 显示「近 2 次」）
+     */
+    data class Average(val days: Int, val sampleCount: Int)
+
+    /**
      * 近 N 次（最多 3 次）实测周期均值：传入按日期降序的经期首日列表。
      * 不足 2 次记录时返回 null（无法计算均值）。
      */
-    fun averageCycleDays(startDaysDesc: List<Long>): Int? {
+    fun cycleAverage(startDaysDesc: List<Long>): Average? {
         if (startDaysDesc.size < 2) return null
         val lengths = mutableListOf<Int>()
         for (i in 0 until startDaysDesc.size - 1) {
@@ -75,17 +87,17 @@ object CycleCalculator {
             cycleLengthBetween(startDaysDesc[i + 1], startDaysDesc[i])?.let { lengths.add(it) }
         }
         if (lengths.isEmpty()) return null
-        return Math.round(lengths.sum().toDouble() / lengths.size).toInt()
+        return Average(Math.round(lengths.sum().toDouble() / lengths.size).toInt(), lengths.size)
     }
 
     /**
      * 近 N 次（最多 3 次）记录的经期持续天数均值：传入按日期降序记录的 periodDays 列表。
      * 与周期均值同口径：不足 2 条记录视为数据不满足测算要求，返回 null（回落手动值）。
      */
-    fun averagePeriodDays(periodDaysDesc: List<Int>): Int? {
+    fun periodAverage(periodDaysDesc: List<Int>): Average? {
         if (periodDaysDesc.size < 2) return null
         val sample = periodDaysDesc.take(AVG_WINDOW)
-        return Math.round(sample.sum().toDouble() / sample.size).toInt()
+        return Average(Math.round(sample.sum().toDouble() / sample.size).toInt(), sample.size)
     }
 
     /** 预测下一次经期首日 = 已知首日 + 周期天数。 */
