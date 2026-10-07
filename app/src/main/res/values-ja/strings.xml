@@ -235,6 +235,8 @@
     <string name="cycle_remove_first_day">初日を削除</string>
     <string name="cycle_remove_last_day">最終日を削除</string>
     <string name="cycle_merge_day_into_period">この日を含める</string>
+    <string name="cycle_merge_day_confirm_title">この日を含めますか？</string>
+    <string name="cycle_merge_day_confirm_text">含めると、生理は %1$s（%2$d 日間）になります。予測は自動で再計算されます。</string>
     <string name="cycle_remove_first_day_confirm_title">初日を削除しますか？</string>
     <string name="cycle_remove_last_day_confirm_title">最終日を削除しますか？</string>
     <string name="cycle_remove_day_confirm_text">削除後、生理は %1$s（%2$d 日間）になります。予測は自動で再計算されます。</string>

@@ -235,6 +235,8 @@
     <string name="cycle_remove_first_day">Remove first day</string>
     <string name="cycle_remove_last_day">Remove last day</string>
     <string name="cycle_merge_day_into_period">Include this day</string>
+    <string name="cycle_merge_day_confirm_title">Include this day?</string>
+    <string name="cycle_merge_day_confirm_text">The period becomes %1$s, %2$d days in total. Related predictions will be recalculated.</string>
     <string name="cycle_remove_first_day_confirm_title">Remove the first day?</string>
     <string name="cycle_remove_last_day_confirm_title">Remove the last day?</string>
     <string name="cycle_remove_day_confirm_text">The period becomes %1$s, %2$d days in total. Related predictions will be recalculated.</string>

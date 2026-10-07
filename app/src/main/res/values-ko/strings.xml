@@ -235,6 +235,8 @@
     <string name="cycle_remove_first_day">첫날 삭제</string>
     <string name="cycle_remove_last_day">마지막 날 삭제</string>
     <string name="cycle_merge_day_into_period">이 날 포함</string>
+    <string name="cycle_merge_day_confirm_title">이 날을 포함할까요?</string>
+    <string name="cycle_merge_day_confirm_text">포함하면 생리는 %1$s(%2$d일)이 됩니다. 관련 예측이 자동으로 다시 계산됩니다.</string>
     <string name="cycle_remove_first_day_confirm_title">첫날을 삭제할까요?</string>
     <string name="cycle_remove_last_day_confirm_title">마지막 날을 삭제할까요?</string>
     <string name="cycle_remove_day_confirm_text">삭제하면 생리는 %1$s(%2$d일)이 됩니다. 관련 예측이 자동으로 다시 계산됩니다.</string>

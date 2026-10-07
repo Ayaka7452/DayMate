@@ -235,6 +235,8 @@
     <string name="cycle_remove_first_day">刪除最前一日</string>
     <string name="cycle_remove_last_day">刪除最後一日</string>
     <string name="cycle_merge_day_into_period">併入呢一日</string>
+    <string name="cycle_merge_day_confirm_title">併入呢一日？</string>
+    <string name="cycle_merge_day_confirm_text">併入之後，經期會變為 %1$s，共 %2$d 日。相關預測會自動重算。</string>
     <string name="cycle_remove_first_day_confirm_title">刪除最前一日？</string>
     <string name="cycle_remove_last_day_confirm_title">刪除最後一日？</string>
     <string name="cycle_remove_day_confirm_text">刪除之後，經期會變為 %1$s，共 %2$d 日。相關預測會自動重算。</string>

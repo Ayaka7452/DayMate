@@ -302,6 +302,9 @@ private fun CycleOverviewScreen(
     // 「删除经期首/末一天」的确认弹窗目标（null = 未打开）。改的是已登记的经期区间，
     // 会连带影响全部预测，所以先确认再落库。
     var removePeriodEdge by remember { mutableStateOf<PendingEdgeRemoval?>(null) }
+    // 「把相邻一天并入经期」的确认弹窗目标（null = 未打开）。与删除同一口径——同样改动经期区间、
+    // 同样连带影响全部预测，所以也要先确认（2026-10-07 用户要求：凡影响整体计算的修改都要确认）。
+    var extendPeriodDay by remember { mutableStateOf<PendingExtension?>(null) }
     // 日历点选的日期（null = 未选中，详情栏展示今天的信息）。点同一天可取消选中，与「今日」高亮互不干扰。
     var selectedDay by remember { mutableStateOf<Long?>(null) }
     // 详情区是否展开：点了「收起」就整体隐去（选中与未选中都能收）。
@@ -511,17 +514,8 @@ private fun CycleOverviewScreen(
                         onAdjustPeriod = { log -> editingLog = log },
                         // 垃圾桶：落库前先弹确认（改动会影响全部预测）
                         onRemovePeriodEdge = { log, first -> removePeriodEdge = PendingEdgeRemoval(log, first) },
-                        // 加号：把相邻一天并入经期。量小、可逆（再点垃圾桶就退回来了），不再多确认一步
-                        onExtendPeriod = { log, d ->
-                            // 落在首日前一天 → 首日往前挪；落在末日之后 → 首日不动，只加一天
-                            val newStart = minOf(log.startDateEpochDay, d)
-                            scope.launch {
-                                container.cycleRepository.update(
-                                    log.copy(startDateEpochDay = newStart, periodDays = log.periodDays + 1)
-                                )
-                                scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
-                            }
-                        },
+                        // 加号：把相邻一天并入经期。同样改动区间、同样影响全部预测，先确认再落库
+                        onExtendPeriod = { log, d -> extendPeriodDay = PendingExtension(log, d) },
                         onAdd = { showAddNote = true },
                         onEdit = { editingNote = it },
                         onDelete = { showDeleteNote = true }
@@ -931,6 +925,35 @@ private fun CycleOverviewScreen(
             },
             dismissButton = {
                 TextButton(onClick = { removePeriodEdge = null }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
+    }
+
+    // 并入相邻一天的确认：与删除同一口径——改动经期区间会连带影响全部预测，先问一句
+    extendPeriodDay?.let { target ->
+        val log = target.log
+        // 落点在首日前一天 → 首日往前挪；落在末日后一天 → 首日不动、天数加一。两种都是「多一个整天」。
+        val newStart = minOf(log.startDateEpochDay, target.day)
+        val newDays = log.periodDays + 1
+        AlertDialog(
+            onDismissRequest = { extendPeriodDay = null },
+            title = { Text(stringResource(R.string.cycle_merge_day_confirm_title)) },
+            text = {
+                Text(stringResource(R.string.cycle_merge_day_confirm_text, formatRange(newStart, newDays), newDays))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        container.cycleRepository.update(
+                            log.copy(startDateEpochDay = newStart, periodDays = newDays)
+                        )
+                        scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                    }
+                    extendPeriodDay = null
+                }) { Text(stringResource(R.string.common_save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { extendPeriodDay = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -2624,6 +2647,9 @@ internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
 /** 「删除经期首日 / 末日」的确认弹窗目标。 */
 private data class PendingEdgeRemoval(val log: CycleLogEntity, val removeFirst: Boolean)
 
+/** 「把相邻一天并入经期」的确认弹窗目标：log = 被并入的那条记录，day = 要并进来的那天。 */
+private data class PendingExtension(val log: CycleLogEntity, val day: Long)
+
 /**
  * 选中日的详情区：阶段定位 + 当日记录 + 添加/删除入口。
  *
@@ -2672,11 +2698,13 @@ internal fun CycleDayDetail(
     /**
      * 删除某条经期的首日 / 末日（垃圾桶）；回调第二参 = 是否删首日。
      * 只在选中「首日」或「末日」时出现——区间是连续的，删中间那天没有意义。
+     * 宿主要弹确认再落库（改动区间会连带影响全部预测）。
      * 日历记事不传。
      */
     onRemovePeriodEdge: ((CycleLogEntity, Boolean) -> Unit)? = null,
     /**
      * 把相邻的一天并入经期（加号）。只在选中「首日前一天」或「末日后一天」时出现。
+     * 宿主要弹确认再落库（与删除同一口径）。
      * 日历记事不传。
      */
     onExtendPeriod: ((CycleLogEntity, Long) -> Unit)? = null,
@@ -2696,10 +2724,16 @@ internal fun CycleDayDetail(
     // ===== 经期区间快捷操作（仅周期管家：三个回调都不传时整行不出现）=====
     // 铅笔：选中任一「已登记经期」区间内的一天；垃圾桶：只在首/末日；加号：只在区间外紧挨着的一天。
     // 一律排除 note != null 的特殊情况记录——那是单日出血标记，不是一段经期。
-    val periodLog = logs.firstOrNull {
+    //
+    // ⚠️ **还没到来的日子一律不给这三个图标**（2026-10-07 用户报告）：一条记录的区间会延伸到
+    // 今天之后——用户点「继续经期记录」把结束日顺延到明天后，明天的格子仍落在区间内、且正好是
+    // 「末日」，于是垃圾桶出现在一个**还没发生**的日子上。没到的日子没有「这天算不算」的事实依据，
+    // 也不该替用户预支（想延长就等那天到了再点），所以判定统一以 day <= today 为前提。
+    val dayReached = day <= today
+    val periodLog = if (dayReached) logs.firstOrNull {
         it.note == null &&
             day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
-    }
+    } else null
     val removeIsFirst = periodLog != null && day == periodLog.startDateEpochDay
     val removeIsLast = periodLog != null &&
         day == periodLog.startDateEpochDay + periodLog.periodDays - 1
@@ -2707,10 +2741,10 @@ internal fun CycleDayDetail(
     // 这里用置灰而不是弹窗——视线已经在图标上，灰掉比多问一句更直观。
     val canRemoveEdge = periodLog != null && (removeIsFirst || removeIsLast) &&
         periodLog.periodDays - 1 >= CycleCalculator.MIN_PERIOD_DAYS
-    val extendLog = logs.firstOrNull {
+    val extendLog = if (dayReached) logs.firstOrNull {
         it.note == null &&
             (day == it.startDateEpochDay - 1 || day == it.startDateEpochDay + it.periodDays)
-    }
+    } else null
     // 并入后若与另一条记录重叠就不给加（与修订弹窗、CycleLogEditDialog 同一套重叠口径）
     val extendOverlaps = extendLog != null && logs.any { other ->
         other.id != extendLog.id &&
