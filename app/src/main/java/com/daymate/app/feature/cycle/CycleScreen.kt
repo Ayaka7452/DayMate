@@ -43,6 +43,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -92,6 +93,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -297,6 +299,9 @@ private fun CycleOverviewScreen(
     val todayIsPeriodEnd =
         activeLog != null && today == activeLog.startDateEpochDay + activeLog.periodDays - 1
     var editingLog by remember { mutableStateOf<CycleLogEntity?>(null) }
+    // 「删除经期首/末一天」的确认弹窗目标（null = 未打开）。改的是已登记的经期区间，
+    // 会连带影响全部预测，所以先确认再落库。
+    var removePeriodEdge by remember { mutableStateOf<PendingEdgeRemoval?>(null) }
     // 日历点选的日期（null = 未选中，详情栏展示今天的信息）。点同一天可取消选中，与「今日」高亮互不干扰。
     var selectedDay by remember { mutableStateOf<Long?>(null) }
     // 详情区是否展开：点了「收起」就整体隐去（选中与未选中都能收）。
@@ -502,6 +507,21 @@ private fun CycleOverviewScreen(
                         onCollapse = { detailExpanded = false },
                         // 预测经期日就地补登记：带着那天的日期打开登记弹窗（顶栏按钮则默认今天）
                         onRegisterPeriod = { d -> registerPreset = d; showRegister = true },
+                        // 铅笔：改起止。复用「修订」弹窗——它本来就是选日期范围的，正好对得上
+                        onAdjustPeriod = { log -> editingLog = log },
+                        // 垃圾桶：落库前先弹确认（改动会影响全部预测）
+                        onRemovePeriodEdge = { log, first -> removePeriodEdge = PendingEdgeRemoval(log, first) },
+                        // 加号：把相邻一天并入经期。量小、可逆（再点垃圾桶就退回来了），不再多确认一步
+                        onExtendPeriod = { log, d ->
+                            // 落在首日前一天 → 首日往前挪；落在末日之后 → 首日不动，只加一天
+                            val newStart = minOf(log.startDateEpochDay, d)
+                            scope.launch {
+                                container.cycleRepository.update(
+                                    log.copy(startDateEpochDay = newStart, periodDays = log.periodDays + 1)
+                                )
+                                scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                            }
+                        },
                         onAdd = { showAddNote = true },
                         onEdit = { editingNote = it },
                         onDelete = { showDeleteNote = true }
@@ -519,6 +539,12 @@ private fun CycleOverviewScreen(
                 val ongoing = endDay != null && today < endDay
                 val pastEnd = endDay != null && today > endDay
                 val alreadyToday = endDay != null && today == endDay
+                // 今天正好是（预测的）结束日、但人还在流 → 给一条「继续经期记录」的出路：点一下把
+                // 结束日顺延到明天。此前这个位置只有「开始新经期」，等于逼用户「结束本次、另起一条」，
+                // 明明没结束却被系统强制收尾（2026-10-07 用户报告）。
+                // 经期持续天数上限 10 天，到顶就不再提供（详情面板的加号同样是这个上限）。
+                val canContinue = alreadyToday && activeLog != null &&
+                    activeLog.periodDays + 1 <= CycleCalculator.MAX_PERIOD_DAYS
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -540,11 +566,31 @@ private fun CycleOverviewScreen(
                         }
                     }
                     Button(
-                        onClick = { showRegister = true },
-                        enabled = !ongoing,
+                        onClick = {
+                            val log = activeLog
+                            if (canContinue && log != null) {
+                                // 今天既是结束日，顺延一天后新结束日就是明天（periodDays + 1）
+                                scope.launch {
+                                    container.cycleRepository.update(
+                                        log.copy(periodDays = log.periodDays + 1)
+                                    )
+                                    scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                                }
+                            } else {
+                                showRegister = true
+                            }
+                        },
+                        enabled = !ongoing && (!alreadyToday || canContinue),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (ongoing) stringResource(R.string.cycle_in_period) else stringResource(R.string.cycle_start_new_period), maxLines = 1)
+                        Text(
+                            when {
+                                ongoing -> stringResource(R.string.cycle_in_period)
+                                alreadyToday -> stringResource(R.string.cycle_continue_period)
+                                else -> stringResource(R.string.cycle_start_new_period)
+                            },
+                            maxLines = 1
+                        )
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -555,7 +601,17 @@ private fun CycleOverviewScreen(
                     OutlinedButton(
                         onClick = { editingLog = lastLog },
                         modifier = Modifier.weight(1f)
-                    ) { Text(stringResource(R.string.cycle_edit_last_period), maxLines = 1) }
+                    ) {
+                        Text(
+                            // 本次还没结束（今天仍在经期内、或今天正好是最后一天）→ 改的是「本次」；
+                            // 已过结束日就成了过去式，叫「上次经期」（2026-10-07 用户要求）
+                            stringResource(
+                                if (endDay != null && today <= endDay) R.string.cycle_edit_current_period
+                                else R.string.cycle_edit_last_period
+                            ),
+                            maxLines = 1
+                        )
+                    }
                     OutlinedButton(
                         onClick = { showBackfill = true },
                         modifier = Modifier.weight(1f)
@@ -842,6 +898,41 @@ private fun CycleOverviewScreen(
         } else {
             showEndConfirm = false
         }
+    }
+
+    // 删除经期首/末一天的确认：直接改动经期区间，进而影响全部预测，先问一句
+    removePeriodEdge?.let { target ->
+        val log = target.log
+        val newStart = if (target.removeFirst) log.startDateEpochDay + 1 else log.startDateEpochDay
+        val newDays = log.periodDays - 1
+        AlertDialog(
+            onDismissRequest = { removePeriodEdge = null },
+            title = {
+                Text(
+                    stringResource(
+                        if (target.removeFirst) R.string.cycle_remove_first_day_confirm_title
+                        else R.string.cycle_remove_last_day_confirm_title
+                    )
+                )
+            },
+            text = {
+                Text(stringResource(R.string.cycle_remove_day_confirm_text, formatRange(newStart, newDays), newDays))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        container.cycleRepository.update(
+                            log.copy(startDateEpochDay = newStart, periodDays = newDays)
+                        )
+                        scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
+                    }
+                    removePeriodEdge = null
+                }) { Text(stringResource(R.string.common_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { removePeriodEdge = null }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
     }
 
     // 修订上次经期弹窗（与历史记录「调整」共用同一交互）
@@ -2545,6 +2636,9 @@ internal fun NoteRow(note: CycleNoteEntity, onEdit: (() -> Unit)? = null) {
  * 管家侧无论是否选中某天都能收起（收起后详情区整体隐去，点任意格子再展开）。
  */
 @Composable
+/** 「删除经期首日 / 末日」的确认弹窗目标。 */
+private data class PendingEdgeRemoval(val log: CycleLogEntity, val removeFirst: Boolean)
+
 internal fun CycleDayDetail(
     day: Long,
     logs: List<CycleLogEntity>,
@@ -2568,6 +2662,24 @@ internal fun CycleDayDetail(
      * 日历记事不传：那是管家的数据，日历记事只看不改（与 [canDelete] 同一原则）。
      */
     onRegisterPeriod: ((Long) -> Unit)? = null,
+    /**
+     * 调整某条**已登记经期**的起止日期（铅笔）。选中区间内任一天都会出现——最近一条和以往的
+     * 历史记录都能改（2026-10-07 用户确认）。**预测经期不在其列**：预测是系统推算的产物，
+     * 只能靠上面的「登记本次经期」把它转成实记录，不能直接改。
+     * 日历记事不传（那是管家的数据，日历记事只看不改，与 [canDelete] 同一原则）。
+     */
+    onAdjustPeriod: ((CycleLogEntity) -> Unit)? = null,
+    /**
+     * 删除某条经期的首日 / 末日（垃圾桶）；回调第二参 = 是否删首日。
+     * 只在选中「首日」或「末日」时出现——区间是连续的，删中间那天没有意义。
+     * 日历记事不传。
+     */
+    onRemovePeriodEdge: ((CycleLogEntity, Boolean) -> Unit)? = null,
+    /**
+     * 把相邻的一天并入经期（加号）。只在选中「首日前一天」或「末日后一天」时出现。
+     * 日历记事不传。
+     */
+    onExtendPeriod: ((CycleLogEntity, Long) -> Unit)? = null,
     onAdd: () -> Unit,
     /** 修改某一条已有记录（入口就挂在那一行右侧）。 */
     onEdit: (CycleNoteEntity) -> Unit,
@@ -2580,6 +2692,36 @@ internal fun CycleDayDetail(
     val date = LocalDate.ofEpochDay(day)
     val dateText = date.format(LocaleWrap.dateFormatter(R.string.date_pattern_md)) + " " +
         date.dayOfWeek.getDisplayName(TextStyle.FULL, LocaleWrap.locale())
+
+    // ===== 经期区间快捷操作（仅周期管家：三个回调都不传时整行不出现）=====
+    // 铅笔：选中任一「已登记经期」区间内的一天；垃圾桶：只在首/末日；加号：只在区间外紧挨着的一天。
+    // 一律排除 note != null 的特殊情况记录——那是单日出血标记，不是一段经期。
+    val periodLog = logs.firstOrNull {
+        it.note == null &&
+            day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
+    }
+    val removeIsFirst = periodLog != null && day == periodLog.startDateEpochDay
+    val removeIsLast = periodLog != null &&
+        day == periodLog.startDateEpochDay + periodLog.periodDays - 1
+    // 删完不能跌破最少天数（项目硬规则 2 天），否则会留下全库唯一一条不合法记录。
+    // 这里用置灰而不是弹窗——视线已经在图标上，灰掉比多问一句更直观。
+    val canRemoveEdge = periodLog != null && (removeIsFirst || removeIsLast) &&
+        periodLog.periodDays - 1 >= CycleCalculator.MIN_PERIOD_DAYS
+    val extendLog = logs.firstOrNull {
+        it.note == null &&
+            (day == it.startDateEpochDay - 1 || day == it.startDateEpochDay + it.periodDays)
+    }
+    // 并入后若与另一条记录重叠就不给加（与修订弹窗、CycleLogEditDialog 同一套重叠口径）
+    val extendOverlaps = extendLog != null && logs.any { other ->
+        other.id != extendLog.id &&
+            day >= other.startDateEpochDay && day < other.startDateEpochDay + other.periodDays
+    }
+    val canExtend = extendLog != null &&
+        extendLog.periodDays + 1 <= CycleCalculator.MAX_PERIOD_DAYS && !extendOverlaps
+    val showAdjust = onAdjustPeriod != null && periodLog != null
+    val showRemove = onRemovePeriodEdge != null && (removeIsFirst || removeIsLast)
+    val showExtend = onExtendPeriod != null && extendLog != null
+    val showPeriodActions = showAdjust || showRemove || showExtend
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -2616,6 +2758,40 @@ internal fun CycleDayDetail(
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(phaseLabel, style = MaterialTheme.typography.labelSmall, color = chipFg)
+                    }
+                }
+            }
+
+            // 经期区间快捷操作：铅笔（改起止）／垃圾桶（砍首末一天）／加号（并入相邻一天）。
+            // 三者互斥出现——落在段内给铅笔、正好在边界再加垃圾桶、落在段外紧邻的一天给加号。
+            if (showPeriodActions) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onAdjustPeriod != null && periodLog != null) {
+                        PeriodIconButton(
+                            icon = Icons.Default.Edit,
+                            contentDescription = stringResource(R.string.cycle_adjust_period_range),
+                            onClick = { onAdjustPeriod(periodLog) }
+                        )
+                    }
+                    if (onRemovePeriodEdge != null && showRemove && periodLog != null) {
+                        PeriodIconButton(
+                            icon = Icons.Default.Delete,
+                            contentDescription = stringResource(
+                                if (removeIsFirst) R.string.cycle_remove_first_day
+                                else R.string.cycle_remove_last_day
+                            ),
+                            enabled = canRemoveEdge,
+                            onClick = { onRemovePeriodEdge(periodLog, removeIsFirst) }
+                        )
+                    }
+                    if (onExtendPeriod != null && showExtend && extendLog != null) {
+                        PeriodIconButton(
+                            icon = Icons.Default.Add,
+                            contentDescription = stringResource(R.string.cycle_merge_day_into_period),
+                            enabled = canExtend,
+                            onClick = { onExtendPeriod(extendLog, day) }
+                        )
                     }
                 }
             }
@@ -2684,6 +2860,41 @@ internal fun CycleDayDetail(
                 }
             }
         }
+    }
+}
+
+/**
+ * 详情面板里的方形图标按钮（经期区间的铅笔 / 垃圾桶 / 加号）。
+ *
+ * 用浅主题色底表达「会改数据的次级动作」——比实心 `Button` 轻、比 `TextButton` 显眼，
+ * 一排三个不抢底部「添加记录 / 删除记录」的视线。禁用态只降不透明度、不另加说明文字：
+ * 视线已经停在图标上，灰掉比多弹一句提示更直接。
+ */
+@Composable
+private fun PeriodIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)
+            )
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(18.dp),
+            tint = if (enabled) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+        )
     }
 }
 

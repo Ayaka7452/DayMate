@@ -26,8 +26,8 @@ android {
         applicationId = "com.ayaka7452.daymate"
         minSdk = 26
         targetSdk = 34
-        versionCode = 157
-        versionName = "1.20.6"
+        versionCode = 158
+        versionName = "1.20.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
