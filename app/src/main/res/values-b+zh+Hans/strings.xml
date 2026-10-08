@@ -152,7 +152,7 @@
     <string name="settings_custom_url_hint">含 {year} 占位符则按年下载，不含则下载整份文件后按年缓存。</string>
     <string name="settings_custom_url_formats">按结构自动识别，已兼容 holiday-cn、日期为键、节假日/工作日 Map、data.list 数组等主流格式，节日名会统一成规范写法。</string>
     <string name="settings_url_http_hint">请填写以 http 开头的地址。</string>
-    <string name="settings_years_hint">勾选需要缓存的年份，选择会随年份自动更新。次年放假安排一般在当年 11 月前后公布，未公布前下载会提示「尚未发布」，不会覆盖已有缓存。\n未勾选明年时，年底的跨年节日（如元旦）会按固定日期推算显示，官方公布后自动校正。</string>
+    <string name="settings_years_hint">勾选需要缓存的年份，选择会随年份自动更新。次年放假安排一般在当年 11 月前后公布，未公布前下载会提示「尚未发布」，不会覆盖已有缓存。\n尚未公布或未缓存的节日（如元旦）会按固定日期推算显示为预计日期，官方公布后自动校正。</string>
     <string name="settings_year_n">%1$d 年</string>
     <string name="settings_cached">已缓存</string>
     <string name="settings_not_cached">未缓存</string>
@@ -551,7 +551,6 @@
     <string name="festival_ui_no_data">节假日数据未下载</string>
     <string name="festival_ui_go_download">前往「设置 → 节假日数据」下载。</string>
     <string name="festival_ui_all_finished">已缓存的法定节假日已全部结束，可在设置中更新。</string>
-    <string name="festival_ui_estimate_hint">预计日期，按固定日期推算，官方安排公布后自动更新。</string>
     <string name="festival_ui_next">下一个节日</string>
     <string name="festival_ui_today_is">今天就是 %1$s</string><string name="festival_ui_span_days">休息 %1$d 天</string>
     <string name="festival_ui_span_tomorrow">明天起休息 %1$d 天</string>

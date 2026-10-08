@@ -349,6 +349,9 @@ private fun inkBottomBelowBaselinePx(text: String, textSizePx: Float): Float? = 
  *  4. 明天开始放假 → 淡蓝「休」+「明天起休息 X 天」（预告，提前一天，总长口径）。
  * 预告只在「明天」出现：不到日子不提前剧透，且淡蓝角标 + 「明天起/明日」文案
  * 与当天实况（绿/橙）双重区分。连休的「连」字不用——统一说「休息 X 天」。
+ *
+ * 推算出的节日（[FestivalDay.isEstimate]）**不产生任何状态条**——官方连休天数拿不到，
+ * 「预计日期」的来源说明放在设置 → 节假日数据缓存里，卡片不解释。
  */
 private fun festivalStatusBar(
     today: FestivalDay?,
@@ -378,14 +381,13 @@ private fun festivalStatusBar(
     tomorrowMakeup != null -> FestivalStatus(
         false, true, Tr.s(R.string.festival_banner_makeup_tomorrow, HolidayNames.display(tomorrowMakeup))
     )
-    // 推算出的节日（官方安排尚未发布，如国庆后到次年公布前）：只说明日期来源，
-    // **不显示连休天数/剩余**——那些都由真实数据算出，推算值给不出，硬算只会误导。
-    festival.isEstimate -> FestivalStatus(
-        true, true, Tr.s(R.string.festival_ui_estimate_hint)
-    )
-    festival.date == LocalDate.now().plusDays(1) && festival.isOffDay -> FestivalStatus(
-        true, true, Tr.s(R.string.festival_ui_span_tomorrow, spanDays)
-    )
+    // 推算出的节日（官方安排尚未发布，如国庆后到次年公布前）一律不产生状态条：
+    // 官方连休天数拿不到，硬算只会误导；「预计日期」的说明收在设置 → 节假日数据缓存里，
+    // 卡片本身不做任何解释（用户 2026-10-08：预计就预计，别在卡片里描述；
+    // 也免得离元旦还有 85 天就顶一条蓝「休」预告角标）。
+    // 同理「明天起放假」的预告也只吃真实数据：推算值 spanDays=0，会得出「休息 0 天」。
+    !festival.isEstimate && festival.date == LocalDate.now().plusDays(1) && festival.isOffDay ->
+        FestivalStatus(true, true, Tr.s(R.string.festival_ui_span_tomorrow, spanDays))
     else -> null
 }
 
