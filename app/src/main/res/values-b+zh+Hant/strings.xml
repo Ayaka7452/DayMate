@@ -152,7 +152,7 @@
     <string name="settings_custom_url_hint">含 {year} 佔位符則按年下載，不含則下載整份檔案後按年快取。</string>
     <string name="settings_custom_url_formats">按結構自動識別，已相容 holiday-cn、日期為鍵、節假日/工作日 Map、data.list 陣列等主流格式，節日名會統一成規範寫法。</string>
     <string name="settings_url_http_hint">請填寫以 http 開頭的地址。</string>
-    <string name="settings_years_hint">勾選需要快取的年份，選擇會隨年份自動更新。次年放假安排一般在當年 11 月前後公佈，未公佈前下載會提示「尚未發佈」，不會覆蓋已有快取。\n未勾选明年时，年底的跨年節日（如元旦）會取不到日期。</string>
+    <string name="settings_years_hint">勾選需要快取的年份，選擇會隨年份自動更新。次年放假安排一般在當年 11 月前後公佈，未公佈前下載會提示「尚未發佈」，不會覆蓋已有快取。\n未勾選明年時，年底的跨年節日（如元旦）會按固定日期推算顯示，官方公佈後自動校正。</string>
     <string name="settings_year_n">%1$d 年</string>
     <string name="settings_cached">已快取</string>
     <string name="settings_not_cached">未快取</string>
@@ -551,6 +551,7 @@
     <string name="festival_ui_no_data">節假日資料未下載</string>
     <string name="festival_ui_go_download">前往「設定 → 節假日資料」下載。</string>
     <string name="festival_ui_all_finished">已快取的節假日已全部結束，可在設定中更新。</string>
+    <string name="festival_ui_estimate_hint">預計日期，按固定日期推算，官方安排公佈後自動更新。</string>
     <string name="festival_ui_next">下一個節日</string>
     <string name="festival_ui_today_is">今天就是 %1$s</string><string name="festival_ui_span_days">休息 %1$d 天</string>
     <string name="festival_ui_span_tomorrow">明天起休息 %1$d 天</string>

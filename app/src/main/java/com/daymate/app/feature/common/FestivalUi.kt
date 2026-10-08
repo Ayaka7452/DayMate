@@ -378,6 +378,11 @@ private fun festivalStatusBar(
     tomorrowMakeup != null -> FestivalStatus(
         false, true, Tr.s(R.string.festival_banner_makeup_tomorrow, HolidayNames.display(tomorrowMakeup))
     )
+    // 推算出的节日（官方安排尚未发布，如国庆后到次年公布前）：只说明日期来源，
+    // **不显示连休天数/剩余**——那些都由真实数据算出，推算值给不出，硬算只会误导。
+    festival.isEstimate -> FestivalStatus(
+        true, true, Tr.s(R.string.festival_ui_estimate_hint)
+    )
     festival.date == LocalDate.now().plusDays(1) && festival.isOffDay -> FestivalStatus(
         true, true, Tr.s(R.string.festival_ui_span_tomorrow, spanDays)
     )

@@ -368,6 +368,22 @@ class FestivalRepository(private val appContext: Context) {
         allDays().firstOrNull { it.date >= from && it.isOffDay }
 
     /**
+     * 下一个放假的节日：**缓存里查不到未来条目时，用内置固定节日推算兜底**（结果 isEstimate=true）。
+     *
+     * 场景：国庆过后到次年安排公布（一般当年 11 月）之间，缓存里没有任何 `>= 今天` 的数据，
+     * 卡片原本只能写「已全部结束」，而下一个节日其实是已知的——元旦必然在 1 月 1 日。
+     * 推算口径见 [FestivalEstimator]：公历固定日 + 农历精确换算 + 清明节气公式；
+     * **调休安排推不出来**，所以整条结果带 isEstimate 标记，官方数据下载后自动被真实条目取代。
+     *
+     * 只在**中国源**下启用：推算表就是中国的法定节日，换成美/日/韩源时凭空冒出「春节」是错的。
+     */
+    fun nextOffDayOrEstimate(from: LocalDate): FestivalDay? {
+        nextOffDay(from)?.let { return it }
+        if (regionOfCurrentSource() != FestivalRegion.CN) return null
+        return FestivalEstimator.next(from)
+    }
+
+    /**
      * 当前数据源是否存在「调休上班日」（isOffDay=false）条目。
      * 补班是中国的调休产物（其他国家撞周末只补休、不补班），据此决定：
      *  - 设置页「休息及补班提醒」开关是否显示（非补班数据源整组隐藏）；

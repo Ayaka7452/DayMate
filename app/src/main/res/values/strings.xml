@@ -152,7 +152,7 @@
     <string name="settings_custom_url_hint">If it contains the {year} placeholder, it downloads by year. Otherwise it downloads the whole file and caches it by year.</string>
     <string name="settings_custom_url_formats">Auto-detected by structure, already compatible with mainstream formats like holiday-cn, date-as-key, holidays/workdays Map, and data.list arrays. Festival names are normalized to a standard form.</string>
     <string name="settings_url_http_hint">Enter an address starting with http.</string>
-    <string name="settings_years_hint">Tick the years to cache. The selection updates automatically with the year. Next year\'s holiday schedule is usually published around November of the current year. Before publication, downloads show \"Not yet released\" and won\'t overwrite the existing cache.\nIf next year isn\'t ticked, cross-year holidays at year-end (such as New Year\'s Day) won\'t get a date.</string>
+    <string name="settings_years_hint">Tick the years to cache. The selection updates automatically with the year. Next year\'s holiday schedule is usually published around November of the current year. Before publication, downloads show \"Not yet released\" and won\'t overwrite the existing cache.\nIf next year isn\'t ticked, cross-year holidays at year-end (such as New Year\'s Day) are shown as estimated dates derived from fixed dates, and are corrected once the official schedule is released.</string>
     <string name="settings_year_n">%1$d</string>
     <string name="settings_cached">Cached</string>
     <string name="settings_not_cached">Not cached</string>
@@ -551,6 +551,7 @@
     <string name="festival_ui_no_data">Holiday data not downloaded</string>
     <string name="festival_ui_go_download">Download it in Settings → Holiday data.</string>
     <string name="festival_ui_all_finished">All cached holidays have passed. You can update them in Settings.</string>
+    <string name="festival_ui_estimate_hint">Estimated date, derived from fixed dates. Updates automatically once the official schedule is released.</string>
     <string name="festival_ui_next">Next holiday</string>
     <string name="festival_ui_today_is">Today is %1$s</string><string name="festival_ui_span_days">%1$d days off</string>
     <string name="festival_ui_span_tomorrow">%1$d days off starting tomorrow</string>

@@ -152,7 +152,7 @@
     <string name="settings_custom_url_hint">{year} プレースホルダーを含む場合は年ごとに、含まない場合はファイル全体をダウンロードして年ごとにキャッシュします。</string>
     <string name="settings_custom_url_formats">構造で自動判別、holiday-cn・日付をキー・祝日/営業日 Map・data.list 配列などの主要形式に対応済み。祝日名は標準表記に統一されます。</string>
     <string name="settings_url_http_hint">http で始まるアドレスを入力してください。</string>
-    <string name="settings_years_hint">キャッシュする年をチェックします。選択は年ごとに自動更新されます。翌年の休日予定は通常、当年の11月頃に公開されます。公開前にダウンロードすると「まだ発表されていません」と表示され、既存のキャッシュは上書きされません。\n翌年が選択されていない場合、年末の年またぎの祝日（元日など）の日付が取得できません。</string>
+    <string name="settings_years_hint">キャッシュする年をチェックします。選択は年ごとに自動更新されます。翌年の休日予定は通常、当年の11月頃に公開されます。公開前にダウンロードすると「まだ発表されていません」と表示され、既存のキャッシュは上書きされません。\n翌年が選択されていない場合、年末の年またぎの祝日（元日など）は固定日から算出した予測日で表示され、公式日程の発表後に自動で校正されます。</string>
     <string name="settings_year_n">%1$d 年</string>
     <string name="settings_cached">キャッシュ済み</string>
     <string name="settings_not_cached">未キャッシュ</string>
@@ -551,6 +551,7 @@
     <string name="festival_ui_no_data">祝日データが未ダウンロード</string>
     <string name="festival_ui_go_download">「設定 → 祝日データ」からダウンロード。</string>
     <string name="festival_ui_all_finished">キャッシュ済みの祝日はすべて終了しました。設定で更新できます。</string>
+    <string name="festival_ui_estimate_hint">予測日です。固定日に基づく推算で、公式日程の発表後に自動更新されます。</string>
     <string name="festival_ui_next">次の祝日</string>
     <string name="festival_ui_today_is">今日は%1$sです</string><string name="festival_ui_span_days">%1$d日間の休み</string>
     <string name="festival_ui_span_tomorrow">明日から%1$d日間の休み</string>

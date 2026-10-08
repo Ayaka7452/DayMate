@@ -62,5 +62,34 @@ object LunarCalendar {
         return (if (isLeap) -month else month) to day
     }
 
+    /**
+     * 某公历年内，农历 [targets] 中各「(月, 日)」对应的公历日期（**闰月不算**）；未出现的键不出现在结果里。
+     *
+     * 用途：在线节假日数据尚未发布时推算农历节日的公历日期（春节=正月初一、端午=五月初五、
+     * 中秋=八月十五）。农历是**确定的天文历法**，ICU 给出的换算就是准确值，不是「估个大概」。
+     *
+     * 实现上「全年逐日比对月日」，而不是直接构造农历日期：ICU 的 `EXTENDED_YEAR` 等字段语义
+     * 随版本有差异，本地无 Android 运行时无法验证；逐日比对只用已经在用的
+     * `MONTH / DAY_OF_MONTH / IS_LEAP_MONTH`，行为完全确定。全年 365 次取值，调用方按年缓存即可。
+     */
+    fun solarDatesOf(year: Int, targets: Collection<Pair<Int, Int>>): Map<Pair<Int, Int>, LocalDate> {
+        if (targets.isEmpty()) return emptyMap()
+        val wanted = targets.toSet()
+        val found = mutableMapOf<Pair<Int, Int>, LocalDate>()
+        val cc = android.icu.util.ChineseCalendar()
+        val zone = ZoneId.systemDefault()
+        val end = LocalDate.of(year, 12, 31)
+        var d = LocalDate.of(year, 1, 1)
+        while (!d.isAfter(end) && found.size < wanted.size) {
+            cc.timeInMillis = d.atStartOfDay(zone).toInstant().toEpochMilli()
+            val key = (cc.get(Calendar.MONTH) + 1) to cc.get(Calendar.DAY_OF_MONTH)
+            if (key in wanted && cc.get(android.icu.util.ChineseCalendar.IS_LEAP_MONTH) == 0) {
+                found.putIfAbsent(key, d)
+            }
+            d = d.plusDays(1)
+        }
+        return found
+    }
+
     private fun absMonth(month: Int): Int = if (month < 0) -month else month
 }

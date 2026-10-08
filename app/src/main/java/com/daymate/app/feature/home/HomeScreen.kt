@@ -229,13 +229,16 @@ fun HomeScreen(
         runCatching {
             val today = java.time.LocalDate.now()
             val todayF = festivalRepo.todayInfo(today)
-            val nextF = festivalRepo.nextOffDay(today)
+            // 缓存里没有未来条目时用内置固定节日推算（元旦/春节/清明/劳动/端午/中秋/国庆）——
+            // 次年安排一般当年 11 月才公布，国庆后到公布前卡片不该只会说「已全部结束」。
+            val nextF = festivalRepo.nextOffDayOrEstimate(today)
             // 假期总长与剩余：今日放假取今日所在假期段，否则取下一个节日所在假期段；
-            // 剩余只对「今日放假」有意义（预告分支用总长）
+            // 剩余只对「今日放假」有意义（预告分支用总长）。推算出的节日没有官方安排，
+            // 算连休只会得出「休息 1 天」这类误导值，直接不给。
             val todayOff = todayF?.isOffDay == true
             val span = when {
                 todayOff -> festivalRepo.offDaySpanLength(today)
-                nextF != null -> festivalRepo.offDaySpanLength(nextF.date)
+                nextF != null && !nextF.isEstimate -> festivalRepo.offDaySpanLength(nextF.date)
                 else -> 0
             }
             val remaining = if (todayOff) festivalRepo.offDayRemainingLength(today) else span
@@ -262,11 +265,11 @@ fun HomeScreen(
         val fresh = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
             val todayF = festivalRepo.todayInfo(today)
-            val nextF = festivalRepo.nextOffDay(today)
+            val nextF = festivalRepo.nextOffDayOrEstimate(today)
             val todayOff = todayF?.isOffDay == true
             val span = when {
                 todayOff -> festivalRepo.offDaySpanLength(today)
-                nextF != null -> festivalRepo.offDaySpanLength(nextF.date)
+                nextF != null && !nextF.isEstimate -> festivalRepo.offDaySpanLength(nextF.date)
                 else -> 0
             }
             val remaining = if (todayOff) festivalRepo.offDayRemainingLength(today) else span
