@@ -156,6 +156,7 @@
     <string name="settings_year_n">%1$d 年</string>
     <string name="settings_cached">已經快取</string>
     <string name="settings_not_cached">未快取</string>
+    <string name="settings_not_cached_estimate">未快取 · 使用推算值</string>
     <string name="settings_required_tag"> · 必選</string>
     <string name="settings_restored_default">已經還原預設設定</string>
     <string name="settings_repair_done_snapshot">修復完成：已經留低快照 daymate.db.bak，並同步到備份</string>

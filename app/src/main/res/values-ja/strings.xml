@@ -156,6 +156,7 @@
     <string name="settings_year_n">%1$d 年</string>
     <string name="settings_cached">キャッシュ済み</string>
     <string name="settings_not_cached">未キャッシュ</string>
+    <string name="settings_not_cached_estimate">未キャッシュ · 推計値を使用</string>
     <string name="settings_required_tag"> · 必須</string>
     <string name="settings_restored_default">デフォルト設定を復元しました</string>
     <string name="settings_repair_done_snapshot">修復完了: スナップショット daymate.db.bak を保存し、バックアップに同期しました</string>

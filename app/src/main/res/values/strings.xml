@@ -156,6 +156,7 @@
     <string name="settings_year_n">%1$d</string>
     <string name="settings_cached">Cached</string>
     <string name="settings_not_cached">Not cached</string>
+    <string name="settings_not_cached_estimate">Not cached · Using estimate</string>
     <string name="settings_required_tag"> · Required</string>
     <string name="settings_restored_default">Default settings restored</string>
     <string name="settings_repair_done_snapshot">Repair complete: snapshot daymate.db.bak saved and synced to backup</string>

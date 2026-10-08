@@ -1383,10 +1383,24 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     val cached = remember(showFestivalYearsDialog) { festivalRepo.cachedYears().toSet() }
+                    // 系统当前正靠推算值兜底的年份：真实数据查不到时才非空（仅中国源会给出）。
+                    // 该年份那行把「未缓存」写成「未缓存 · 使用推算值」，让用户知道卡片上那颗节日
+                    // 不是官方数据、而是按固定日期推算的（2026-10-08 用户要求）。
+                    val estimateYear = remember(showFestivalYearsDialog) {
+                        runCatching {
+                            festivalRepo.nextOffDayOrEstimate(java.time.LocalDate.now())
+                                ?.takeIf { it.isEstimate }?.date?.year
+                        }.getOrNull()
+                    }
                     years.forEach { y ->
                         val offset = y - thisYear
                         val required = offset == 0
                         val checked = required || offset in festivalOffsetDraft
+                        val statusRes = when {
+                            y in cached -> R.string.settings_cached
+                            y == estimateYear -> R.string.settings_not_cached_estimate
+                            else -> R.string.settings_not_cached
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1405,7 +1419,7 @@ fun SettingsScreen(
                             Text(stringResource(R.string.settings_year_n, y), style = MaterialTheme.typography.bodyLarge)
                             Spacer(Modifier.weight(1f))
                             Text(
-                                (if (y in cached) stringResource(R.string.settings_cached) else stringResource(R.string.settings_not_cached)) +
+                                stringResource(statusRes) +
                                     (if (required) stringResource(R.string.settings_required_tag) else ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline

@@ -156,6 +156,7 @@
     <string name="settings_year_n">%1$d년</string>
     <string name="settings_cached">캐시됨</string>
     <string name="settings_not_cached">캐시 안 됨</string>
+    <string name="settings_not_cached_estimate">캐시 안 됨 · 추산값 사용</string>
     <string name="settings_required_tag"> · 필수</string>
     <string name="settings_restored_default">기본 설정이 복원되었습니다</string>
     <string name="settings_repair_done_snapshot">복원 완료: 스냅샷 daymate.db.bak 저장 및 백업에 동기화됨</string>

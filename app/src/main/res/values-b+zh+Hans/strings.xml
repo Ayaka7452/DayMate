@@ -156,6 +156,7 @@
     <string name="settings_year_n">%1$d 年</string>
     <string name="settings_cached">已缓存</string>
     <string name="settings_not_cached">未缓存</string>
+    <string name="settings_not_cached_estimate">未缓存 · 使用推算值</string>
     <string name="settings_required_tag"> · 必选</string>
     <string name="settings_restored_default">已恢复默认设置</string>
     <string name="settings_repair_done_snapshot">修复完成：已留快照 daymate.db.bak，并同步到备份</string>
