@@ -165,17 +165,48 @@ fun HomeScreen(
     val vaultSet by container.settingsRepository.vaultPasswordSet
         .collectAsState(initial = false)
     // 主页顶部卡片模式：festival（默认）/ event / off
+    // 就近同步预载（同 homeViewMode 模式）：首帧即按用户选定模式渲染，
+    // 否则 event 模式首帧走默认 "festival"、真实值到了再闪切换。
+    val homeTopCardInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.homeTopCard.first()
+            }
+        }.getOrDefault("festival")
+    }
     val homeTopCard by container.settingsRepository.homeTopCard
-        .collectAsState(initial = "festival")
-    // 节日卡片右侧角标 emoji（默认 ☀️）
+        .collectAsState(initial = homeTopCardInit)
+    // 节日卡片右侧角标 emoji（默认 ☀️）：同步预载，改过 emoji 的用户首帧即真值
+    val homeBadgeEmojiInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.homeBadgeEmoji.first()
+            }
+        }.getOrDefault("☀️")
+    }
     val homeBadgeEmoji by container.settingsRepository.homeBadgeEmoji
-        .collectAsState(initial = "☀️")
+        .collectAsState(initial = homeBadgeEmojiInit)
     // 周期管家入口按钮：默认关，需在「周期管家 → 设置 → 隐私与快捷事件」里开启
+    // 同步预载：开了入口的用户首帧就有按钮，不出现「按钮迟一步弹出来」
+    val cycleEntryInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.cycleEntryEnabled.first()
+            }
+        }.getOrDefault(false)
+    }
     val cycleEntryEnabled by container.settingsRepository.cycleEntryEnabled
-        .collectAsState(initial = false)
+        .collectAsState(initial = cycleEntryInit)
     // 日历预览的长按加号入口：默认开；开启后长按 + 号的展开面板中多一枚「日历预览」小按钮
+    val calendarLongPressInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.calendarLongPressEnabled.first()
+            }
+        }.getOrDefault(true)
+    }
     val calendarLongPressEnabled by container.settingsRepository.calendarLongPressEnabled
-        .collectAsState(initial = true)
+        .collectAsState(initial = calendarLongPressInit)
 
     // 云备份指示器：备份位置含云端（both/cloud）且 WebDAV 配置完整时常驻显示
     val cloudEnabled by container.autoBackup.cloudEnabled.collectAsState(initial = false)
@@ -292,8 +323,16 @@ fun HomeScreen(
     // 卡片必须跟着变——早先只在首次组合时读一次，用户得重启 App 才看得到新国家的节日。
     val festivalVersion by festivalRepo.version.collectAsState()
     // 假期天数口径：false=假期中段只显示剩余（默认）/ true=「总长 · 还剩 N 天」
+    // 同步预载：开着「总长」口径的用户首帧即真值，天数文案不跳变
+    val holidaySpanTotalInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.holidaySpanTotal.first()
+            }
+        }.getOrDefault(false)
+    }
     val holidaySpanTotal by container.settingsRepository.holidaySpanTotal
-        .collectAsState(initial = false)
+        .collectAsState(initial = holidaySpanTotalInit)
     LaunchedEffect(festivalVersion, makeupHint) {
         val fresh = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val today = java.time.LocalDate.now()
@@ -355,8 +394,16 @@ fun HomeScreen(
     }
 
     // 搜索数据源：全部未删除事件（含文件夹内的）；结果按剩余天数升序
+    // ⚠️ 该列表同时是「最近倒数日」顶部卡片（homeTopCard="event"）的数据源：
+    // 不预载的话首帧 allEvents 为空 → show==null → 整张卡片不画，Flow 出数后才突然出现。
+    // 就近同步预载（同 listSeed 模式），首帧卡片直接渲染真实最近倒数日。
     val allEventsFlow = remember { container.eventRepository.observeAll() }
-    val allEvents by allEventsFlow.collectAsState(initial = emptyList())
+    val allEventsSeed = remember(allEventsFlow) {
+        runCatching {
+            kotlinx.coroutines.runBlocking { allEventsFlow.first() }
+        }.getOrDefault(emptyList<EventEntity>())
+    }
+    val allEvents by allEventsFlow.collectAsState(initial = allEventsSeed)
     val folderNameById = remember(folders) { folders.associate { it.id to it.name } }
     val searchResults = remember(allEvents, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
