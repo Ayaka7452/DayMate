@@ -414,7 +414,7 @@ fun SettingsScreen(
                 )
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(top = 12.dp, bottom = 8.dp))
             HorizontalDivider()
 
             Text(
@@ -443,7 +443,7 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(top = 8.dp, bottom = 8.dp))
             HorizontalDivider()
 
             // ===== 节日卡片 =====
@@ -502,7 +502,7 @@ fun SettingsScreen(
                 Text(homeBadgeEmoji, style = MaterialTheme.typography.titleLarge)
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(top = 4.dp, bottom = 8.dp))
             HorizontalDivider()
 
             // ===== 日历记事（独立分组：长按加号面板里的入口属于这个功能，不跟节日卡片混在一堆） =====
@@ -536,7 +536,7 @@ fun SettingsScreen(
                 )
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(top = 4.dp, bottom = 8.dp))
             HorizontalDivider()
 
             // ===== 数据备份（主库在内部，所选文件夹仅作备份目标） =====
@@ -592,7 +592,7 @@ fun SettingsScreen(
                 )
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(top = 12.dp, bottom = 8.dp))
             HorizontalDivider()
 
             // ===== 隐私：截图限制 =====
@@ -652,7 +652,7 @@ fun SettingsScreen(
                 )
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(top = 12.dp, bottom = 8.dp))
             HorizontalDivider()
 
             // ===== 节假日数据（在线下载 + 本地缓存，无内置离线数据） =====
@@ -853,13 +853,13 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(top = 4.dp, bottom = 8.dp))
             HorizontalDivider()
 
             // ===== 数据维护（体检 + 无损修复 + 回收碎片，完成后同步各备份点） =====
             DataMaintenanceSection(container = container)
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(bottom = 8.dp))
             HorizontalDivider()
 
             // ===== 检查更新（默认开；关掉后启动时不再发请求，此处仍可手动检查） =====
@@ -933,7 +933,7 @@ fun SettingsScreen(
             }
 
             // ===== 诊断日志（检查更新之下）：全 app 关键操作链路，仅本机，新用户默认关 =====
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(bottom = 8.dp))
             HorizontalDivider()
 
             Text(
@@ -994,7 +994,7 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            Spacer(Modifier.padding(top = 10.dp, bottom = 8.dp))
             HorizontalDivider()
 
             Row(
