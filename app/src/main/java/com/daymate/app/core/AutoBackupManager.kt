@@ -204,7 +204,9 @@ class AutoBackupManager(
                     CloudBackup.upload(internalDb, cloudCfg)
                     // 上传是阻塞调用，期间本协程可能已被新的防抖任务取消：
                     // 此时不能再用这份（可能已过期的）成功结果覆写状态
-                    coroutineContext.ensureActive()
+                    // withLock 的 action 不是 CoroutineScope 接收者，这里要用顶层 coroutineContext
+                    //（kotlin.coroutines 的 suspend 属性），写成 `coroutineContext` 会 Unresolved
+                    kotlin.coroutines.coroutineContext.ensureActive()
                     AppLogger.log("Backup", "云端自动备份完成")
                     _cloudState.value = CloudBackupState.Success(System.currentTimeMillis())
                     // 勾停留片刻后回到常态；期间若又开始新一轮备份则不打扰（届时已是 Syncing）
