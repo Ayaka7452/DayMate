@@ -72,7 +72,7 @@
     <string name="home_folder_delete_note">被刪除資料夾中的事件將移回主空間，僅資料夾本身進入回收筒。</string>
     <string name="home_folder_delete_confirm_desc">資料夾「%1$s」中的事件將移回主空間，僅資料夾本身進入回收筒。</string>
     <string name="home_vault_not_setup">Vault 尚未設定</string>
-    <string name="home_vault_locked">請先解鎖保險箱</string>
+    <string name="home_vault_locked">請先解鎖 Vault</string>
     <string name="home_vault_setup_hint">需先進入 Vault 設定密碼，之後才能移入內容。</string>
     <string name="home_go_settings">去設定</string>
     <string name="home_move_to_vault_title">移入 Vault？</string>
@@ -134,6 +134,7 @@
     <string name="settings_cycle_screenshot_off">已阻止截圖、錄屏與最近任務縮圖。</string>
     <string name="settings_vault_screenshot_section">Vault 允許截圖</string>
     <string name="settings_vault_screenshot_on">已允許截圖與錄屏，解鎖與設密頁仍受限。</string>
+    <string name="settings_vault_screenshot_off">已阻止截圖、錄屏與最近任務縮圖。</string>
     <string name="settings_festival_section">節假日資料</string>
     <string name="settings_festival_desc">由應用從所選資料源下載並快取到本機。跟隨節日與節日角標等功能需要該資料。</string>
     <string name="settings_source_section">資料來源</string>
@@ -323,7 +324,6 @@
     <string name="cycle_reselect_range">重新選擇這次經期的開始與結束日期。</string>
     <string name="cycle_overlap_adjust">與另一條記錄的日期重疊，請調整。</string>
     <string name="cycle_will_change_n">將改為 %1$s，共 %2$d 天</string>
-    <string name="cycle_note_special_optional">備註（特殊情況說明，可選）</string>
     <string name="cycle_value_days_n">%1$d 天</string>
     <string name="cycle_error_empty_password">請輸入密碼</string>
     <string name="cycle_error_wrong_password">密碼錯誤</string>

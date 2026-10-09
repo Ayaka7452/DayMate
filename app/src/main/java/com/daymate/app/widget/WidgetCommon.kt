@@ -199,7 +199,10 @@ object WidgetRenderer {
             return buildListViews(context, appWidgetId, festival) to true
         }
         val picked = pickEvent(events, context, appWidgetId)
-        val model = picked?.let { buildModel(it) }
+        // 跟随节日的假期段序号：假期中显示「假期第 x 天」
+        val holidayDayN = picked?.linkedFestival?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { container.festivalRepository.holidayDayIndexOf(it, LocalDate.now()) }.getOrNull() }
+        val model = picked?.let { buildModel(it, holidayDayN) }
         return buildViews(context, appWidgetId, model, style, picked?.id, festival) to false
     }
 
@@ -216,12 +219,24 @@ object WidgetRenderer {
             ?: events.maxByOrNull { it.targetDateEpochDay }
     }
 
-    private fun buildModel(picked: EventEntity): WidgetModel {
+    private fun buildModel(picked: EventEntity, holidayDayN: Int?): WidgetModel {
         val today = LocalDate.now()
         val diff = (picked.targetDateEpochDay - today.toEpochDay()).toInt()
         val isFuture = diff >= 0
         val dateStr = LocalDate.ofEpochDay(picked.targetDateEpochDay)
             .format(DateTimeFormatter.ofPattern("yyyy/M/d"))
+
+        // 跟随节日的假期段内（与 App 内同口径）：大字显示假期序号，副标题拼「假期第 x 天」
+        // 整句（与事件详情页「假期第 x 天 · 已过 y 天」的结构一致；整句不放大字——
+        // 英文 "Day 3 of the holiday" 太长会溢出）。
+        if (holidayDayN != null) {
+            return WidgetModel(
+                title = picked.title,
+                subtitle = "$dateStr · " + Tr.s(R.string.unit_holiday_day_n, holidayDayN),
+                number = holidayDayN.toString(),
+                unit = Tr.s(R.string.unit_days)
+            )
+        }
 
         // 数字与单位：跟随事件的显示单位（月/年不足 1 时自动退回更小单位）
         var number = abs(diff).toString()

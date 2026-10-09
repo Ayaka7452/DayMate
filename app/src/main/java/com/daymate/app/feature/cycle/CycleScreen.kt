@@ -244,8 +244,8 @@ private fun CycleOverviewScreen(
             return Tr.s(R.string.cycle_warn_overlap)
         }
         // 与任一真实经期记录首日间隔不足 15 天（不重叠）：两次「经期」间隔过短，
-        // 基本不可能是两次独立经期，多为经间期出血。特殊情况记录（带备注的单日标记）不参与判断
-        val tooClose = logs.filter { it.note == null }.firstOrNull {
+        // 基本不可能是两次独立经期，多为经间期出血。特殊情况记录（单日标记，periodDays == 1）不参与判断
+        val tooClose = logs.filter { it.periodDays > 1 }.firstOrNull {
             val gap = kotlin.math.abs(it.startDateEpochDay - day)
             gap in 1 until CycleCalculator.MIN_PERIOD_INTERVAL_DAYS
         }
@@ -271,8 +271,8 @@ private fun CycleOverviewScreen(
     }
 
     val today = LocalDate.now().toEpochDay()
-    // 推算锚点只用真正的经期记录；特殊情况记录（带备注的单日标记）不作为「上次经期」
-    val lastLog = logs.firstOrNull { it.note == null }
+    // 推算锚点只用真正的经期记录；特殊情况记录（单日标记，periodDays == 1）不作为「上次经期」
+    val lastLog = logs.firstOrNull { it.periodDays > 1 }
     val scope = rememberCoroutineScope()
     var showRegister by remember { mutableStateOf(false) }
     var showBackfill by remember { mutableStateOf(false) }
@@ -291,8 +291,8 @@ private fun CycleOverviewScreen(
     var manualCalendar by remember { mutableStateOf<Boolean?>(null) }
     val showCalendar = manualCalendar ?: initialCalendar
     val overdue = lastLog != null && today >= CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
-    // 结束本次经期只对真正的经期记录响应；特殊情况记录（备注标记的单日出血）不参与
-    val activeLog = logs.firstOrNull { it.note == null && it.startDateEpochDay <= today }
+    // 结束本次经期只对真正的经期记录响应；特殊情况记录（单日出血标记）不参与
+    val activeLog = logs.firstOrNull { it.periodDays > 1 && it.startDateEpochDay <= today }
     val activeDiff = activeLog?.let { (today - it.startDateEpochDay + 1).toInt() }
     // 今天恰好是本次经期记录的最后一天（已结束/记录到今天）：阶段显示用「今日结束」而非「月经期」
     val todayIsPeriodEnd =
@@ -1304,8 +1304,8 @@ private fun CycleSettingsScreen(
     var showNeedLog by remember { mutableStateOf(false) }
 
     val today = LocalDate.now().toEpochDay()
-    // 推算锚点只用真正的经期记录；特殊情况记录（带备注的单日标记）不作为「上次经期」
-    val lastLog = logs.firstOrNull { it.note == null }
+    // 推算锚点只用真正的经期记录；特殊情况记录（单日标记，periodDays == 1）不作为「上次经期」
+    val lastLog = logs.firstOrNull { it.periodDays > 1 }
     // 生效参数：自动开启且数据足够时按近 3 次记录均值推算，否则回落到手动设置值
     val cycleDays = container.cycleRepository.effectiveCycleDays(logs, cycleManual, cycleAuto)
     val periodDays = container.cycleRepository.effectivePeriodDays(logs, periodManual, periodAuto)
@@ -1730,7 +1730,7 @@ private fun CycleLogEditDialog(
             OutlinedTextField(
                 value = noteText,
                 onValueChange = { noteText = it.take(50) },
-                label = { Text(stringResource(R.string.cycle_note_special_optional)) },
+                label = { Text(stringResource(R.string.cycle_note_optional_label)) },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2744,7 +2744,7 @@ internal fun CycleDayDetail(
 
     // ===== 经期区间快捷操作（仅周期管家：三个回调都不传时整行不出现）=====
     // 铅笔：选中任一「已登记经期」区间内的一天；垃圾桶：只在首/末日；加号：只在区间外紧挨着的一天。
-    // 一律排除 note != null 的特殊情况记录——那是单日出血标记，不是一段经期。
+    // 一律排除单日特殊情况记录（periodDays == 1）——那是单日出血标记，不是一段经期。
     //
     // ⚠️ **还没到来的日子一律不给这三个图标**（2026-10-07 用户报告）：一条记录的区间会延伸到
     // 今天之后——用户点「继续经期记录」把结束日顺延到明天后，明天的格子仍落在区间内、且正好是
@@ -2752,7 +2752,7 @@ internal fun CycleDayDetail(
     // 也不该替用户预支（想延长就等那天到了再点），所以判定统一以 day <= today 为前提。
     val dayReached = day <= today
     val periodLog = if (dayReached) logs.firstOrNull {
-        it.note == null &&
+        it.periodDays > 1 &&
             day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
     } else null
     val removeIsFirst = periodLog != null && day == periodLog.startDateEpochDay
@@ -2763,7 +2763,7 @@ internal fun CycleDayDetail(
     val canRemoveEdge = periodLog != null && (removeIsFirst || removeIsLast) &&
         periodLog.periodDays - 1 >= CycleCalculator.MIN_PERIOD_DAYS
     val extendLog = if (dayReached) logs.firstOrNull {
-        it.note == null &&
+        it.periodDays > 1 &&
             (day == it.startDateEpochDay - 1 || day == it.startDateEpochDay + it.periodDays)
     } else null
     // 并入后若与另一条记录重叠就不给加（与修订弹窗、CycleLogEditDialog 同一套重叠口径）

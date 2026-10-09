@@ -134,6 +134,7 @@
     <string name="settings_cycle_screenshot_off">スクリーンショット、録画、最近のタスクのサムネイルをブロック。</string>
     <string name="settings_vault_screenshot_section">Vault でのスクリーンショットを許可</string>
     <string name="settings_vault_screenshot_on">スクリーンショットと録画を許可、ロック解除とパスワード設定画面は制限されたまま。</string>
+    <string name="settings_vault_screenshot_off">スクリーンショット、録画、最近のタスクのサムネイルをブロック。</string>
     <string name="settings_festival_section">祝日データ</string>
     <string name="settings_festival_desc">アプリが選択したソースからダウンロードし、端末にキャッシュします。祝日の追跡や祝日バッジなどの機能に必要です。</string>
     <string name="settings_source_section">データソース</string>
@@ -323,7 +324,6 @@
     <string name="cycle_reselect_range">今回の生理の開始日と終了日を再選択。</string>
     <string name="cycle_overlap_adjust">別の記録と日付が重複しています。調整してください。</string>
     <string name="cycle_will_change_n">%1$s に変更します（合計 %2$d 日）</string>
-    <string name="cycle_note_special_optional">備考（特別なケースの説明、任意）</string>
     <string name="cycle_value_days_n">%1$d 日</string>
     <string name="cycle_error_empty_password">パスワードを入力してください</string>
     <string name="cycle_error_wrong_password">パスワードが違います</string>

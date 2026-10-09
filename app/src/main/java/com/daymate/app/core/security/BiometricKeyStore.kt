@@ -24,10 +24,6 @@ object BiometricKeyStore {
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
 
-    /** 是否已托管过会话密钥（否则指纹解锁无法解密，应引导用户改用密码）。 */
-    fun hasWrappedKey(ctx: Context): Boolean =
-        prefs(ctx).getString(PREF_WRAPPED, null) != null
-
     /** 把会话密钥包裹后持久化；成功返回 true（Keystore 不可用时返回 false）。 */
     fun wrap(ctx: Context, rawKey: ByteArray): Boolean {
         val blob = KeystoreWrap.wrap(ALIAS, rawKey) ?: return false

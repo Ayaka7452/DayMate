@@ -638,7 +638,7 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.settings_vault_screenshot_section), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (allowScreenshotVault) stringResource(R.string.settings_vault_screenshot_on) else stringResource(R.string.settings_cycle_screenshot_off),
+                        if (allowScreenshotVault) stringResource(R.string.settings_vault_screenshot_on) else stringResource(R.string.settings_vault_screenshot_off),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )

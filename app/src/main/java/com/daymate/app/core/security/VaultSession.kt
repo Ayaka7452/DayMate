@@ -16,8 +16,6 @@ object VaultSession {
     /** 当前解锁密钥；未解锁为 null。 */
     val key: SecretKey? get() = _key
 
-    val unlocked: Boolean get() = _key != null
-
     fun unlock(key: SecretKey) {
         _key = key
         AppLogger.log("Vault", "Vault 解锁")

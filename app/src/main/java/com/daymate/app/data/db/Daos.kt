@@ -127,9 +127,6 @@ interface VaultEventDao {
     @Query("SELECT * FROM vault_events WHERE repeatRule IS NOT NULL AND targetDateEpochDay < :todayEpochDay")
     suspend fun getRepeatingPast(todayEpochDay: Long): List<VaultEventEntity>
 
-    @Query("SELECT * FROM vault_events")
-    suspend fun getAll(): List<VaultEventEntity>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: VaultEventEntity): Long
 
@@ -164,9 +161,6 @@ interface VaultFolderDao {
     @Query("SELECT * FROM vault_folders WHERE id = :id")
     suspend fun getById(id: Long): VaultFolderEntity?
 
-    @Query("SELECT * FROM vault_folders")
-    suspend fun getAll(): List<VaultFolderEntity>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(folder: VaultFolderEntity): Long
 
@@ -195,9 +189,6 @@ interface CycleLogDao {
     @Query("SELECT * FROM cycle_logs ORDER BY startDateEpochDay DESC")
     suspend fun getAll(): List<CycleLogEntity>
 
-    @Query("SELECT * FROM cycle_logs WHERE id = :id")
-    suspend fun getById(id: Long): CycleLogEntity?
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(log: CycleLogEntity): Long
 
@@ -222,12 +213,6 @@ interface CycleNoteDao {
 
     @Query("SELECT * FROM cycle_notes ORDER BY dateEpochDay DESC, id ASC")
     fun observeAll(): Flow<List<CycleNoteEntity>>
-
-    @Query("SELECT * FROM cycle_notes ORDER BY dateEpochDay DESC, id ASC")
-    suspend fun getAll(): List<CycleNoteEntity>
-
-    @Query("SELECT * FROM cycle_notes WHERE dateEpochDay = :day ORDER BY id ASC")
-    suspend fun getByDay(day: Long): List<CycleNoteEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(note: CycleNoteEntity): Long

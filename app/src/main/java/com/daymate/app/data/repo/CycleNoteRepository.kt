@@ -20,10 +20,6 @@ class CycleNoteRepository(
 
     fun observeAll(): Flow<List<CycleNoteEntity>> = dao.observeAll()
 
-    suspend fun getAll(): List<CycleNoteEntity> = dao.getAll()
-
-    suspend fun getByDay(day: Long): List<CycleNoteEntity> = dao.getByDay(day)
-
     /** 全表行数，供备份的「空数据护栏」判断应用是否真的没数据用（同 [CycleRepository.countAll]）。 */
     suspend fun countAll(): Int = dao.countAll()
 

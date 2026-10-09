@@ -35,7 +35,6 @@ class DbRepair(
 
     /** 单张表的体检数据。 */
     data class TableStat(
-        val table: String,
         /** 面向用户的名称（资源 id；静态 val 里不能取字符串，否则语言会被冻结）。 */
         val labelRes: Int,
         val rows: Long,
@@ -337,7 +336,7 @@ class DbRepair(
 
         val tables = listOf(
             TableStat(
-                "events", R.string.db_t_events,
+                R.string.db_t_events,
                 rows = count(d, "events"),
                 inRecycleBin = count(d, "events WHERE isDeleted = 1"),
                 danglingRefs = count(
@@ -346,13 +345,13 @@ class DbRepair(
                 )
             ),
             TableStat(
-                "folders", R.string.db_t_folders,
+                R.string.db_t_folders,
                 rows = count(d, "folders"),
                 inRecycleBin = count(d, "folders WHERE isDeleted = 1"),
                 danglingRefs = 0
             ),
             TableStat(
-                "vault_events", R.string.db_t_vault_events,
+                R.string.db_t_vault_events,
                 rows = count(d, "vault_events"),
                 inRecycleBin = 0,
                 danglingRefs = count(
@@ -361,9 +360,9 @@ class DbRepair(
                         "AND folderId NOT IN (SELECT id FROM vault_folders)"
                 )
             ),
-            TableStat("vault_folders", R.string.db_t_vault_folders, count(d, "vault_folders"), 0, 0),
-            TableStat("cycle_logs", R.string.db_t_cycle_logs, count(d, "cycle_logs"), 0, 0),
-            TableStat("cycle_notes", R.string.db_t_cycle_notes, count(d, "cycle_notes"), 0, 0)
+            TableStat(R.string.db_t_vault_folders, count(d, "vault_folders"), 0, 0),
+            TableStat(R.string.db_t_cycle_logs, count(d, "cycle_logs"), 0, 0),
+            TableStat(R.string.db_t_cycle_notes, count(d, "cycle_notes"), 0, 0)
         )
 
         var badTs = 0L

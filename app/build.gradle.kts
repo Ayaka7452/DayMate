@@ -26,8 +26,8 @@ android {
         applicationId = "com.ayaka7452.daymate"
         minSdk = 26
         targetSdk = 34
-        versionCode = 166
-        versionName = "1.21.6"
+        versionCode = 167
+        versionName = "1.21.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -75,6 +75,12 @@ android {
         compose = true
         buildConfig = true
     }
+}
+
+// Room schema 快照导出（exportSchema = true）：schema JSON 是迁移排查与
+// Room 校验失败定位的基线，首次构建生成 app/schemas/<version>.json
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

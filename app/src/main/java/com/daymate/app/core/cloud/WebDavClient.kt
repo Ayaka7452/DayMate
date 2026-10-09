@@ -35,8 +35,7 @@ data class WebDavEntry(
     /** 相对 baseUrl 的路径（已解码、无前导/尾随斜杠），例如 `DayMate/daymate.db`。 */
     val path: String,
     val isDirectory: Boolean,
-    val size: Long = 0L,
-    val lastModified: String? = null
+    val size: Long = 0L
 )
 
 /**
@@ -70,7 +69,6 @@ class WebDavClient(private val config: WebDavConfig) {
                 <d:displayname/>
                 <d:resourcetype/>
                 <d:getcontentlength/>
-                <d:getlastmodified/>
               </d:prop>
             </d:propfind>
         """.trimIndent()
@@ -157,10 +155,6 @@ class WebDavClient(private val config: WebDavConfig) {
         if (e.code == 404) null else throw e
     }
 
-    /** 资源是否存在。 */
-    fun exists(path: String, isCollection: Boolean = false): Boolean =
-        statOrNull(path, isCollection) != null
-
     /** 创建集合（目录）。父目录必须已存在；已存在时服务器返回 405，这里静默容忍。 */
     fun mkcol(path: String) {
         try {
@@ -216,15 +210,6 @@ class WebDavClient(private val config: WebDavConfig) {
         } catch (e: Throwable) {
             tmp.delete()
             throw e
-        }
-    }
-
-    /** 删除远程资源；不存在时静默返回。 */
-    fun delete(path: String) {
-        try {
-            perform("DELETE", fullUrl(path, isCollection = false)) { "" }
-        } catch (e: WebDavException) {
-            if (e.code != 404) throw e
         }
     }
 
@@ -320,7 +305,6 @@ class WebDavClient(private val config: WebDavConfig) {
             var href: String? = null
             var isDirectory = false
             var size = 0L
-            var modified: String? = null
             var display: String? = null
             while (event != XmlPullParser.END_DOCUMENT) {
                 when (event) {
@@ -330,7 +314,7 @@ class WebDavClient(private val config: WebDavConfig) {
                         when (name) {
                             "response" -> {
                                 href = null; isDirectory = false
-                                size = 0L; modified = null; display = null
+                                size = 0L; display = null
                             }
                             // 集合标志：<d:resourcetype><d:collection/></d:resourcetype>
                             "collection" -> isDirectory = true
@@ -341,13 +325,12 @@ class WebDavClient(private val config: WebDavConfig) {
                         if (text.isNotEmpty()) when (pendingTag) {
                             "href" -> href = text
                             "getcontentlength" -> size = text.toLongOrNull() ?: 0L
-                            "getlastmodified" -> modified = text
                             "displayname" -> display = text
                         }
                     }
                     XmlPullParser.END_TAG -> {
                         if (localName(parser) == "response") {
-                            href?.let { toEntry(it, isDirectory, size, modified, display)?.let(out::add) }
+                            href?.let { toEntry(it, isDirectory, size, display)?.let(out::add) }
                         }
                         pendingTag = null
                     }
@@ -366,7 +349,6 @@ class WebDavClient(private val config: WebDavConfig) {
         rawHref: String,
         isDirectory: Boolean,
         size: Long,
-        modified: String?,
         display: String?
     ): WebDavEntry? {
         val absUrl = runCatching { URI(resolveLocation(base, rawHref)) }.getOrNull() ?: return null
@@ -379,8 +361,7 @@ class WebDavClient(private val config: WebDavConfig) {
             name = display?.takeIf { it.isNotBlank() } ?: decoded.substringAfterLast('/'),
             path = decoded,
             isDirectory = isDirectory,
-            size = size,
-            lastModified = modified
+            size = size
         )
     }
 

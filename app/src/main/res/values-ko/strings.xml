@@ -134,6 +134,7 @@
     <string name="settings_cycle_screenshot_off">스크린샷, 화면 녹화, 최근 작업 미리보기 차단됨.</string>
     <string name="settings_vault_screenshot_section">Vault 스크린샷 허용</string>
     <string name="settings_vault_screenshot_on">스크린샷 및 화면 녹화 허용, 잠금 해제 및 비밀번호 설정 화면은 제한 유지.</string>
+    <string name="settings_vault_screenshot_off">스크린샷, 화면 녹화, 최근 작업 미리보기 차단됨.</string>
     <string name="settings_festival_section">공휴일 데이터</string>
     <string name="settings_festival_desc">앱이 선택한 소스에서 다운로드하여 기기에 캐시합니다. 명절 추적 및 명절 배지 등의 기능에 필요한 데이터입니다.</string>
     <string name="settings_source_section">데이터 소스</string>
@@ -323,7 +324,6 @@
     <string name="cycle_reselect_range">이번 생리의 시작일과 종료일 다시 선택.</string>
     <string name="cycle_overlap_adjust">다른 기록과 날짜가 겹칩니다. 조정해 주세요.</string>
     <string name="cycle_will_change_n">%1$s(으)로 변경, 총 %2$d일</string>
-    <string name="cycle_note_special_optional">메모(특수 사례 설명, 선택)</string>
     <string name="cycle_value_days_n">%1$d일</string>
     <string name="cycle_error_empty_password">비밀번호를 입력하세요</string>
     <string name="cycle_error_wrong_password">비밀번호가 틀렸습니다</string>

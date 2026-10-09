@@ -669,6 +669,22 @@ class FestivalRepository(private val appContext: Context) {
     private class DataNotPublished : RuntimeException()
 
     private fun download(url: String): String {
+        var lastError: Exception? = null
+        // 网络抖动重试一次；「未发布」(404) 是确定性结果，重试没有意义
+        repeat(2) { attempt ->
+            try {
+                return downloadOnce(url)
+            } catch (e: DataNotPublished) {
+                throw e
+            } catch (e: Exception) {
+                lastError = e
+                if (attempt == 0) runCatching { Thread.sleep(400) }
+            }
+        }
+        throw lastError ?: RuntimeException("download failed")
+    }
+
+    private fun downloadOnce(url: String): String {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 15_000

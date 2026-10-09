@@ -194,25 +194,55 @@ object StorageBackup {
         val uri = sourceUri ?: return false
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return false
         val src = findMainBackup(root) ?: return false
-        for (suffix in SUFFIXES) {
-            val target = File(internalDb.path + suffix)
-            target.parentFile?.mkdirs()
-            if (suffix.isEmpty()) {
-                ctx.contentResolver.openInputStream(src.uri)?.use { input ->
-                    target.outputStream().use { output -> input.copyTo(output) }
-                } ?: return false
-            } else {
-                // -wal / -shm 为可选：存在则复制，不存在则清掉内部残留，让下次打开重建
-                val ext = findSidecar(root, suffix)
-                if (ext != null) {
-                    ctx.contentResolver.openInputStream(ext.uri)?.use { input ->
-                        target.outputStream().use { output -> input.copyTo(output) }
-                    }
-                } else {
-                    target.delete()
+        // 回滚保护：先把当前主库（含 sidecar）快照到 .import_bak——导入中途失败时旧库已被
+        // 部分覆盖，没有快照就还原不回来，应用数据会停在「半新半旧」的不可用状态。
+        // 快照不完整（IO 异常）直接放弃导入，绝不覆盖现有数据。
+        val backupBase = internalDb.path + ".import_bak"
+        val backedUp = mutableSetOf<String>()
+        val snapOk = runCatching {
+            for (suffix in SUFFIXES) {
+                val cur = File(internalDb.path + suffix)
+                if (cur.exists()) {
+                    cur.copyTo(File(backupBase + suffix), overwrite = true)
+                    backedUp.add(suffix)
                 }
             }
+        }.isSuccess
+        if (!snapOk) return false
+        val copied = runCatching {
+            for (suffix in SUFFIXES) {
+                val target = File(internalDb.path + suffix)
+                target.parentFile?.mkdirs()
+                if (suffix.isEmpty()) {
+                    val input = ctx.contentResolver.openInputStream(src.uri)
+                        ?: error("主库输入流不可用")
+                    input.use { ins -> target.outputStream().use { ins.copyTo(it) } }
+                } else {
+                    // -wal / -shm 为可选：存在则复制，不存在则清掉内部残留，让下次打开重建
+                    val ext = findSidecar(root, suffix)
+                    if (ext != null) {
+                        val input = ctx.contentResolver.openInputStream(ext.uri)
+                            ?: error("附属文件输入流不可用")
+                        input.use { ins -> target.outputStream().use { ins.copyTo(it) } }
+                    } else {
+                        target.delete()
+                    }
+                }
+            }
+            true
+        }.getOrDefault(false)
+        if (!copied) {
+            // 还原：快照过的用快照覆盖回去；原本不存在的 sidecar 删掉半截残留
+            for (suffix in SUFFIXES) {
+                val target = File(internalDb.path + suffix)
+                val bak = File(backupBase + suffix)
+                runCatching {
+                    if (suffix in backedUp) bak.copyTo(target, overwrite = true) else target.delete()
+                }
+            }
+            return false
         }
+        for (suffix in SUFFIXES) runCatching { File(backupBase + suffix).delete() }
         return true
     }
 
@@ -272,7 +302,8 @@ object StorageBackup {
         val uri = treeUri ?: return 0
         val root = DocumentFile.fromTreeUri(ctx, uri) ?: return 0
         val src = findMainBackup(root) ?: return 0
-        val tmp = File(ctx.cacheDir, "daymate_probe.db")
+        // 随机后缀：恢复弹窗与自动备份护栏同时探测时不再互踩同一临时文件
+        val tmp = File(ctx.cacheDir, "daymate_probe_" + System.nanoTime() + ".db")
         return try {
             // 主文件复制失败（拿不到流 / IO 异常）→ 返回 -1，绝不按 0 行放行
             var copied = false
@@ -281,19 +312,19 @@ object StorageBackup {
                 copied = true
             }
             if (!copied) {
-                deleteProbeTemps(ctx)
+                deleteProbeTemps(tmp)
                 return -1
             }
             for (suffix in listOf("-wal", "-shm")) {
                 findSidecar(root, suffix)?.let { ext ->
                     ctx.contentResolver.openInputStream(ext.uri)?.use { ins ->
-                        File(ctx.cacheDir, "daymate_probe.db$suffix").outputStream().use { ins.copyTo(it) }
+                        File(tmp.path + suffix).outputStream().use { ins.copyTo(it) }
                     }
                 }
             }
-            countDataRows(tmp).also { deleteProbeTemps(ctx) }
+            countDataRows(tmp).also { deleteProbeTemps(tmp) }
         } catch (_: Throwable) {
-            deleteProbeTemps(ctx)
+            deleteProbeTemps(tmp)
             -1
         }
     }
@@ -325,9 +356,9 @@ object StorageBackup {
         }
     }
 
-    private fun deleteProbeTemps(ctx: Context) {
-        for (name in listOf("daymate_probe.db", "daymate_probe.db-wal", "daymate_probe.db-shm")) {
-            File(ctx.cacheDir, name).delete()
+    private fun deleteProbeTemps(tmp: File) {
+        for (suffix in listOf("", "-wal", "-shm")) {
+            File(tmp.path + suffix).delete()
         }
     }
 }

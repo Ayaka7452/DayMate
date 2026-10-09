@@ -69,7 +69,7 @@ data class CycleLogEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     /** 经期首日（epoch day）。 */
     val startDateEpochDay: Long,
-    /** 该次经期持续天数（2~10 合理区间，登记后可调整）。 */
+    /** 该次经期持续天数（2~10 合理区间，登记后可调整）；=1 为特殊情况单日标记，不参与统计。 */
     val periodDays: Int = 5,
     val note: String? = null,
     val createdAt: Long = System.currentTimeMillis(),

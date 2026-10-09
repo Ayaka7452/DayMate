@@ -27,7 +27,7 @@ class CycleEventBridge(
     suspend fun nextPredictedStart(): Long? {
         val logs = cycleRepository.getAll()
         // 特殊情况记录（带备注的单日出血标记）不参与预测锚定
-        val realLogs = logs.filter { it.note == null }
+        val realLogs = logs.filter { it.periodDays > 1 }
         if (realLogs.isEmpty()) return null
         val lastStart = realLogs.maxOf { it.startDateEpochDay }
         val cycleDays = cycleRepository.effectiveCycleDays(

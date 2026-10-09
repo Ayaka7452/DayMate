@@ -134,6 +134,7 @@
     <string name="settings_cycle_screenshot_off">Screenshots, screen recording, and recent-task thumbnails blocked.</string>
     <string name="settings_vault_screenshot_section">Allow screenshots in Vault</string>
     <string name="settings_vault_screenshot_on">Screenshots and screen recording allowed. Unlock and password setup remain restricted.</string>
+    <string name="settings_vault_screenshot_off">Screenshots, screen recording, and recent-task thumbnails blocked.</string>
     <string name="settings_festival_section">Holiday Data</string>
     <string name="settings_festival_desc">Downloaded by the app from the selected source and cached on this device. Features like festival tracking and festival badges need this data.</string>
     <string name="settings_source_section">Data Source</string>
@@ -323,7 +324,6 @@
     <string name="cycle_reselect_range">Re-select the start and end dates of this period.</string>
     <string name="cycle_overlap_adjust">Overlaps with another record\'s dates. Please adjust.</string>
     <string name="cycle_will_change_n">Will change to %1$s, %2$d days total</string>
-    <string name="cycle_note_special_optional">Note (special case description, optional)</string>
     <string name="cycle_value_days_n">%1$d days</string>
     <string name="cycle_error_empty_password">Please enter your password</string>
     <string name="cycle_error_wrong_password">Wrong password</string>

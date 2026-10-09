@@ -15,7 +15,7 @@ import kotlin.math.abs
 
 /**
  * 2×2 方形小组件「自动」模式的多事件列表数据源：
- * 显示距离今天最近的若干个事件（未到期优先、过去事件按远近混排），点击行直达对应事件详情。
+ * 显示最临近的若干个事件（未到期优先，其次已过期按远近），点击行直达对应事件详情。
  */
 class CountdownWidgetListService : RemoteViewsService() {
 
@@ -57,9 +57,14 @@ class CountdownWidgetListService : RemoteViewsService() {
                 return
             }
             val today = LocalDate.now().toEpochDay()
-            // 按与今天的距离取最近的最多 4 个（自动模式无固定事件概念，全部事件参与）
-            events.sortedBy { abs(it.targetDateEpochDay - today) }
-                .take(4)
+            // 未到期事件优先、各自按与今天的距离取最近的最多 4 个（与 WidgetRenderer.pickEvent
+            // 口径一致；自动模式无固定事件概念，全部事件参与）
+            events.sortedWith(
+                compareBy(
+                    { if (it.targetDateEpochDay >= today) 0 else 1 },
+                    { abs(it.targetDateEpochDay - today) }
+                )
+            ).take(4)
                 .forEach { e ->
                     val diff = (e.targetDateEpochDay - today).toInt()
                     // 跟随节日的假期段内覆盖为「假期第 x 天」（与主页同口径）

@@ -16,7 +16,7 @@ import androidx.room.migration.Migration
         CycleNoteEntity::class
     ],
     version = 11,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class DayMateDatabase : RoomDatabase() {
     abstract fun eventDao(): EventDao
@@ -303,10 +303,17 @@ abstract class DayMateDatabase : RoomDatabase() {
             db.query("PRAGMA table_info($table)").use { c ->
                 while (c.moveToNext()) existing.add(c.getString(1))
             }
-            // 表不存在或结构异常（没有主键列）→ 交给 Room 按当前实体自行建表，不在此处硬造
-            if ("id" !in existing) return
-
             val tmp = "${table}__v9"
+
+            // 旧表结构异常（缺主键列）：数据已无法安全复制，重建空表——
+            // 若保留旧表，迁移后 schema 与实体不匹配，Room 校验会直接崩溃
+            if ("id" !in existing) {
+                db.execSQL(createSql)
+                db.execSQL("DROP TABLE $table")
+                db.execSQL("ALTER TABLE $tmp RENAME TO $table")
+                db.execSQL(indexSql)
+                return
+            }
 
             fun exprFor(col: String): String {
                 if (col == "folderId") {

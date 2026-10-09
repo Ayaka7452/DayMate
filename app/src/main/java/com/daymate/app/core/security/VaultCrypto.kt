@@ -35,16 +35,9 @@ object VaultCrypto {
         return factory.generateSecret(spec).encoded
     }
 
-    /** 密码验证用派生（hex），与旧实现兼容。 */
-    fun hash(password: String, saltHex: String): String = derive(password, saltHex).toHex()
-
-    /** 加密用 AES-256 密钥（与 [hash] 同源派生）。 */
-    fun key(password: String, saltHex: String): SecretKey =
-        SecretKeySpec(derive(password, saltHex), "AES")
-
     /**
      * 一次 PBKDF2 同时得到「验证用 hash」与「加密密钥」。
-     * 设置密码/解锁时两者都要用，各自调 [hash]/[key] 会把 10 万次迭代的派生跑两遍。
+     * 设置密码/解锁时两者都要用，分开派生会把 10 万次迭代的派生跑两遍。
      */
     fun deriveAll(password: String, saltHex: String): Pair<String, SecretKey> {
         val raw = derive(password, saltHex)

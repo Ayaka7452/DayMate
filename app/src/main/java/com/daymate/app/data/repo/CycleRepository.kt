@@ -17,8 +17,6 @@ class CycleRepository(
 
     fun observeAll(): Flow<List<CycleLogEntity>> = dao.observeAll()
 
-    suspend fun getById(id: Long): CycleLogEntity? = dao.getById(id)
-
     suspend fun getAll(): List<CycleLogEntity> = dao.getAll()
 
     /**
@@ -39,16 +37,16 @@ class CycleRepository(
 
     /**
      * 近 3 次实测周期均值（天）+ 实际样本数；不足 2 次记录返回 null。
-     * 特殊情况记录（带备注的单日出血标记）不参与推算，只做日历标记。
+     * 特殊情况记录（单日标记，periodDays == 1）不参与推算，只做日历标记。
      */
     fun cycleAverage(logs: List<CycleLogEntity>): CycleCalculator.Average? =
         CycleCalculator.cycleAverage(
-            logs.filter { it.note == null }.map { it.startDateEpochDay }.sortedDescending()
+            logs.filter { it.periodDays > 1 }.map { it.startDateEpochDay }.sortedDescending()
         )
 
     /** 近 3 次记录的经期持续天数均值（天）+ 实际样本数；不足 2 条记录视为数据不足，返回 null。特殊记录不参与。 */
     fun periodAverage(logs: List<CycleLogEntity>): CycleCalculator.Average? =
-        CycleCalculator.periodAverage(logs.filter { it.note == null }.map { it.periodDays })
+        CycleCalculator.periodAverage(logs.filter { it.periodDays > 1 }.map { it.periodDays })
 
     /**
      * 生效周期天数：自动开启且能算出均值（≥2 条有效记录）时用近 3 次均值，
