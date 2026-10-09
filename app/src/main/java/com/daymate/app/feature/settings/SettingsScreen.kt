@@ -325,7 +325,8 @@ fun SettingsScreen(
                 )
             }
 
-            Spacer(Modifier.padding(vertical = 8.dp))
+            // 语言行自带 bottom 12dp，Spacer 不再加 top：横线上方空白 12dp，与后续分组一致
+            Spacer(Modifier.padding(bottom = 8.dp))
             HorizontalDivider()
 
             // 与「默认排序」「主页顶部卡片」等分区保持同一节奏：分割线后标题留 16dp
