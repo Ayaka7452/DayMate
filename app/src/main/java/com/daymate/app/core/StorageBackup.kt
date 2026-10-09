@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.ayaka7452.daymate.core.log.AppLogger
 import java.io.File
 
 /**
@@ -108,18 +109,27 @@ object StorageBackup {
         if (!src.exists()) return
         synchronized(exportLock) {
             val root = DocumentFile.fromTreeUri(ctx, uri) ?: return
-            // 覆盖前清理：按名字模式删除所有旧备份（含被 SAF 改名的 "(1)/(2)" 变体与旧版 -wal/-shm），
-            // 否则 createFile 会被系统自动改名，越积越多。
-            purgeBackupFiles(root)
-            val target = root.createFile("application/octet-stream", DB_NAME)
-            if (target == null) {
-                purgeBackupFiles(root)
-                return
-            }
-            src.inputStream().use { input ->
-                ctx.contentResolver.openOutputStream(target.uri)?.use { output ->
-                    input.copyTo(output)
+            // 不再「先 purge 旧备份、再写新的」：写入途中失败/被中断（IO 错误、SAF 提供方断开、
+            // 存储满、进程被杀）时旧备份已经删掉了，只剩一份半截新文件——等于「备份被自己的
+            // 备份操作弄丢」。改为先写、写完校验通过再清理其余残留；写坏就把这份删掉，
+            // 旧备份原样保留（createFile 通常已把它改名成 "(1)"，purge 不会误删）。
+            val target = root.createFile("application/octet-stream", DB_NAME) ?: return
+            val written = try {
+                val out = ctx.contentResolver.openOutputStream(target.uri)
+                if (out == null) {
+                    false
+                } else {
+                    src.inputStream().use { input -> out.use { output -> input.copyTo(output) } }
+                    isFileReadableSqlite(ctx, target.uri)
                 }
+            } catch (e: Exception) {
+                AppLogger.log(ctx, "Backup", "导出失败：${e.message}")
+                false
+            }
+            if (!written) {
+                AppLogger.log(ctx, "Backup", "导出校验未通过，保留旧备份")
+                runCatching { root.delete(target) }
+                return
             }
             // 写入后再清一次：若本次 createFile 仍被改名（说明旧文件确实删不掉），
             // 就保留刚写入的这份、把其它同名残留清掉，尽量只留一份备份。

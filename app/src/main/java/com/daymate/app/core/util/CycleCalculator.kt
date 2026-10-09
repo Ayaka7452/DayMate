@@ -208,8 +208,11 @@ object CycleCalculator {
         for ((s, pd) in logsDesc) {
             if (epochDay in periodRange(s, pd)) return Phase.PERIOD
         }
-        // 锚点 = 最后一个不晚于目标日的记录。目标日已 ≥ 最早记录，故必然存在（兜底走最早一条）。
-        val anchor = logsDesc.lastOrNull { it.first <= epochDay } ?: logsDesc.last()
+        // 锚点 = **最晚**一条不晚于目标日的记录。logsDesc 按首日**降序**（DAO `ORDER BY startDateEpochDay DESC`），
+        // 所以必须用 `firstOrNull`——取降序里第一个命中的才是「最近的那条」。
+        // 早先误写成 `lastOrNull`，取到的是**最早**一条：锚点整体前移，后续 `while` 推进出的预测周期
+        // 跟着偏，周期不规律时越往后偏得越多（等距周期时两者恰好相同，所以长期没被发现）。
+        val anchor = logsDesc.firstOrNull { it.first <= epochDay } ?: logsDesc.last()
         var anchorStart = anchor.first
         val anchorPd = anchor.second
         while (anchorStart + cycleDays <= epochDay) anchorStart += cycleDays

@@ -123,7 +123,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.TextStyle
-import java.util.Locale
 
 /**
  * 周期管家：
@@ -835,7 +834,9 @@ private fun CycleOverviewScreen(
                 Column {
                     // 三种 reason 文案结尾并不统一（「日期重叠」无句号，另两种自带句号），
                     // 直接拼接会产出「。。」——统一去掉结尾句号后由此处补一个
-                    Text(pending.reason.trimEnd('。') + stringResource(R.string.cycle_special_note_suffix))
+                    // 六语言 reason 的句末标点各不相同（中文日文用「。」，英文韩文用「.」），
+                    // 只 trim 中文句号会让英文/韩文界面拼出「..」双句点——suffix 本身已带句号或分隔符
+                    Text(pending.reason.trimEnd('。', '.', '！', '!', '？', '?', ' ') + stringResource(R.string.cycle_special_note_suffix))
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = noteText,
@@ -2068,7 +2069,7 @@ private fun CycleHistoryScreen(
                                     )
                                     Text(
                                         LocalDate.ofEpochDay(day).dayOfWeek
-                                            .getDisplayName(TextStyle.FULL, Locale.CHINA),
+                                            .getDisplayName(TextStyle.FULL, LocaleWrap.locale()),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                     )
@@ -2251,7 +2252,9 @@ private fun CycleCalendarMonth(
     // 取 onSurface 5%，与日历记事的「常态格子」同一口径，两个视图观感一致。
     val noDataBg = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
 
-    val logEntries = logs.map { it.startDateEpochDay to it.periodDays }
+    // 与下面 loggedDays / noteDays 同款要 remember：这份 list 会喂给网格里 42 个格子的
+    // phaseOfAnyDay（内部还有 minOf + 两趟线性扫描），每次重组重建等于把开销放大 42 倍
+    val logEntries = remember(logs) { logs.map { it.startDateEpochDay to it.periodDays } }
     val loggedDays = remember(logs) {
         val set = mutableSetOf<Long>()
         logs.forEach { set.addAll(CycleCalculator.periodRange(it.startDateEpochDay, it.periodDays)) }
@@ -2520,8 +2523,9 @@ internal fun describeDay(
     }
 
     // 锚点推进：与 phaseOfAnyDay 同款，保证 nextStart 恒晚于 day。
-    // 目标日已 ≥ 最早记录，故锚点必然存在（兜底取最早一条）。
-    val anchorLog = logs.lastOrNull { it.startDateEpochDay <= day } ?: logs.last()
+    // logs 降序（DAO ORDER BY startDateEpochDay DESC），取「最晚一条不晚于 day」要用 firstOrNull；
+    // 早先写成 lastOrNull 取到的是最早一条，两处口径必须一起改，否则详情与网格会打架。
+    val anchorLog = logs.firstOrNull { it.startDateEpochDay <= day } ?: logs.last()
     var anchorStart = anchorLog.startDateEpochDay
     val anchorPd = anchorLog.periodDays
     while (anchorStart + cycleDays <= day) anchorStart += cycleDays

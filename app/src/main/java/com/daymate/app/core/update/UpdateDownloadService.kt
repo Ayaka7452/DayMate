@@ -29,6 +29,7 @@ import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 下载新版本 APK，并在通知栏显示进度；下载完成后直接拉起系统安装界面。
@@ -112,6 +113,15 @@ class UpdateDownloadService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /**
+     * 是否有下载正在进行。
+     *
+     * 原注释说「重复调用（用户连点）由 START_NOT_STICKY + 单实例服务天然合并」——**这个前提不成立**：
+     * START_NOT_STICKY 只管「进程被杀后要不要重启」，连点两次更新会走两次 `onStartCommand`、
+     * 起两个协程同时 `FileOutputStream` 写同一个 `$name.part`，结果是一个损坏的 APK。
+     */
+    private val downloading = AtomicBoolean(false)
+
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -130,13 +140,22 @@ class UpdateDownloadService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        // 已有下载在进行中：复用进行中的任务，不再起第二个协程去抢同一个 .part 文件
+        if (!downloading.compareAndSet(false, true)) return START_NOT_STICKY
 
         ensureChannel(this)
         AppLogger.log(this, "Update", "开始下载新版本 v$version")
         // 必须在 5 秒内进入前台，否则系统抛 ANR/崩溃；先挂一条 0% 的通知上去
         startForegroundCompat(buildProgressNotification(0, 0L, 0L, version))
 
-        scope.launch { download(url, name, version) }
+        scope.launch {
+            try {
+                download(url, name, version)
+            } finally {
+                // 无论成功、失败还是被取消都要放开标记，否则一次异常就卡住后续下载
+                downloading.set(false)
+            }
+        }
         // 不重启：进程被杀后留着半截文件没有意义，下次点更新会重新下载
         return START_NOT_STICKY
     }
@@ -255,7 +274,9 @@ class UpdateDownloadService : Service() {
             .setOnlyAlertOnce(true)
             .build()
         notify(notif)
-        stopForegroundCompat()
+        // 与 done() 同款用 DETACH：走 stopForegroundCompat() 是 STOP_FOREGROUND_REMOVE + cancel(NOTIF_ID)，
+        // 会把上面刚发的「下载失败」通知立刻撤掉，用户永远看不到失败原因。
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
         stopSelf()
     }
 
@@ -308,8 +329,7 @@ class UpdateDownloadService : Service() {
         }
     }
 
-    private fun stopForegroundCompat() {
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        runCatching { NotificationManagerCompat.from(this).cancel(NOTIF_ID) }
-    }
+    // 注：原先这里有个 stopForegroundCompat()（STOP_FOREGROUND_REMOVE + cancel(NOTIF_ID)），
+    // 唯一调用者是 fail()——正是它把刚发出的「下载失败」通知立刻撤掉。fail() 改用 DETACH 后
+    // 该方法已无调用者，连同它的语义一起移除，别再引回来。
 }

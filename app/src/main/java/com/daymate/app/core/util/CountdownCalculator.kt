@@ -4,6 +4,7 @@ import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
 import java.time.Period
+import java.time.temporal.ChronoUnit
 
 object CountdownCalculator {
 
@@ -37,9 +38,16 @@ object CountdownCalculator {
         var date = LocalDate.ofEpochDay(targetEpochDay)
         if (date >= today) return null
         when (rule) {
-            REPEAT_WEEKLY -> while (date < today) date = date.plusWeeks(1)
-            REPEAT_MONTHLY -> while (date < today) date = date.plusMonths(1)
-            REPEAT_YEARLY -> while (date < today) date = date.plusYears(1)
+            REPEAT_WEEKLY -> date = date.plusWeeks(ChronoUnit.WEEKS.between(date, today))
+                .let { if (it < today) it.plusWeeks(1) else it }
+            // MONTHLY / YEARLY 必须「把原始日号搬到 today 所在的那个月/年」，而不是逐个周期累加：
+            // 累加会**永久漂移**（1/31 → 2/29 → 3/29 → 4/29…再也回不到 31 号），
+            // 而本文件的类注释承诺的是「锚定同一日号，取不到就落到月末」。
+            // `withMonth` / `withYear` 自带 clamp 到目标月末/2月28日，一次到位。
+            REPEAT_MONTHLY -> date = date.withYear(today.year).withMonth(today.month)
+                .let { if (it < today) it.plusMonths(1) else it }
+            REPEAT_YEARLY -> date = date.withYear(today.year)
+                .let { if (it < today) it.plusYears(1) else it }
             else -> return null
         }
         return date
