@@ -132,7 +132,13 @@ private data class FestivalInit(
     val today: com.ayaka7452.daymate.data.festival.FestivalDay?,
     val next: com.ayaka7452.daymate.data.festival.FestivalDay?,
     val spanDays: Int,
-    val spanRemaining: Int
+    val spanRemaining: Int,
+    /**
+     * 「明日补班预告」条目（今天不是节日、明天是调休上班日才非空）。
+     * 必须和其余字段一起进首帧预载：它原先是唯一「首帧恒为 null」的状态，
+     * 状态条因此会先不画、下一帧再突然冒出来（v1.21.2 修的闪现）。
+     */
+    val tomorrowMakeup: com.ayaka7452.daymate.data.festival.FestivalDay?
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -221,11 +227,24 @@ fun HomeScreen(
 
     // 节假日数据（在线下载 + 本地缓存）：主页顶部节日卡片 + 底部状态条
     val festivalRepo = remember { container.festivalRepository }
+    // 「明日补班预告」开关：DataStore 异步读盘期间 collectAsState 的 initial 只能是写死值，
+    // 这里同步预载一次真实偏好（DataStore 已被主题读取预热，走内存缓存），
+    // 否则关掉开关的用户会看到预告先闪一下再消失。与 homeViewMode / gridSpacing 同一写法。
+    val makeupHintInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.makeupHintEnabled.first()
+            }
+        }.getOrDefault(true)
+    }
+    // 休息及补班提醒开关（默认开）：设置里可关（非补班数据源整组隐藏），关掉后状态条不再预告
+    val makeupHint by container.settingsRepository.makeupHintEnabled
+        .collectAsState(initial = makeupHintInit)
     // 冷启动同步预载节日状态：此前 hasData 占位为 false，首帧会先画一帧
     // 「节日数据未下载」提示、下一拍才换成正常卡片（用户看到的冷启动闪烁就是它）。
     // 缓存查询只是读本地小 JSON 文件，首次组合时同步读一次开销极小，
     // 换来首帧直接是正确的节日卡片，无中间态。
-    val festivalInit = remember(festivalRepo) {
+    val festivalInit = remember(festivalRepo, makeupHintInit) {
         runCatching {
             val today = java.time.LocalDate.now()
             val todayF = festivalRepo.todayInfo(today)
@@ -242,8 +261,15 @@ fun HomeScreen(
                 else -> 0
             }
             val remaining = if (todayOff) festivalRepo.offDayRemainingLength(today) else span
-            FestivalInit(festivalRepo.hasData(), todayF, nextF, span, remaining)
-        }.getOrDefault(FestivalInit(false, null, null, 0, 0))
+            // 明日补班预告一并同步算出来：它原先是唯一「首帧恒 null」的字段 ——
+            // 「明天补班」那条状态条因此会先不画、LaunchedEffect 跑完才突然冒出来
+            // （用户 2026-10-09 报告的闪现：今天普通工作日 + 明天国庆调休补班日，必现）。
+            // 开关关闭时首帧同样不给预告，两个方向都不闪。
+            val tmrMakeup = if (makeupHintInit && todayF == null) {
+                festivalRepo.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
+            } else null
+            FestivalInit(festivalRepo.hasData(), todayF, nextF, span, remaining, tmrMakeup)
+        }.getOrDefault(FestivalInit(false, null, null, 0, 0, null))
     }
     var festivalHasData by remember { mutableStateOf(festivalInit.hasData) }
     var todayFestival by remember { mutableStateOf(festivalInit.today) }
@@ -252,12 +278,12 @@ fun HomeScreen(
     // 假期剩余天数（含今天）：假期中段「还剩 X 天」/ 最后一天「假期余额不足」用
     var festivalSpanRemaining by remember { mutableStateOf(festivalInit.spanRemaining) }
     // 明日补班预告：仅当今天不是节日、明天是调休上班日时非空（卡片状态条「班」+「明日」句式）
-    var tomorrowMakeup by remember { mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(null) }
+    var tomorrowMakeup by remember {
+        mutableStateOf<com.ayaka7452.daymate.data.festival.FestivalDay?>(festivalInit.tomorrowMakeup)
+    }
     // 以「节日数据版本号」为 key 重读，而不是 Unit：换数据源或下载完成后数据变了，
     // 卡片必须跟着变——早先只在首次组合时读一次，用户得重启 App 才看得到新国家的节日。
     val festivalVersion by festivalRepo.version.collectAsState()
-    // 休息及补班提醒开关（默认开）：设置里可关（非补班数据源整组隐藏），关掉后状态条不再预告
-    val makeupHint by container.settingsRepository.makeupHintEnabled.collectAsState(initial = true)
     // 假期天数口径：false=假期中段只显示剩余（默认）/ true=「总长 · 还剩 N 天」
     val holidaySpanTotal by container.settingsRepository.holidaySpanTotal
         .collectAsState(initial = false)
@@ -273,20 +299,19 @@ fun HomeScreen(
                 else -> 0
             }
             val remaining = if (todayOff) festivalRepo.offDayRemainingLength(today) else span
-            FestivalInit(festivalRepo.hasData(), todayF, nextF, span, remaining)
+            // 明日补班预告：今日本身是节日（无论休/班）就不预告明天，避免状态条叠报；开关关闭同样不预告。
+            // 口径与首帧预载完全一致（都用已取到的 todayF，不再重复查一次今天）
+            val tmrMakeup = if (makeupHint && todayF == null) {
+                festivalRepo.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
+            } else null
+            FestivalInit(festivalRepo.hasData(), todayF, nextF, span, remaining, tmrMakeup)
         }
         festivalHasData = fresh.hasData
         todayFestival = fresh.today
         nextFestival = fresh.next
         festivalSpanDays = fresh.spanDays
         festivalSpanRemaining = fresh.spanRemaining
-        tomorrowMakeup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val today = java.time.LocalDate.now()
-            // 今日本身是节日（无论休/班）就不预告明天，避免状态条叠报；开关关闭同样不预告
-            if (makeupHint && festivalRepo.todayInfo(today) == null) {
-                festivalRepo.todayInfo(today.plusDays(1))?.takeIf { !it.isOffDay }
-            } else null
-        }
+        tomorrowMakeup = fresh.tomorrowMakeup
     }
 
     // 排序模式：remaining_asc/remaining_desc/manual（manual 才允许手动调整顺序）
