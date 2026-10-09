@@ -308,7 +308,8 @@ private fun CycleOverviewScreen(
     var selectedDay by remember { mutableStateOf<Long?>(null) }
     // 详情区是否展开：点了「收起」就整体隐去（选中与未选中都能收）。
     // 与 selectedDay 解耦——收起只影响显示，不抹掉「正在看哪天」的选中态。
-    var detailExpanded by remember { mutableStateOf(true) }
+    // 默认收起：进页面不自动摊开某天详情，等用户点日历某天才展开（2026-10-09 用户要求）。
+    var detailExpanded by remember { mutableStateOf(false) }
     // 收起动画期间 detailExpanded 已置 false，用「最后一次看的日期」兜底渲染详情内容——
     // 否则内容会先跳成今天的资料、再随卡片一起滑走，看起来像闪了一下。
     // 只在点击回调里更新（不在组合期写状态），保持单向数据流。
@@ -536,6 +537,18 @@ private fun CycleOverviewScreen(
             // ===== 操作按钮：2×2 网格，上排「结束 / 开始」对称，下排「修订 / 补记」 =====
             // 经期进行中（今天未到记录结束日）：「结束本次经期」可点，「开始新经期」置灰；
             // 已到/已过结束日：结束侧置灰（经期已结束），开始侧恢复可点——两个主按钮恰好一活一灰
+            // 整体包一层浅背景卡片，与下方「选中日详情」同款框体，避免四个按钮裸露平铺显得突兀
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
             if (lastLog != null) {
                 val endDay = activeLog?.let { it.startDateEpochDay + it.periodDays - 1 }
                 val ongoing = endDay != null && today < endDay
@@ -635,6 +648,9 @@ private fun CycleOverviewScreen(
                     ) { Text(stringResource(R.string.cycle_backfill_history_period)) }
                 }
             }
+
+                } // 关闭操作按钮 Column
+            } // 关闭操作按钮 Card
 
             Spacer(Modifier.height(16.dp))
 
