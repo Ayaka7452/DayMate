@@ -72,6 +72,7 @@
     <string name="home_folder_delete_note">被删除文件夹中的事件将移回主空间，仅文件夹本身进入回收站。</string>
     <string name="home_folder_delete_confirm_desc">文件夹「%1$s」中的事件将移回主空间，仅文件夹本身进入回收站。</string>
     <string name="home_vault_not_setup">Vault 尚未设置</string>
+    <string name="home_vault_locked">请先解锁保险箱</string>
     <string name="home_vault_setup_hint">需先进入 Vault 设置密码，之后才能移入内容。</string>
     <string name="home_go_settings">去设置</string>
     <string name="home_move_to_vault_title">移入 Vault？</string>

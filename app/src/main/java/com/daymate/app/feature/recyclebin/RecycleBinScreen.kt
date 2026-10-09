@@ -66,7 +66,10 @@ fun RecycleBinScreen(
     val query = searchQuery.trim()
     val shownFolders = remember(binFolders, query) {
         if (query.isEmpty()) binFolders
-        else binFolders.filter { it.name.lowercase().contains(query.lowercase()) }
+        else {
+            val ql = query.lowercase()
+            binFolders.filter { it.name.lowercase().contains(ql) }
+        }
     }
     val shownEvents = remember(binEvents, query) {
         if (query.isEmpty()) binEvents
@@ -74,6 +77,32 @@ fun RecycleBinScreen(
     }
 
     val hasItems = binEvents.isNotEmpty() || binFolders.isNotEmpty()
+
+    /**
+     * 恢复文件夹：只把「随该文件夹一起进回收站」的事件一并复活。
+     *
+     * 为什么不能直接调 `restoreByFolders(folderIds)`：那条 SQL 是
+     * `UPDATE events SET isDeleted=0, deletedAt=0 WHERE folderId IN (...)`，**不带 isDeleted 过滤**。
+     * 而删除文件夹走的是 `unparentByFolders`（`UPDATE events SET folderId=NULL WHERE ... AND isDeleted=0`），
+     * 它只把**当时还活着**的事件解除归属、留在主空间，已软删的事件保持 folderId 不变、继续躺在回收站。
+     * 于是只剩「先前被单独删掉、且恰好还在这个文件夹里」的事件匹配上 `folderId IN (...)`，
+     * 恢复文件夹会把它们静默复活——等于丢弃用户的删除意图。
+     *
+     * 判据用文件夹自己的 deletedAt：删除文件夹那一刻，其内仍存活的事件 deletedAt 会**晚于或等于**
+     * 先前被单独删除的那些（后者写入的是更早的时刻）。这里在内存里按同一口径挑出子事件 id，
+     * 再走 [EventRepository.restoreByIds] 精确恢复，不动 DAO/仓储。
+     */
+    fun restoreFolder(folderId: Long, folderDeletedAt: Long) {
+        scope.launch {
+            val childIds = binEvents
+                .filter { it.folderId == folderId && it.deletedAt >= folderDeletedAt }
+                .map { it.id }
+            if (childIds.isNotEmpty()) {
+                container.eventRepository.restoreByIds(childIds)
+            }
+            container.folderRepository.restoreByIds(listOf(folderId))
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -154,12 +183,7 @@ fun RecycleBinScreen(
                             BinRow(
                                 title = "${folder.icon ?: "📁"}  ${folder.name}",
                                 subtitle = Tr.s(R.string.common_folder),
-                                onRestore = {
-                                    scope.launch {
-                                        container.eventRepository.restoreByFolders(listOf(folder.id))
-                                        container.folderRepository.restoreByIds(listOf(folder.id))
-                                    }
-                                },
+                                onRestore = { restoreFolder(folder.id, folder.deletedAt) },
                                 onDelete = { confirmTarget = BinTarget(folder.id, "folder") }
                             )
                         }
@@ -189,10 +213,17 @@ fun RecycleBinScreen(
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
-                        container.eventRepository.deleteByIds(binEvents.map { it.id })
-                        binFolders.forEach {
-                            container.eventRepository.hardDeleteEventsByFolders(listOf(it.id))
-                            container.folderRepository.deleteByIds(listOf(it.id))
+                        // 先删回收站里的事件（只删 isDeleted=1，删完下面按文件夹硬删时已不会重复命中它们），
+                        // 再按文件夹整批硬删子事件 + 删文件夹行：各一次批量调用，
+                        // 此前逐个文件夹循环会每次都触发一次刷新发射（N+1）。
+                        val eventIds = binEvents.map { it.id }
+                        if (eventIds.isNotEmpty()) {
+                            container.eventRepository.deleteByIds(eventIds)
+                        }
+                        val folderIds = binFolders.map { it.id }
+                        if (folderIds.isNotEmpty()) {
+                            container.eventRepository.hardDeleteEventsByFolders(folderIds)
+                            container.folderRepository.deleteByIds(folderIds)
                         }
                     }
                     clearConfirm = false

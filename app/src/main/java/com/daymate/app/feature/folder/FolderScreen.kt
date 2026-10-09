@@ -353,7 +353,9 @@ fun FolderScreen(
                                     )
                                 }
                             },
-                            onReorder = { action -> moveEvent(event, action) },
+                            // 非手动排序时重排项无意义（moveEvent 内部也会直接返回），不展示菜单入口，
+                            // 与 VaultScreen / HomeScreen 的 onReorder = if (manualSort) ... else null 对齐
+                            onReorder = if (manualSort) ({ action -> moveEvent(event, action) }) else null,
                             dragHandle = handle
                         )
                     }
@@ -388,8 +390,17 @@ fun FolderScreen(
                 }
             },
             onDelete = {
+                // 与本页「移到回收站」入口（showFolderDeleteConfirm）走同一套软删：
+                // 此前这里调 folderRepository.delete()（@Delete → DELETE FROM folders），
+                // 同一个「删除文件夹」概念存在不可撤销与可撤销两套实现。
                 scope.launch {
-                    folder?.let { container.folderRepository.delete(it) }
+                    folder?.let {
+                        container.eventRepository.unparentByFolders(listOf(it.id))
+                        container.folderRepository.softDeleteByIds(
+                            listOf(it.id),
+                            System.currentTimeMillis()
+                        )
+                    }
                     onBack()
                 }
             }

@@ -96,6 +96,7 @@ import androidx.compose.ui.unit.sp
 import com.ayaka7452.daymate.Routes
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.CloudBackupState
+import com.ayaka7452.daymate.core.security.VaultSession
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
@@ -220,6 +221,12 @@ fun HomeScreen(
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // v1.21.5：VaultBridge 已在未解锁时拒绝搬运（未解锁 encrypt 会把**明文**写进 Vault 表）。
+    // 入口这里拦一道并给可读提示，否则用户点完确认才发现没反应。
+    val vaultReady = VaultSession.key != null
+    fun toastVaultLocked() =
+        Toast.makeText(context, Tr.s(R.string.home_vault_locked), Toast.LENGTH_SHORT).show()
 
     // 检查更新：冷启动按节流规则查一次（24h 内不重复查、点过「稍后」的版本不再弹）。
     // 整条链路（弹窗 → 通知权限 → 下载服务）都收在 UpdateHost 里，这里只挂一行。
@@ -498,7 +505,11 @@ fun HomeScreen(
                             TextButton(onClick = { showMoveDialog = true }) { Text(stringResource(R.string.home_move_into_folder)) }
                         }
                         TextButton(
-                            onClick = { if (vaultSet) vaultConfirmBatch = true else vaultNeedSetup = true },
+                            onClick = {
+                                if (!vaultSet) vaultNeedSetup = true
+                                else if (!vaultReady) toastVaultLocked()
+                                else vaultConfirmBatch = true
+                            },
                             enabled = totalSelected > 0
                         ) { Text(stringResource(R.string.home_move_to_vault)) }
                         TextButton(
@@ -801,7 +812,7 @@ fun HomeScreen(
                                     else onNavigate("event_detail?eventId=${event.id}")
                                 },
                                 onMoveToVault = {
-                                    if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
+                                    if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
                                 },
                                 onMoveToFolder = { singleMoveEventId = event.id },
                                 onMoveToRecycleBin = {
@@ -966,7 +977,7 @@ fun HomeScreen(
                                 else onNavigate("event_detail?eventId=${event.id}")
                             },
                             onMoveToVault = {
-                                if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
+                                if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
                             },
                             onMoveToFolder = { singleMoveEventId = event.id },
                             onMoveToRecycleBin = {
@@ -1042,7 +1053,7 @@ fun HomeScreen(
                                 else onNavigate("event_detail?eventId=${event.id}")
                             },
                             onMoveToVault = {
-                                if (vaultSet) vaultConfirmEventId = event.id else vaultNeedSetup = true
+                                if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
                             },
                             onMoveToFolder = { singleMoveEventId = event.id },
                             onMoveToRecycleBin = {

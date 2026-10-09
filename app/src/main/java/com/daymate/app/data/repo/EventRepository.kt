@@ -83,11 +83,11 @@ class EventRepository(
             onChanged(); refreshSignal.tryEmit(Unit)
         }
 
-    suspend fun restoreByFolders(folderIds: List<Long>) =
-        dao.restoreByFolders(folderIds).also {
-            AppLogger.log("Data", "恢复文件夹事件 folderIds=$folderIds")
-            onChanged(); refreshSignal.tryEmit(Unit)
-        }
+    // 原先这里有 restoreByFolders(folderIds)：SQL 是 `UPDATE events SET isDeleted=0, deletedAt=0
+    // WHERE folderId IN (...)`，**没有 isDeleted 过滤**。而删文件夹走的是 [unparentByFolders]——
+    // 它只把存活事件的 folderId 置 NULL、**根本不软删**。于是删完文件夹后回收站里该文件夹下
+    // 恰恰只剩「先前被单独删除」的事件，恢复文件夹会把它们百分百复活（静默丢失删除意图）。
+    // 回收站改为按 deletedAt 判据挑 id 后走 [restoreByIds]，本方法与 DAO 里的同名查询一并删除。
 
     suspend fun moveToFolder(ids: List<Long>, folderId: Long?) =
         dao.moveToFolder(ids, folderId).also {

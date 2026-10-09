@@ -72,6 +72,7 @@
     <string name="home_folder_delete_note">刪咗嘅資料夾入面嘅事件會移返去主空間，得資料夾本身入回收筒。</string>
     <string name="home_folder_delete_confirm_desc">資料夾「%1$s」入面嘅事件會移返去主空間，得資料夾本身入回收筒。</string>
     <string name="home_vault_not_setup">Vault 仲未設定</string>
+    <string name="home_vault_locked">請先解鎖保險箱</string>
     <string name="home_vault_setup_hint">要先入 Vault 設定密碼，之後先可以移入內容。</string>
     <string name="home_go_settings">去設定</string>
     <string name="home_move_to_vault_title">移入 Vault？</string>

@@ -436,6 +436,9 @@ private fun VaultListScreen(
     val defaultSort by container.settingsRepository.defaultSort
         .collectAsState(initial = SortModes.REMAINING_ASC)
     val manualSort = defaultSort == SortModes.MANUAL
+    // 设置里的「假期天数口径」，透传给事件预览（与主空间 EventDetailScreen 同一开关）
+    val holidaySpanTotal by container.settingsRepository.holidaySpanTotal
+        .collectAsState(initial = false)
 
     // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
     val displayEvents = remember(eventList.toList(), defaultSort) {
@@ -661,7 +664,9 @@ private fun VaultListScreen(
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
-                        val handleModifier = if (!selectionMode && manualSort) {
+                        // 与下方事件行、HomeScreen、FolderScreen 同一口径：多选态下才给拖拽手柄。
+                        // 此前写成 !selectionMode，导致文件夹与事件的拖拽手柄互斥。
+                        val handleModifier = if (selectionMode && manualSort) {
                             Modifier.draggableHandle(
                                 onDragStarted = { isDragging = true },
                                 onDragStopped = {
@@ -746,6 +751,7 @@ private fun VaultListScreen(
             event = ev,
             folderLabel = ev.folderId?.let { vaultFolderNameById[it] },
             festivalRepo = container.festivalRepository,
+            showSpanTotal = holidaySpanTotal,
             onDismiss = { previewEvent = null },
             onEdit = {
                 previewEvent = null
@@ -934,6 +940,9 @@ fun VaultFolderScreen(
     val defaultSort by container.settingsRepository.defaultSort
         .collectAsState(initial = SortModes.REMAINING_ASC)
     val manualSort = defaultSort == SortModes.MANUAL
+    // 设置里的「假期天数口径」，透传给事件预览（与主空间 EventDetailScreen 同一开关）
+    val holidaySpanTotal by container.settingsRepository.holidaySpanTotal
+        .collectAsState(initial = false)
 
     // 拖拽排序用的可变镜像列表（拖拽中不同步，避免跳动）
     var isDraggingEvents by remember { mutableStateOf(false) }
@@ -1100,6 +1109,7 @@ fun VaultFolderScreen(
             event = ev,
             folderLabel = folder?.let { "${it.icon ?: "📁"} ${it.name}" },
             festivalRepo = container.festivalRepository,
+            showSpanTotal = holidaySpanTotal,
             onDismiss = { previewEvent = null },
             onEdit = {
                 previewEvent = null
@@ -1654,6 +1664,8 @@ private fun VaultEventPreviewDialog(
     event: VaultEventEntity,
     folderLabel: String?,
     festivalRepo: FestivalRepository?,
+    /** 设置里的「假期天数口径」真实值：与 EventDetailScreen 一致传入，否则同一开关在主空间生效、在 Vault 预览恒为关。 */
+    showSpanTotal: Boolean = false,
     onDismiss: () -> Unit,
     onEdit: () -> Unit
 ) {
@@ -1702,6 +1714,7 @@ private fun VaultEventPreviewDialog(
                         folderLabel = folderLabel
                     ),
                     festivalRepo = festivalRepo,
+                    showSpanTotal = showSpanTotal,
                     modifier = Modifier.padding(padding)
                 )
             }

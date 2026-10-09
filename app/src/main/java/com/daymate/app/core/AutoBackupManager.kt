@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * 云备份（WebDAV）的执行状态，供主页顶栏的云备份指示器展示。
@@ -71,6 +74,19 @@ class AutoBackupManager(
     /** 成功态在 UI 上停留的时长；到点自动回到 [CloudBackupState.Idle]。 */
     private val successLingerMs = 2000L
     private var backupJob: Job? = null
+
+    /**
+     * 备份**执行段**（WAL 合并 + 本地导出 + 云端上传）的串行锁。
+     *
+     * 为什么光靠 `backupJob?.cancel()` 不够：上传走的是阻塞式 WebDAV 调用，
+     * 取消协程**中断不了已经在飞的 PUT**。若不加锁，被取消的旧任务与防抖起的新任务
+     * 就会并发写同一个远程路径（谁后写谁赢，另一份等于白传），
+     * 并且旧任务还会在上传结束后用过期结果覆写 [cloudState]。
+     *
+     * 有了它：新任务在锁上等待；等待期间若自己被取消，`lock()` 直接抛
+     * CancellationException，连上传都不会发起。
+     */
+    private val backupMutex = Mutex()
 
     // ===== 云备份状态（主页顶栏指示器用） =====
 
@@ -139,7 +155,17 @@ class AutoBackupManager(
     }
 
     private suspend fun runBackup() {
-        runCatching { doBackup() }
+        // 不能用 runCatching：它捕获 Throwable，会把 CancellationException 一并吞掉，
+        // 于是防抖里 backupJob?.cancel() 形同虚设——旧任务照旧跑到上传，
+        // 与新任务并发 PUT 到同一远程路径，且用过期的执行结果覆写 _cloudState。
+        try {
+            doBackup()
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            // 兜底：doBackup 内部各步已各自记日志，这里只防 unforeseen 逃逸
+            AppLogger.logError("Backup", "自动备份异常", t)
+        }
     }
 
     private suspend fun doBackup() {
@@ -159,39 +185,45 @@ class AutoBackupManager(
         // 两个目标都没配置 → 无事可做
         if (localUri == null && cloudCfg == null) return
 
-        // 合并 WAL 进主文件，使复制/上传出的 daymate.db 包含全部已提交数据（两种目标共用）
-        runCatching {
-            val d: SupportSQLiteDatabase = db.openHelper.writableDatabase
-            d.query("PRAGMA wal_checkpoint(TRUNCATE)").use { /* drain cursor */ }
-        }
+        // 执行段串行：防抖取消只能打断协程的中断点，打断不了已在飞的阻塞式导出/上传
+        backupMutex.withLock {
+            // 合并 WAL 进主文件，使复制/上传出的 daymate.db 包含全部已提交数据（两种目标共用）
+            runCatching {
+                val d: SupportSQLiteDatabase = db.openHelper.writableDatabase
+                d.query("PRAGMA wal_checkpoint(TRUNCATE)").use { /* drain cursor */ }
+            }
 
-        if (localUri != null && localBackupAllowed(localUri)) {
-            runCatching { StorageBackup.exportInternal(context, internalDb, localUri) }
-                .onSuccess { AppLogger.log("Backup", "本地自动备份完成 target=$target") }
-                .onFailure { AppLogger.logError("Backup", "本地自动备份失败", it) }
-        }
-        if (cloudCfg != null && cloudBackupAllowed(cloudCfg)) {
-            _cloudState.value = CloudBackupState.Syncing
-            try {
-                CloudBackup.upload(internalDb, cloudCfg)
-                AppLogger.log("Backup", "云端自动备份完成")
-                _cloudState.value = CloudBackupState.Success(System.currentTimeMillis())
-                // 勾停留片刻后回到常态；期间若又开始新一轮备份则不打扰（届时已是 Syncing）
-                scope.launch {
-                    delay(successLingerMs)
-                    if (_cloudState.value is CloudBackupState.Success) {
-                        _cloudState.value = CloudBackupState.Idle
+            if (localUri != null && localBackupAllowed(localUri)) {
+                runCatching { StorageBackup.exportInternal(context, internalDb, localUri) }
+                    .onSuccess { AppLogger.log("Backup", "本地自动备份完成 target=$target") }
+                    .onFailure { AppLogger.logError("Backup", "本地自动备份失败", it) }
+            }
+            if (cloudCfg != null && cloudBackupAllowed(cloudCfg)) {
+                _cloudState.value = CloudBackupState.Syncing
+                try {
+                    CloudBackup.upload(internalDb, cloudCfg)
+                    // 上传是阻塞调用，期间本协程可能已被新的防抖任务取消：
+                    // 此时不能再用这份（可能已过期的）成功结果覆写状态
+                    coroutineContext.ensureActive()
+                    AppLogger.log("Backup", "云端自动备份完成")
+                    _cloudState.value = CloudBackupState.Success(System.currentTimeMillis())
+                    // 勾停留片刻后回到常态；期间若又开始新一轮备份则不打扰（届时已是 Syncing）
+                    scope.launch {
+                        delay(successLingerMs)
+                        if (_cloudState.value is CloudBackupState.Success) {
+                            _cloudState.value = CloudBackupState.Idle
+                        }
                     }
+                } catch (ce: CancellationException) {
+                    throw ce
+                } catch (t: Throwable) {
+                    // 失败必须留痕：主页常驻红叉角标，直到下次成功或用户手动重试
+                    AppLogger.logError("Backup", "云端自动备份失败", t)
+                    _cloudState.value = CloudBackupState.Failure(
+                        reason = t.message ?: t::class.java.simpleName,
+                        at = System.currentTimeMillis()
+                    )
                 }
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (t: Throwable) {
-                // 失败必须留痕：主页常驻红叉角标，直到下次成功或用户手动重试
-                AppLogger.logError("Backup", "云端自动备份失败", t)
-                _cloudState.value = CloudBackupState.Failure(
-                    reason = t.message ?: t::class.java.simpleName,
-                    at = System.currentTimeMillis()
-                )
             }
         }
     }

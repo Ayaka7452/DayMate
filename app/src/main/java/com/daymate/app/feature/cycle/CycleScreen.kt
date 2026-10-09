@@ -433,6 +433,15 @@ private fun CycleOverviewScreen(
                                     detailExpanded = true   // 点任意一天都把详情区带回来
                                 }
                             },
+                            // 「今天」按钮走独立回调而非复用上面的 toggle 回调：
+                            // 上面的语义是「再点同一格 = 取消选中并折叠详情」，
+                            // 而「今天」的预期是幂等地「回本月 + 选中今天 + 展开详情」。
+                            // 两者混用会导致「今天已选中且详情展开时再点一次 → 反向取消并折叠」。
+                            onGoToToday = {
+                                selectedDay = today
+                                lastDetailDay = today
+                                detailExpanded = true
+                            },
                             onPickMonth = { ym ->
                                 monthPickerTarget = ym
                                 showMonthPicker = true
@@ -2195,6 +2204,12 @@ private fun CycleCalendarMonth(
     today: Long,
     selectedDay: Long?,
     onSelectDay: (Long) -> Unit,
+    /**
+     * 顶栏「今天」按钮的幂等动作：回本月由本组件完成，**选中今天**交给宿主。
+     * 与 [onSelectDay] 分开是因为 onSelectDay 带「再点同一格 = 取消选中并折叠详情」的切换语义，
+     * 「今天」按钮重复点击时应保持选中并展开详情。
+     */
+    onGoToToday: () -> Unit = {},
     /** 顶栏「今天」的请求序号：值变化即回本月（见下方 LaunchedEffect）。 */
     todayRequest: Int = 0,
     /** 宿主年月选择器的结果（非 null 即跳转到该年月）；由本组件消费后回调置空。 */
@@ -2206,11 +2221,11 @@ private fun CycleCalendarMonth(
     var monthOffset by remember { mutableStateOf(0) }
     val month = LocalDate.now().plusMonths(monthOffset.toLong())
 
-    // 主视图顶栏「今天」：回本月 + 选中今天（选中动作由宿主注入，这里只负责归零偏移）
+    // 主视图顶栏「今天」：回本月 + 选中今天（归零偏移在本组件内，选中动作由宿主注入）
     LaunchedEffect(todayRequest) {
         if (todayRequest > 0) {
             monthOffset = 0
-            onSelectDay(today)
+            onGoToToday()
         }
     }
     // 宿主年月选择器的结果：把目标年月换算成相对本月的偏移，再置空 pending

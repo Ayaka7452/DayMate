@@ -80,7 +80,9 @@ import com.ayaka7452.daymate.feature.common.rememberUpdateStarter
 import com.ayaka7452.daymate.feature.setup.StorageSetupBody
 import com.ayaka7452.daymate.core.log.AppLogger
 import com.ayaka7452.daymate.widget.WidgetRenderer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -686,7 +688,9 @@ fun SettingsScreen(
             // 只在「当前用的确实是内置区域源」时才提示——用户手填的 URL 是他自己选的，
             // 与 chooseLanguage 里「不擅自替换自定义源」保持同一口径，否则自定义源用户会被一直絮叨。
             // 以 festivalSourceLabel 为 remember 的 key：换源时该 state 会变，提示随之重新判定。
-            val suggestedRegion = regionForLanguage(appLanguage)
+            // 以 appLanguage 为 key（与紧邻的 currentRegion 同款写法）：
+            // regionForLanguage 每次都要走 SharedPreferences 读取 + Locale 解析，不该在每次重组里重跑。
+            val suggestedRegion = remember(appLanguage) { regionForLanguage(appLanguage) }
             val currentRegion = remember(festivalSourceLabel) { festivalRepo.regionOfCurrentSource() }
             if (currentRegion != null && currentRegion != suggestedRegion) {
                 Text(
@@ -787,6 +791,14 @@ fun SettingsScreen(
             val makeupSupported = remember(festivalVersion) {
                 runCatching { festivalRepo.hasMakeupData() }.getOrDefault(false)
             }
+            // 「假期天数口径」只依赖**放假日**条目是否存在，与补班数据无关：
+            // 美/日/韩等只列法定假日的源 hasMakeupData() 恒为 false，但照样能算假期总长。
+            // 故按「缓存里有放假日条目」单独显隐（只读查询，不改 FestivalRepository）。
+            val offDaySupported = remember(festivalVersion) {
+                runCatching {
+                    festivalRepo.daysOfYears(festivalRepo.cachedYears()).any { it.isOffDay }
+                }.getOrDefault(false)
+            }
             if (makeupSupported) {
                 Row(
                     modifier = Modifier
@@ -803,17 +815,19 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
-                Switch(
-                    checked = makeupHintEnabled,
-                    onCheckedChange = { enabled ->
-                        scope.launch { container.settingsRepository.setMakeupHintEnabled(enabled) }
-                        // 立即刷新小组件：关掉时角标当天就消失，不用等下次重建
-                        WidgetRenderer.refreshAll(ctx)
-                    }
-                )
+                    Switch(
+                        checked = makeupHintEnabled,
+                        onCheckedChange = { enabled ->
+                            scope.launch { container.settingsRepository.setMakeupHintEnabled(enabled) }
+                            // 立即刷新小组件：关掉时角标当天就消失，不用等下次重建
+                            WidgetRenderer.refreshAll(ctx)
+                        }
+                    )
                 }
-                // 假期天数口径：假期中段「只显示剩余」（默认）或「总长 · 还剩 N 天」。
-                // 与补班开关同组显隐：数据源没有逐日条目时天数口径无从谈起
+            }
+            // 假期天数口径：假期中段「只显示剩余」（默认）或「总长 · 还剩 N 天」。
+            // 判据是「缓存里有放假日条目」而非补班数据：只列法定假日的源也得能开。
+            if (offDaySupported) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1012,13 +1026,25 @@ fun SettingsScreen(
 
     // 诊断日志 app 内查看：只显示尾部若干行（完整内容走导出），等宽字体便于对时间线
     if (showDiagViewer) {
-        val (text, truncated) = remember { AppLogger.readTail(ctx, maxLines = 800) }
+        // readTail 内部 f.readLines() 会把整份 diag_log.txt（上限 1MB）读进内存并构建 List，
+        // 放组合期同步读就是主线程 IO。改为弹窗打开后在 IO 线程读，读到之前正文留空。
+        var diagText by remember { mutableStateOf("") }
+        var diagTruncated by remember { mutableStateOf(false) }
+        var diagLoaded by remember { mutableStateOf(false) }
+        LaunchedEffect(ctx) {
+            val (t, truncated) = withContext(Dispatchers.IO) {
+                AppLogger.readTail(ctx, maxLines = 800)
+            }
+            diagText = t
+            diagTruncated = truncated
+            diagLoaded = true
+        }
         AlertDialog(
             onDismissRequest = { showDiagViewer = false },
             title = { Text(stringResource(R.string.settings_diag_section)) },
             text = {
                 Column {
-                    if (truncated) {
+                    if (diagTruncated) {
                         Text(
                             stringResource(R.string.settings_diag_truncated, 800),
                             style = MaterialTheme.typography.bodySmall,
@@ -1031,11 +1057,13 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
                     ) {
-                        Text(
-                            text.ifBlank { stringResource(R.string.settings_diag_empty) },
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
+                        if (diagLoaded) {
+                            Text(
+                                diagText.ifBlank { stringResource(R.string.settings_diag_empty) },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        }
                     }
                 }
             },

@@ -72,6 +72,7 @@
     <string name="home_folder_delete_note">Events in the deleted folder will be moved back to the main space. Only the folder itself goes to Trash.</string>
     <string name="home_folder_delete_confirm_desc">Events in folder \'%1$s\' will be moved back to the main space. Only the folder itself goes to Trash.</string>
     <string name="home_vault_not_setup">Vault is not set up</string>
+    <string name="home_vault_locked">Unlock the Vault first</string>
     <string name="home_vault_setup_hint">Set a password in Vault first, then you can move content in.</string>
     <string name="home_go_settings">Go to Settings</string>
     <string name="home_move_to_vault_title">Move to Vault?</string>

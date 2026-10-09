@@ -47,8 +47,8 @@ interface EventDao {
     @Query("UPDATE events SET folderId = NULL WHERE folderId IN (:folderIds) AND isDeleted = 0")
     suspend fun unparentByFolders(folderIds: List<Long>)
 
-    @Query("UPDATE events SET isDeleted = 0, deletedAt = 0 WHERE folderId IN (:folderIds)")
-    suspend fun restoreByFolders(folderIds: List<Long>)
+    // 原 restoreByFolders 已删：它无 isDeleted 过滤，而删文件夹只解归属（unparentByFolders）、
+    // 不软删事件，恢复时会复活用户单独删过的事件。恢复走 restoreByIds 精确指定 id。
 
     @Query("DELETE FROM events WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)

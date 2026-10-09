@@ -72,6 +72,7 @@
     <string name="home_folder_delete_note">삭제된 폴더의 이벤트는 주 공간으로 돌아가고, 폴더 자체만 휴지통으로 이동합니다.</string>
     <string name="home_folder_delete_confirm_desc">폴더 \'%1$s\'의 이벤트는 주 공간으로 돌아가고, 폴더 자체만 휴지통으로 이동합니다.</string>
     <string name="home_vault_not_setup">Vault 가 설정되지 않았습니다</string>
+    <string name="home_vault_locked">먼저 보관함을 잠금 해제하세요</string>
     <string name="home_vault_setup_hint">먼저 Vault 에서 비밀번호를 설정해야 내용을 이동할 수 있습니다.</string>
     <string name="home_go_settings">설정으로</string>
     <string name="home_move_to_vault_title">Vault 로 이동할까요?</string>

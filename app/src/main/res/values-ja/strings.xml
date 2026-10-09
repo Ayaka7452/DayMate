@@ -72,6 +72,7 @@
     <string name="home_folder_delete_note">削除されたフォルダ内のイベントはメイン空間に戻り、フォルダ本体のみがゴミ箱に入ります。</string>
     <string name="home_folder_delete_confirm_desc">フォルダ「%1$s」内のイベントはメイン空間に戻り、フォルダ本体のみがゴミ箱に入ります。</string>
     <string name="home_vault_not_setup">Vault が設定されていません</string>
+    <string name="home_vault_locked">先に保険庫を解除してください</string>
     <string name="home_vault_setup_hint">まず Vault でパスワードを設定すると、その後で内容を移動できます。</string>
     <string name="home_go_settings">設定へ</string>
     <string name="home_move_to_vault_title">Vault に移動しますか？</string>

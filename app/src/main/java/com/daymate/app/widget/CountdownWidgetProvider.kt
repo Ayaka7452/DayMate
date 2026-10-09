@@ -43,6 +43,9 @@ class CountdownWidgetProvider : AppWidgetProvider() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         AppLogger.log(context, "Wide", "onDeleted ids=${appWidgetIds.joinToString()}")
+        // 必须清偏好：否则 event_for_widget_<id> / opacity_for_widget_<id> 永久残留，
+        // 系统复用 appWidgetId 时新组件会继承已删除组件的绑定（与另两个 provider 保持一致）
+        appWidgetIds.forEach { WidgetPrefs.clearWidget(context, it) }
         super.onDeleted(context, appWidgetIds)
     }
 

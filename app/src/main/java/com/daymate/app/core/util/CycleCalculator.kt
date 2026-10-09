@@ -202,7 +202,10 @@ object CycleCalculator {
         logsDesc: List<Pair<Long, Int>>,
         cycleDays: Int
     ): Phase {
-        if (logsDesc.isEmpty()) return Phase.FOLLICULAR
+        // 零条记录 = 任何一天都「早于最早一次登记」，同属无数据区。
+        // 原先返回 FOLLICULAR，会让零记录用户的整月日历被涂成卵泡期色，而同一天的详情区
+        // 写的是「尚无记录」——两个视图自相矛盾（2026-10-09 全库审查发现）。
+        if (logsDesc.isEmpty()) return Phase.NONE
         // 早于最早一次登记：无数据区。记录都在未来（提前登记）时同样适用。
         if (epochDay < logsDesc.minOf { it.first }) return Phase.NONE
         for ((s, pd) in logsDesc) {

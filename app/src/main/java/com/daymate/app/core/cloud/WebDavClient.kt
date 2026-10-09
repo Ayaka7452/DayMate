@@ -12,14 +12,15 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.xmlpull.v1.XmlPullParser
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.StringReader
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.URI
-import java.net.URLDecoder
 import java.net.URLEncoder
 import java.net.UnknownHostException
+import java.nio.charset.StandardCharsets
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
@@ -73,21 +74,46 @@ class WebDavClient(private val config: WebDavConfig) {
               </d:prop>
             </d:propfind>
         """.trimIndent()
+
+        /**
+         * 进程级共享的基础客户端（超时策略在这里定一次，各实例用 `newBuilder()` 派生）。
+         * 关闭自动跳转：见类注释（非 GET 的 301/302 被改成 GET 会让 PUT/PROPFIND 静默失败）。
+         */
+        private val BASE_CLIENT: OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
+            .writeTimeout(300, TimeUnit.SECONDS)
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
     }
 
     /** 规范化后的 baseUrl，保证以 `/` 结尾（URI.resolve 才会把最后一段当目录）。 */
     private val base: String = config.url.trim().let { if (it.endsWith("/")) it else "$it/" }
 
+    /**
+     * Basic 认证头。**必须显式给 UTF-8**：OkHttp `Credentials.basic` 的两参重载字符集固定
+     * ISO-8859-1，含中文/emoji 的口令（WebDAV 账号密码并不限 ASCII）会被逐字符替换成 `?`，
+     * 服务器收到错误口令 → 401。
+     */
     private val auth: String? =
-        if (config.username.isNotEmpty()) Credentials.basic(config.username, config.password) else null
+        if (config.username.isNotEmpty()) {
+            Credentials.basic(config.username, config.password, StandardCharsets.UTF_8)
+        } else {
+            null
+        }
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .writeTimeout(300, TimeUnit.SECONDS)
-        // 关闭自动跳转：见类注释（保方法 + 保认证头）
-        .followRedirects(false)
-        .followSslRedirects(false)
+    /**
+     * 本实例用的客户端：从进程级 [BASE_CLIENT] 派生，只叠加 per-config 的「信任自签名证书」。
+     *
+     * 为什么共享基础实例：每次 `WebDavClient(cfg)` 都 `OkHttpClient()` 新建的话，会得到各自独立的
+     * ConnectionPool 与 Dispatcher 线程池；而调用方（CloudBackup.upload 等）是一次操作 new 一个
+     * client、用完就扔、从不 shutdown → 线程与连接泄漏。`newBuilder()` 会复用同一个连接池与线程池。
+     *
+     * 注意 baseUrl / Authorization **不能**放进共享实例：它们是每次构造时由 [config] 决定的
+     * per-call 状态（见 [auth]），混进去会让换了配置的请求也带上旧凭据。
+     */
+    private val client: OkHttpClient = BASE_CLIENT.newBuilder()
         .apply { if (config.allowSelfSigned) trustAll(this) }
         .build()
 
@@ -364,8 +390,48 @@ class WebDavClient(private val config: WebDavConfig) {
     private fun encodeSegment(seg: String): String =
         URLEncoder.encode(seg, "UTF-8").replace("+", "%20")
 
-    private fun decode(s: String): String =
-        runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
+    /**
+     * 解码 href 里的单个路径段：**只解 `%XX`，保留字面 `+`**。
+     *
+     * 不用 `URLDecoder.decode`：它是表单解码器，会把 `+` 一并变成空格，
+     * 而 [encodeSegment] 输出的是 `%20`（空格），两者并不互逆 —— 于是目录名含 `+`
+     * （如「备份+测试」）时，[toEntry] 拿到的 name / path 会是错的。
+     *
+     * 逐个字符处理而不是先整体替换：残留的单个 `%`（非法转义）只影响它自己，
+     * 不会把后面本已编码好的 `%XX` 一起吃掉。
+     */
+    private fun decode(s: String): String {
+        if (s.indexOf('%') < 0) return s
+        val out = StringBuilder(s.length)
+        val bytes = ByteArrayOutputStream(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            val hi = if (c == '%' && i + 2 < s.length) hexVal(s[i + 1]) else -1
+            val lo = if (hi >= 0) hexVal(s[i + 2]) else -1
+            if (lo >= 0) {
+                bytes.write((hi shl 4) or lo)
+                i += 3
+            } else {
+                // 非转义字符：先把此前攒下的字节按 UTF-8 解出来，再原样落下这个字符
+                if (bytes.size() > 0) {
+                    out.append(String(bytes.toByteArray(), StandardCharsets.UTF_8))
+                    bytes.reset()
+                }
+                out.append(c)
+                i++
+            }
+        }
+        if (bytes.size() > 0) out.append(String(bytes.toByteArray(), StandardCharsets.UTF_8))
+        return out.toString()
+    }
+
+    private fun hexVal(c: Char): Int = when (c) {
+        in '0'..'9' -> c - '0'
+        in 'a'..'f' -> c - 'a' + 10
+        in 'A'..'F' -> c - 'A' + 10
+        else -> -1
+    }
 
     private fun resolveLocation(from: String, location: String): String =
         runCatching { URI(from).resolve(location).toString() }.getOrDefault(location)

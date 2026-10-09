@@ -121,9 +121,14 @@ fun CalendarPreviewScreen(
     val month = remember(monthOffset) { YearMonth.now().plusMonths(monthOffset.toLong()) }
 
     // ===== 数据 =====
-    val events by container.eventRepository.observeAll().collectAsState(initial = emptyList())
-    val logs by container.cycleRepository.observeAll().collectAsState(initial = emptyList())
-    val notes by container.cycleNoteRepository.observeAll().collectAsState(initial = emptyList())
+    // 用 remember 固定 Flow 实例，避免每次重组重建 collectAsState 观察者导致观察链反复取消重建
+    // （三者都不带参数依赖，container 由导航固定，故无需 key）
+    val eventsFlow = remember { container.eventRepository.observeAll() }
+    val events by eventsFlow.collectAsState(initial = emptyList())
+    val logsFlow = remember { container.cycleRepository.observeAll() }
+    val logs by logsFlow.collectAsState(initial = emptyList())
+    val notesFlow = remember { container.cycleNoteRepository.observeAll() }
+    val notes by notesFlow.collectAsState(initial = emptyList())
     val cycleManual by container.settingsRepository.cycleDays
         .collectAsState(initial = CycleCalculator.DEFAULT_CYCLE_DAYS)
     val cycleAuto by container.settingsRepository.cycleCycleAuto.collectAsState(initial = true)

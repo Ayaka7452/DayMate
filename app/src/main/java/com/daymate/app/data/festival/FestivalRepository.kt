@@ -161,6 +161,22 @@ class FestivalRepository(private val appContext: Context) {
     private val cacheDir = File(appContext.filesDir, CACHE_DIR)
 
     /**
+     * 进程内已解析缓存：`（数据源键, 年份）→ 条目`。
+     *
+     * 为什么需要：所有查询只读磁盘缓存，[loadYear] 每次都是一次 `File.readText()` +
+     * 全量 JSON 解析。而首页冷启动的同步预载会逐天调 [isOffDay] / [offDaySpanLength] /
+     * [offDayRemainingLength]，一个循环里就是几十次调用；[allDays] 更狠，
+     * [cachedYearsOf] 过滤空文件时解析一遍、`flatMap { loadYear(it) }` 又一遍。
+     * 加上这层后这些重复解析全部命中内存。
+     *
+     * 正确性优先：失效点宁可多不可少——见 [invalidateMemoryCache] 的所有调用处
+     * （数据源切换、下载写入、删除残留缓存、清理旧年份）。
+     * 只缓存非空结果：空结果要么是文件不存在、要么是解析失败，
+     * 都属于「可能马上被下载改变」的状态，不值得缓存。
+     */
+    private val memCache = HashMap<String, List<FestivalDay>>()
+
+    /**
      * 数据变更信号（自增计数）。源切换、下载完成、缓存清理时 +1。
      *
      * 主页与文件夹页的节日横幅都是在 `LaunchedEffect(Unit)` 里一次性读缓存的——没有这个信号，
@@ -171,7 +187,23 @@ class FestivalRepository(private val appContext: Context) {
     val version: StateFlow<Long> = _version.asStateFlow()
 
     private fun changed() {
+        invalidateMemoryCache()
         _version.value += 1
+    }
+
+    /**
+     * 清空进程内解析缓存。凡是**动了 `filesDir/festival_cache/` 下文件**的地方都必须调用：
+     *  - [writeCache] 写完新数据；
+     *  - [dropStaleFutureCache] 删掉「尚未发布」的残留年份；
+     *  - [pruneOldCache] 清旧年份；
+     *  - [migrateLegacyCache] 迁老命名（构造期，为稳妥一并清）；
+     *  - [changed]（切数据源）。
+     *
+     * 不按「版本号进 key」而是直接整份清：缓存条目数以年份 × 数据源计，量级极小，
+     * 整清的代价可以忽略；而按 key 留旧条目一旦漏掉某个失效点就是脏读。
+     */
+    private fun invalidateMemoryCache() {
+        synchronized(memCache) { memCache.clear() }
     }
 
     init {
@@ -204,6 +236,7 @@ class FestivalRepository(private val appContext: Context) {
                 else runCatching { f.renameTo(target) }
             }
         }
+        invalidateMemoryCache()
     }
 
     // ---------- 数据源管理（设置页可编辑） ----------
@@ -301,6 +334,8 @@ class FestivalRepository(private val appContext: Context) {
                 if (y < minYear) runCatching { f.delete() }
             }
         }
+        // 删了文件，进程内缓存必须跟着失效
+        invalidateMemoryCache()
     }
 
     /** 当前数据源对应的缓存键：内置区域用区域名，自定义 URL 统一用 CUSTOM。 */
@@ -341,14 +376,34 @@ class FestivalRepository(private val appContext: Context) {
 
     private fun loadYear(year: Int): List<FestivalDay> = loadYearOf(cacheKey(), year)
 
+    /**
+     * 读某数据源某年的条目：先查进程内 [memCache]，未命中才读盘 + 解析。
+     *
+     * 只缓存非空结果：空结果要么是「文件不存在」、要么是「解析失败」，都可能被随后的下载
+     * 立刻改变；不缓存空结果意味着「刚下载完」这一场景一定会重新读盘，不会拿到旧的空值。
+     */
     private fun loadYearOf(key: String, year: Int): List<FestivalDay> {
+        val ck = "$key/$year"
+        synchronized(memCache) { memCache[ck] }?.let { return it }
         val f = cacheFile(year, key)
         if (!f.exists()) return emptyList()
-        return runCatching { parseAny(f.readText())[year] ?: emptyList() }.getOrDefault(emptyList())
+        val parsed = runCatching { parseAny(f.readText())[year] ?: emptyList() }.getOrDefault(emptyList())
+        if (parsed.isNotEmpty()) {
+            synchronized(memCache) { memCache[ck] = parsed }
+        }
+        return parsed
     }
 
-    private fun allDays(): List<FestivalDay> =
-        cachedYears().flatMap { loadYear(it) }.sortedBy { it.date }
+    /**
+     * 全部年份的条目（升序）。
+     *
+     * 直接按 [cachedYearsOf] 已过滤出的年份各读一次即可——[loadYearOf] 带进程内缓存，
+     * 这里的第二次读取命中内存，不再重复解析 JSON（原实现对同一年份要解析两遍）。
+     */
+    private fun allDays(): List<FestivalDay> {
+        val key = cacheKey()
+        return cachedYearsOf(key).flatMap { loadYearOf(key, it) }.sortedBy { it.date }
+    }
 
     /**
      * 批量读取若干年份的节假日条目（日历预览等需要整月标注的页面用）。
@@ -559,9 +614,35 @@ class FestivalRepository(private val appContext: Context) {
             pending.add(year)
             if (dropStaleFutureCache(key, year)) removed.add(year)
         } else {
-            cacheFile(year, key).writeText(normalize(year, days))
+            writeCache(cacheFile(year, key), normalize(year, days))
             ok.add(year)
         }
+    }
+
+    /**
+     * 原子写缓存文件：先写同目录的 `.part` 临时文件，再 `renameTo` 覆盖目标。
+     *
+     * 为什么不能直接 `writeText`：那是 truncate + write，**写入期间文件是半截的**。
+     * 而缓存文件有多个并发读者（首页 `LaunchedEffect(Dispatchers.IO)`、
+     * `WidgetRenderer.refreshAll`、设置页状态查询），它们会在这个窗口里读到半截 JSON，
+     * 被 [loadYearOf] 的 `runCatching` 吞成空列表 —— 表现为「刚下载完，缓存年份凭空消失」。
+     *
+     * 同一文件系统上的 `rename` 是原子的，读者只会看到「完整的旧内容」或「完整的新内容」。
+     * 临时文件名沿用 `xxx.json.part`，不会被 [pruneOldCache] / [cachedYearsOf] 的命名解析误认。
+     */
+    private fun writeCache(target: File, text: String) {
+        val tmp = File(target.parentFile, target.name + ".part")
+        try {
+            tmp.writeText(text)
+            if (!tmp.renameTo(target)) {
+                // 极少数文件系统（如跨挂载点）不支持 rename 覆盖，退回直写
+                target.writeText(text)
+            }
+        } finally {
+            if (tmp.exists()) tmp.delete()
+        }
+        // 内容已换，进程内缓存必须同步失效，否则会继续供出上一份解析结果
+        invalidateMemoryCache()
     }
 
     /**
@@ -578,7 +659,10 @@ class FestivalRepository(private val appContext: Context) {
     private fun dropStaleFutureCache(key: String, year: Int, today: LocalDate = LocalDate.now()): Boolean {
         if (year <= today.year) return false
         val f = cacheFile(year, key)
-        return f.exists() && runCatching { f.delete() }.getOrDefault(false)
+        val deleted = f.exists() && runCatching { f.delete() }.getOrDefault(false)
+        // 文件真被删了才需要清内存；year <= today.year 的早返回路径不动文件
+        if (deleted) invalidateMemoryCache()
+        return deleted
     }
 
     /** 该年份的文件还不存在/还没内容——「尚未发布」，不是失败。 */
