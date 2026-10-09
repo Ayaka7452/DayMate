@@ -128,7 +128,7 @@ object StorageBackup {
             }
             if (!written) {
                 AppLogger.log(ctx, "Backup", "导出校验未通过，保留旧备份")
-                runCatching { root.delete(target) }
+                runCatching { target.delete() }
                 return
             }
             // 写入后再清一次：若本次 createFile 仍被改名（说明旧文件确实删不掉），

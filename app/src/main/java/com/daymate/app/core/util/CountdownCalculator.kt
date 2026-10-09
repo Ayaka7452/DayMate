@@ -44,7 +44,7 @@ object CountdownCalculator {
             // 累加会**永久漂移**（1/31 → 2/29 → 3/29 → 4/29…再也回不到 31 号），
             // 而本文件的类注释承诺的是「锚定同一日号，取不到就落到月末」。
             // `withMonth` / `withYear` 自带 clamp 到目标月末/2月28日，一次到位。
-            REPEAT_MONTHLY -> date = date.withYear(today.year).withMonth(today.month)
+            REPEAT_MONTHLY -> date = date.withYear(today.year).withMonth(today.monthValue)
                 .let { if (it < today) it.plusMonths(1) else it }
             REPEAT_YEARLY -> date = date.withYear(today.year)
                 .let { if (it < today) it.plusYears(1) else it }
