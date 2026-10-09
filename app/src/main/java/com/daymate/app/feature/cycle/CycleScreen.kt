@@ -652,7 +652,8 @@ private fun CycleOverviewScreen(
             if (lastLog != null) {
                 val nextStart = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
                 val phase = CycleCalculator.phaseOf(today, lastLog.startDateEpochDay, periodDays, cycleDays)
-                val ovuRange = CycleCalculator.ovulationWindow(lastLog.startDateEpochDay, periodDays, nextStart)
+                // 受孕窗口（7 天）只作文案提示用；日历着色走更窄的 ovulationPhaseRange
+                val ovuRange = CycleCalculator.fertileWindow(lastLog.startDateEpochDay, periodDays, nextStart)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     InfoCard(
                         stringResource(R.string.cycle_last_period),
@@ -2526,7 +2527,8 @@ internal fun describeDay(
     while (anchorStart + cycleDays <= day) anchorStart += cycleDays
     val nextStart = anchorStart + cycleDays
     val ovu = CycleCalculator.effectiveOvulationDay(anchorStart, anchorPd, nextStart)
-    val window = CycleCalculator.ovulationWindow(anchorStart, anchorPd, nextStart)
+    // 同上：只用于「窗口 Y ~ Z」文案。着色口径更窄（ovulationPhaseRange），别混用
+    val window = CycleCalculator.fertileWindow(anchorStart, anchorPd, nextStart)
 
     return when {
         // 走到这里说明不在任何已登记经期区间内（前面已 return），所以经期只可能是**预测**的

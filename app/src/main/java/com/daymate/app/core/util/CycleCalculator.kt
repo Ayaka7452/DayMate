@@ -3,15 +3,20 @@ package com.ayaka7452.daymate.core.util
 import com.ayaka7452.daymate.R
 
 /**
- * 周期管家：经期/排卵期/黄体期推算。
+ * 周期管家：经期/卵泡期/排卵期/黄体期推算。
  *
  * 医学口径（日历法，严谨性说明）：
  *  - 黄体期：排卵后到下次月经来潮，医学共识近似为固定 14 天
  *    （实际个体波动 11~17 天，且同一人不同周期也有波动，此处取标准近似值）。
- *  - 排卵日 ≈ 预测下次经期首日 − 14 天。
- *  - 排卵期窗口 = 排卵日前 5 天 ～ 排卵日后 1 天，共约 7 天：
- *    精子在体内最长存活约 5 天，卵子排出后可受精约 24 小时。
- *  - 月经期 = 经期首日 ～ 首日 + 持续天数 − 1；卵泡期 = 月经期结束后 ～ 排卵日前一日。
+ *  - 排卵日 ≈ 预测下次经期首日 − 14 天；周期偏短/经期偏长时按下方两个保底后移。
+ *  - **着色窗口 ≠ 受孕窗口**（2026-10-09 修，用户报告「经期刚结束就排卵」）：
+ *      · 排卵期**着色**只取 [OVULATION_BEFORE, OVULATION_AFTER]（各 1 天）——排卵日前 5 天
+ *        仍是**卵泡期**（卵子还没排）。早先着色也用 5 天前，把整段卵泡期末梢挖成排卵色，
+ *        周期偏短时卵泡期只剩 2 天，日历上读起来就是「经期一结束立刻排卵」。
+ *      · 受孕窗口 [FERTILE_BEFORE, OVULATION_AFTER]（共 7 天）**只用于文案提示**，依据是
+ *        精子在体内最长存活约 5 天、卵子排出后可受精约 24 小时。
+ *      · 两者必须分开：既保住医学上正确的阶段着色，又不丢「易孕期」提示。
+ *  - 月经期 = 经期首日 ～ 首日 + 持续天数 − 1；卵泡期 = 月经期结束后 ～ 排卵期着色前一日。
  *  - 周期天数 = 相邻两次经期首日的间隔。有效周期记录取 15~60 天；
  *    近期均值最多参考最近 3 次（部分周期受压力/作息/疾病影响，均值仅供参考）。
  *
@@ -47,14 +52,17 @@ object CycleCalculator {
      */
     const val MIN_PERIOD_INTERVAL_DAYS = 15
 
-    /** 排卵期窗口：排卵日前 5 天 ～ 排卵日后 1 天。 */
-    const val OVULATION_BEFORE = 5L
+    /** 排卵期着色窗口：排卵日前 1 天 ～ 后 1 天（阶段口径，**不是**受孕窗口）。 */
+    const val OVULATION_BEFORE = 1L
     const val OVULATION_AFTER = 1L
 
-    /** 动态推算保底：卵泡期最少天数（经期过长时排卵日/窗口后移收窄，保证卵泡期不被吃光）。 */
-    const val MIN_FOLLICULAR_DAYS = 2L
+    /** 受孕窗口：排卵日前 5 天 ～ 后 1 天。**只给文案提示用，不参与日历着色**。 */
+    const val FERTILE_BEFORE = 5L
 
-    /** 动态推算保底：黄体期最短天数（医学共识黄体期波动 11~17 天，压缩仍在合理区间）。 */
+    /** 着色口径下卵泡期最少天数（保底，避免「经期刚结束就排卵」）。 */
+    const val MIN_FOLLICULAR_DAYS = 6L
+
+    /** 着色口径下黄体期最短天数（医学共识黄体期波动 11~17 天）。 */
     const val MIN_LUTEAL_DAYS = 11L
 
     /** 相邻两次经期首日算出一个周期长度；不在 15~60 天内视为无效记录（漏记/异常周期）。 */
@@ -106,16 +114,19 @@ object CycleCalculator {
 
     /**
      * 动态排卵日：标准口径为下次经期首日 − 14。
-     * 经期较长挤占卵泡期时排卵日自动后移（卵泡期保底 MIN_FOLLICULAR_DAYS 天，
-     * 黄体期最短 MIN_LUTEAL_DAYS 天——仍在医学共识 11~17 天区间内），
-     * 避免「经期一长，卵泡期直接消失、经期后立刻排卵」的怪象。
+     * 周期偏短或经期偏长把卵泡期挤没时，排卵日自动后移——两个保底**都要把着色窗口
+     * 自身的宽度算进去**，否则实际着色后阶段天数会少一天：
+     *  - 卵泡期 = 经期结束次日 ～ ovu−OVULATION_BEFORE−1 ≥ MIN_FOLLICULAR_DAYS
+     *    → ovu ≥ 经期结束次日 + MIN_FOLLICULAR_DAYS + OVULATION_BEFORE
+     *  - 黄体期 = ovu+OVULATION_AFTER+1 ～ 下次经期−1 ≥ MIN_LUTEAL_DAYS
+     *    → ovu ≤ 下次经期 − MIN_LUTEAL_DAYS − OVULATION_AFTER − 1
+     * 两者冲突时（周期太短装不下）以黄体期保底优先——黄体期短于 11 天的影响（黄体功能不足）
+     * 比卵泡期略短更大。
      */
     fun effectiveOvulationDay(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): Long {
         val standard = nextStartEpochDay - LUTEAL_DAYS
-        // 卵泡期保底 2 天：排卵日不得早于经期结束次日 + 保底天数
-        val earliest = startEpochDay + periodDays + MIN_FOLLICULAR_DAYS
-        // 黄体期最短 11 天：排卵日不得晚于下次经期首日 − 11
-        val latest = nextStartEpochDay - MIN_LUTEAL_DAYS
+        val earliest = startEpochDay + periodDays + MIN_FOLLICULAR_DAYS + OVULATION_BEFORE
+        val latest = nextStartEpochDay - MIN_LUTEAL_DAYS - OVULATION_AFTER - 1
         return maxOf(standard, earliest).coerceAtMost(latest)
     }
 
@@ -124,26 +135,40 @@ object CycleCalculator {
         startEpochDay..(startEpochDay + periodDays - 1)
 
     /**
-     * 动态排卵期窗口：默认排卵日前 5 ～ 后 1 天；经期过后空间不足时窗口自动收窄
-     * （保证窗口之前仍留有至少 MIN_FOLLICULAR_DAYS 天卵泡期）。
+     * 排卵期**着色**区间 [ovu − OVULATION_BEFORE, ovu + OVULATION_AFTER]。
+     *
+     * 只覆盖排卵日附近：再往前都是卵泡期（卵子尚未排出）。clamp 两个方向是为了
+     * 病态输入（超长经期 + 超短周期）时不侵入经期、不越过下次经期前一日；
+     * 此时返回的区间可能为空（lo > hi，Kotlin 的 `in` 判定自然为 false）。
      */
-    fun ovulationWindow(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange {
+    fun ovulationPhaseRange(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange {
         val ovu = effectiveOvulationDay(startEpochDay, periodDays, nextStartEpochDay)
-        val periodEnd = startEpochDay + periodDays - 1
-        val before = OVULATION_BEFORE
-            .coerceAtMost(ovu - periodEnd - MIN_FOLLICULAR_DAYS - 1)
-            .coerceAtLeast(0L)
-        return (ovu - before)..(ovu + OVULATION_AFTER)
+        val lo = maxOf(ovu - OVULATION_BEFORE, startEpochDay + periodDays)
+        val hi = minOf(ovu + OVULATION_AFTER, nextStartEpochDay - 1)
+        return lo..hi
     }
 
-    /** 黄体期区间 [动态排卵日, 下次经期首日 − 1]（下次经期当天回到月经期）。 */
-    fun lutealRange(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange =
-        effectiveOvulationDay(startEpochDay, periodDays, nextStartEpochDay)..(nextStartEpochDay - 1)
+    /**
+     * 受孕窗口 [ovu − FERTILE_BEFORE, ovu + OVULATION_AFTER]，共约 7 天。
+     *
+     * **只给文案提示用**（「排卵日 X · 窗口 Y ~ Z」），不参与日历着色——着色窄是刻意的，
+     * 见类注释里「着色窗口 ≠ 受孕窗口」。
+     */
+    fun fertileWindow(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange {
+        val ovu = effectiveOvulationDay(startEpochDay, periodDays, nextStartEpochDay)
+        val lo = maxOf(ovu - FERTILE_BEFORE, startEpochDay + periodDays)
+        val hi = minOf(ovu + OVULATION_AFTER, nextStartEpochDay - 1)
+        return lo..hi
+    }
 
-    /** 卵泡期区间 [月经期结束次日, 排卵期窗口前一日]。 */
+    /** 黄体期区间 [排卵期着色结束次日, 下次经期首日 − 1]（下次经期当天回到月经期）。 */
+    fun lutealRange(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange =
+        (ovulationPhaseRange(startEpochDay, periodDays, nextStartEpochDay).last + 1)..(nextStartEpochDay - 1)
+
+    /** 卵泡期区间 [月经期结束次日, 排卵期着色前一日]。 */
     fun follicularRange(startEpochDay: Long, periodDays: Int, nextStartEpochDay: Long): LongRange {
         val from = startEpochDay + periodDays
-        val to = ovulationWindow(startEpochDay, periodDays, nextStartEpochDay).first - 1
+        val to = ovulationPhaseRange(startEpochDay, periodDays, nextStartEpochDay).first - 1
         return if (from <= to) from..to else LongRange.EMPTY
     }
 
@@ -152,7 +177,7 @@ object CycleCalculator {
         val nextStart = nextStartAfter(lastStartEpochDay, cycleDays)
         return when {
             todayEpochDay in periodRange(lastStartEpochDay, periodDays) -> Phase.PERIOD
-            todayEpochDay in ovulationWindow(lastStartEpochDay, periodDays, nextStart) -> Phase.OVULATION
+            todayEpochDay in ovulationPhaseRange(lastStartEpochDay, periodDays, nextStart) -> Phase.OVULATION
             todayEpochDay in lutealRange(lastStartEpochDay, periodDays, nextStart) -> Phase.LUTEAL
             todayEpochDay in follicularRange(lastStartEpochDay, periodDays, nextStart) -> Phase.FOLLICULAR
             // 今天已在预测周期之外（下次经期理论上今天或之前来但还没登记）：
@@ -194,7 +219,7 @@ object CycleCalculator {
         if (epochDay in periodRange(anchorStart, anchorPd)) return Phase.PREDICTED_PERIOD
         val nextStart = anchorStart + cycleDays
         return when {
-            epochDay in ovulationWindow(anchorStart, anchorPd, nextStart) -> Phase.OVULATION
+            epochDay in ovulationPhaseRange(anchorStart, anchorPd, nextStart) -> Phase.OVULATION
             epochDay in lutealRange(anchorStart, anchorPd, nextStart) -> Phase.LUTEAL
             else -> Phase.FOLLICULAR
         }
@@ -206,7 +231,7 @@ object CycleCalculator {
      */
     fun phaseSegments(startEpochDay: Long, periodDays: Int, cycleDays: Int): List<Int> {
         val nextStart = startEpochDay + cycleDays
-        val window = ovulationWindow(startEpochDay, periodDays, nextStart)
+        val window = ovulationPhaseRange(startEpochDay, periodDays, nextStart)
         // 病态输入（超长经期+超短周期）下窗口可能落在经期区间内，clamp 保证分段有序
         val ovuFirst = maxOf(window.first, startEpochDay + periodDays)
         val ovuLast = maxOf(window.last, ovuFirst).coerceAtMost(startEpochDay + cycleDays - 1)
