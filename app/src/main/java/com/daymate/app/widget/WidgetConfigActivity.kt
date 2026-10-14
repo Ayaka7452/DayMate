@@ -26,10 +26,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -52,13 +52,13 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-/** 多事件模式勾选上限，与渲染层槽位上限保持一致。 */
+/** 多事件列表的槽位硬上限，与渲染层 MAX_LIST_SLOTS 保持一致。 */
 private const val MULTI_LIMIT = 4
 
 /**
  * 小组件部署/重新配置页：添加小组件到桌面时弹出。
- * - 显示方式二选一：多个事件（默认，空间不够自动只放 1 个）或固定单个事件；
- * - 多事件模式可勾选要显示的事件（上限 4 个），不勾选则自动挑选最近的。
+ * 只有一份事件多选清单：不勾选显示最近的一个倒数日；勾一个以单卡片显示；
+ * 勾多个成列表，顺序即勾选顺序，行首带序号。勾选上限按该组件当前尺寸算。
  */
 class WidgetConfigActivity : ComposeActivity() {
 
@@ -149,10 +149,11 @@ private fun WidgetConfigScreen(
     val events by remember { container.eventRepository.observeAll() }
         .collectAsState(initial = emptyList())
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    var mode by remember { mutableStateOf(WidgetPrefs.modeFor(ctx, appWidgetId)) }
-    var selected by remember { mutableStateOf(WidgetPrefs.eventForWidget(ctx, appWidgetId)) }
-    var checkedIds by remember { mutableStateOf(WidgetPrefs.selectedEventsFor(ctx, appWidgetId)) }
+    // 勾选顺序即列表显示顺序
+    var checkedOrder by remember { mutableStateOf(WidgetPrefs.selectedOrderFor(ctx, appWidgetId)) }
     var opacity by remember { mutableStateOf(WidgetPrefs.opacityFor(ctx, appWidgetId).toFloat()) }
+    // 勾选上限按该组件当前尺寸算（与渲染层同口径），槽位硬上限 4
+    val limit = remember { minOf(MULTI_LIMIT, WidgetRenderer.listSlotCount(ctx, appWidgetId)) }
 
     Scaffold(
         topBar = {
@@ -173,14 +174,8 @@ private fun WidgetConfigScreen(
                 horizontalArrangement = Arrangement.End
             ) {
                 Button(onClick = {
-                    // 两项配置都只写入该组件实例，与其他小组件互不影响
-                    WidgetPrefs.setModeFor(ctx, appWidgetId, mode)
-                    if (mode == WidgetPrefs.WidgetMode.MULTI) {
-                        WidgetPrefs.setSelectedEventsFor(ctx, appWidgetId, checkedIds)
-                        WidgetPrefs.setEventForWidget(ctx, appWidgetId, 0L)
-                    } else {
-                        WidgetPrefs.setEventForWidget(ctx, appWidgetId, selected)
-                    }
+                    // 配置只写入该组件实例，与其他小组件互不影响；空列表 = 自动显示最近的一个
+                    WidgetPrefs.setSelectedOrderFor(ctx, appWidgetId, checkedOrder)
                     WidgetPrefs.setOpacityFor(ctx, appWidgetId, opacity.toInt())
                     onConfirm(appWidgetId)
                 }) {
@@ -197,87 +192,52 @@ private fun WidgetConfigScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                Tr.s(R.string.widget_config_mode_title),
+                Tr.s(R.string.widget_config_pick),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            OptionRow(
-                title = Tr.s(R.string.widget_config_mode_multi),
-                subtitle = Tr.s(R.string.widget_config_mode_multi_desc),
-                selected = mode == WidgetPrefs.WidgetMode.MULTI,
-                onClick = { mode = WidgetPrefs.WidgetMode.MULTI }
-            )
-            OptionRow(
-                title = Tr.s(R.string.widget_config_mode_single),
-                subtitle = null,
-                selected = mode == WidgetPrefs.WidgetMode.SINGLE,
-                onClick = { mode = WidgetPrefs.WidgetMode.SINGLE }
+            Text(
+                Tr.s(R.string.widget_config_pick_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-            if (mode == WidgetPrefs.WidgetMode.MULTI) {
-                Text(
-                    Tr.s(R.string.widget_config_multi_pick),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                    items(events, key = { it.id }) { ev ->
-                        val id = ev.id
-                        val checked = checkedIds.contains(id)
-                        // 勾满上限后未勾选项置灰，点击不生效
-                        val enabled = checked || checkedIds.size < MULTI_LIMIT
-                        CheckRow(
-                            title = ev.title,
-                            subtitle = LocalDate.ofEpochDay(ev.targetDateEpochDay)
-                                .format(DateTimeFormatter.ofPattern("yyyy/M/d")),
-                            checked = checked,
-                            enabled = enabled,
-                            onCheck = { want ->
-                                checkedIds = when {
-                                    !want -> checkedIds - id
-                                    checkedIds.size < MULTI_LIMIT -> checkedIds + id
-                                    else -> checkedIds
-                                }
+            // 已勾选的排前面，按勾选顺序带序号——顺序即 widget 列表的显示顺序
+            val ordered = events.sortedBy { ev -> checkedOrder.indexOf(ev.id).takeIf { it >= 0 } ?: Int.MAX_VALUE }
+            LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+                items(ordered, key = { it.id }) { ev ->
+                    val id = ev.id
+                    val checked = checkedOrder.contains(id)
+                    // 勾满上限后未勾选项置灰，需取消已选的才能继续勾
+                    val enabled = checked || checkedOrder.size < limit
+                    val seq = checkedOrder.indexOf(id)
+                    CheckRow(
+                        title = if (seq >= 0) "${seq + 1}. ${ev.title}" else ev.title,
+                        subtitle = LocalDate.ofEpochDay(ev.targetDateEpochDay)
+                            .format(DateTimeFormatter.ofPattern("yyyy/M/d")),
+                        checked = checked,
+                        enabled = enabled,
+                        onCheck = { want ->
+                            checkedOrder = when {
+                                want -> checkedOrder + id
+                                else -> checkedOrder - id
                             }
-                        )
-                    }
-                }
-                Text(
-                    Tr.s(R.string.widget_config_multi_limit),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                Spacer(Modifier.padding(vertical = 4.dp))
-            } else {
-                Text(
-                    Tr.s(R.string.widget_config_pick),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                    item {
-                        OptionRow(
-                            title = Tr.s(R.string.widget_config_auto),
-                            subtitle = Tr.s(R.string.widget_config_auto_desc),
-                            selected = selected == 0L,
-                            onClick = { selected = 0L }
-                        )
-                    }
-                    items(events, key = { it.id }) { ev ->
-                        OptionRow(
-                            title = ev.title,
-                            subtitle = LocalDate.ofEpochDay(ev.targetDateEpochDay)
-                                .format(DateTimeFormatter.ofPattern("yyyy/M/d")),
-                            selected = selected == ev.id,
-                            onClick = { selected = ev.id }
-                        )
-                    }
+                        }
+                    )
                 }
             }
+            Text(
+                Tr.s(R.string.widget_config_multi_limit, limit),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+            if (checkedOrder.isNotEmpty()) {
+                TextButton(onClick = { checkedOrder = emptyList() }) {
+                    Text(Tr.s(R.string.widget_config_clear))
+                }
+            }
+            Spacer(Modifier.padding(vertical = 4.dp))
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -306,30 +266,6 @@ private fun WidgetConfigScreen(
                 color = MaterialTheme.colorScheme.outline
             )
             Spacer(Modifier.padding(vertical = 16.dp))
-        }
-    }
-}
-
-@Composable
-private fun OptionRow(title: String, subtitle: String?, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected, onClick = onClick)
-        Spacer(Modifier.width(8.dp))
-        Column {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
         }
     }
 }

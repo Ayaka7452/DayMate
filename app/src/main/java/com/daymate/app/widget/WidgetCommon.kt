@@ -33,15 +33,11 @@ object WidgetPrefs {
     private const val FILE = "widget_prefs"
     private const val KEY_OPACITY = "card_opacity" // 旧全局键，仅迁移用
     private const val KEY_DEFAULT_EVENT = "default_event_id" // 旧全局键，仅迁移用
-    private const val PREFIX_WIDGET_EVENT = "event_for_widget_"
     private const val PREFIX_WIDGET_OPACITY = "opacity_for_widget_"
-    private const val PREFIX_WIDGET_MODE = "mode_for_widget_"
-    private const val PREFIX_WIDGET_SELECTED = "selected_for_widget_"
+    private const val PREFIX_WIDGET_SELECTED = "selected_for_widget_" // 旧无序 StringSet，仅迁移用
+    private const val PREFIX_WIDGET_SELECTED_ORDER = "selected_order_for_widget_"
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-
-    /** 小组件显示模式：多事件列表（默认）或固定单个事件。 */
-    enum class WidgetMode { MULTI, SINGLE }
 
     /**
      * 单个小组件的不透明度 5–100（默认 100）。
@@ -54,52 +50,42 @@ object WidgetPrefs {
         prefs(ctx).edit().putInt(PREFIX_WIDGET_OPACITY + appWidgetId, value.coerceIn(5, 100)).apply()
     }
 
-    /** 单个小组件绑定的事件 id；0 = 未绑定（单事件模式下由渲染层自动挑选）。 */
-    fun eventForWidget(ctx: Context, appWidgetId: Int): Long =
-        prefs(ctx).getLong(PREFIX_WIDGET_EVENT + appWidgetId, 0L)
-
-    fun setEventForWidget(ctx: Context, appWidgetId: Int, eventId: Long) {
-        prefs(ctx).edit().putLong(PREFIX_WIDGET_EVENT + appWidgetId, eventId).apply()
-    }
-
     /**
-     * 显示模式。旧版没有该键：曾绑定事件（event != 0）的老组件迁移为单事件模式，
-     * 未绑定（自动）的老组件迁移为多事件模式——升级后行为与旧版一致。
+     * 该小组件勾选的事件 id，**按勾选顺序排列**（顺序即列表显示的上下顺序）。
+     * 空 = 未勾选（自动显示最近的一个，单卡片）；1 个 = 单事件卡片；≥2 个 = 多事件列表。
+     *
+     * 存储为逗号分隔的有序字符串（StringSet 无序，v1.22.2 的旧格式读一次即迁移）。
+     * 旧版单事件绑定（event_for_widget_）迁移为只含该事件的列表。
      */
-    fun modeFor(ctx: Context, appWidgetId: Int): WidgetMode {
+    fun selectedOrderFor(ctx: Context, appWidgetId: Int): List<Long> {
         val p = prefs(ctx)
-        val key = PREFIX_WIDGET_MODE + appWidgetId
+        val key = PREFIX_WIDGET_SELECTED_ORDER + appWidgetId
         if (p.contains(key)) {
-            return if (p.getInt(key, 0) == 1) WidgetMode.SINGLE else WidgetMode.MULTI
+            return p.getString(key, null)?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
         }
-        val legacyEvent = p.getLong(PREFIX_WIDGET_EVENT + appWidgetId, 0L)
-        val migrated = if (legacyEvent != 0L) WidgetMode.SINGLE else WidgetMode.MULTI
-        p.edit().putInt(key, if (migrated == WidgetMode.SINGLE) 1 else 0).apply()
-        return migrated
+        // 迁移：v1.22.2 的无序勾选集合 / 更早的单事件绑定
+        val legacy = p.getStringSet(PREFIX_WIDGET_SELECTED + appWidgetId, null)
+            ?.mapNotNull { it.toLongOrNull() }?.toSet()
+            ?: p.getLong("event_for_widget_" + appWidgetId, 0L).takeIf { it != 0L }?.let { setOf(it) }
+            ?: emptySet()
+        setSelectedOrderFor(ctx, appWidgetId, legacy.toList())
+        p.edit().remove(PREFIX_WIDGET_SELECTED + appWidgetId).remove("event_for_widget_" + appWidgetId).apply()
+        return legacy.toList()
     }
 
-    fun setModeFor(ctx: Context, appWidgetId: Int, mode: WidgetMode) {
-        prefs(ctx).edit().putInt(PREFIX_WIDGET_MODE + appWidgetId, if (mode == WidgetMode.SINGLE) 1 else 0).apply()
-    }
-
-    /** 多事件模式下用户勾选的事件 id 集合；空 = 自动挑选最近的若干个。 */
-    fun selectedEventsFor(ctx: Context, appWidgetId: Int): Set<Long> =
-        prefs(ctx).getStringSet(PREFIX_WIDGET_SELECTED + appWidgetId, emptySet())
-            ?.mapNotNull { it.toLongOrNull() }?.toSet() ?: emptySet()
-
-    fun setSelectedEventsFor(ctx: Context, appWidgetId: Int, ids: Set<Long>) {
+    fun setSelectedOrderFor(ctx: Context, appWidgetId: Int, ids: List<Long>) {
         prefs(ctx).edit()
-            .putStringSet(PREFIX_WIDGET_SELECTED + appWidgetId, ids.map { it.toString() }.toSet())
+            .putString(PREFIX_WIDGET_SELECTED_ORDER + appWidgetId, ids.joinToString(","))
             .apply()
     }
 
     /** 小组件被移除时清理其全部配置。 */
     fun clearWidget(ctx: Context, appWidgetId: Int) {
         prefs(ctx).edit()
-            .remove(PREFIX_WIDGET_EVENT + appWidgetId)
             .remove(PREFIX_WIDGET_OPACITY + appWidgetId)
-            .remove(PREFIX_WIDGET_MODE + appWidgetId)
             .remove(PREFIX_WIDGET_SELECTED + appWidgetId)
+            .remove(PREFIX_WIDGET_SELECTED_ORDER + appWidgetId)
+            .remove("event_for_widget_" + appWidgetId)
             .apply()
     }
 
@@ -120,8 +106,8 @@ object WidgetPrefs {
                 CountdownWidgetSquareProvider::class.java
             )) {
                 for (id in manager.getAppWidgetIds(ComponentName(context, cls))) {
-                    if (legacyEvent != 0L && !p.contains(PREFIX_WIDGET_EVENT + id)) {
-                        p.edit().putLong(PREFIX_WIDGET_EVENT + id, legacyEvent).apply()
+                    if (legacyEvent != 0L && !p.contains("event_for_widget_" + id)) {
+                        p.edit().putLong("event_for_widget_" + id, legacyEvent).apply()
                     }
                     if (legacyOpacity != -1 && !p.contains(PREFIX_WIDGET_OPACITY + id)) {
                         p.edit().putInt(PREFIX_WIDGET_OPACITY + id, legacyOpacity).apply()
@@ -215,7 +201,7 @@ object WidgetRenderer {
 
     /**
      * 构建单个小组件的 RemoteViews。
-     * 多事件模式（默认）走槽位式多事件列表；单事件模式走大数字卡片。
+     * 勾选数量决定形态：0 个 = 自动最近（单卡片）；1 个 = 该事件单卡片；≥2 个 = 多事件列表。
      */
     private suspend fun buildViewsForWidget(
         context: Context,
@@ -230,10 +216,12 @@ object WidgetRenderer {
         val festival = runCatching {
             container.festivalRepository.todayInfo(LocalDate.now())
         }.getOrNull()
-        if (WidgetPrefs.modeFor(context, appWidgetId) == WidgetPrefs.WidgetMode.MULTI) {
-            return buildListViews(context, container, appWidgetId, events, festival)
+        val selected = WidgetPrefs.selectedOrderFor(context, appWidgetId)
+        if (selected.size >= 2) {
+            return buildListViews(context, container, appWidgetId, events, festival, selected)
         }
-        val picked = pickEvent(events, context, appWidgetId)
+        val picked = if (selected.size == 1) events.firstOrNull { it.id == selected[0] } ?: pickLatest(events)
+        else pickLatest(events)
         // 跟随节日的假期段序号：假期中显示「假期第 x 天」
         val holidayDayN = picked?.linkedFestival?.takeIf { it.isNotBlank() }
             ?.let { runCatching { container.festivalRepository.holidayDayIndexOf(it, LocalDate.now()) }.getOrNull() }
@@ -241,13 +229,9 @@ object WidgetRenderer {
         return buildViews(context, appWidgetId, model, style, picked?.id, festival)
     }
 
-    /** 事件选取优先级：该小组件绑定的事件 > 自动（最近未到期，否则最近已过）。 */
-    private fun pickEvent(events: List<EventEntity>, context: Context, appWidgetId: Int): EventEntity? {
+    /** 自动挑选：最近未到期，否则最近已过。 */
+    private fun pickLatest(events: List<EventEntity>): EventEntity? {
         if (events.isEmpty()) return null
-        WidgetPrefs.eventForWidget(context, appWidgetId)
-            .takeIf { it != 0L }
-            ?.let { id -> events.firstOrNull { it.id == id } }
-            ?.let { return it }
         val today = LocalDate.now().toEpochDay()
         return events.filter { it.targetDateEpochDay - today >= 0 }
             .minByOrNull { it.targetDateEpochDay }
@@ -344,16 +328,16 @@ object WidgetRenderer {
 
     /**
      * 多事件列表视图（槽位式，三种尺寸共用同一布局，高度由 widget 实际尺寸决定）：
-     *  - 行数 = min(事件数, 槽位上限 4, 高度能容纳的行数)，每行 weight=1 平均分割；
-     *  - 行间 1dp 浅色分割线（最后一行不画），点击行直达对应事件详情；
-     *  - 勾选了事件就只在勾选集合内挑，没勾选则自动挑最近的。
+     *  - 行数 = min(勾选数, 槽位上限 4, 高度能容纳的行数)，每行 weight=1 平均分割；
+     *  - 显示顺序 = 用户勾选顺序，行首带序号标记；行间 1dp 浅色分割线，点击行直达详情。
      */
     private suspend fun buildListViews(
         context: Context,
         container: AppContainer,
         appWidgetId: Int,
         events: List<EventEntity>,
-        festival: com.ayaka7452.daymate.data.festival.FestivalDay?
+        festival: com.ayaka7452.daymate.data.festival.FestivalDay?,
+        selectedOrder: List<Long>
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_countdown_list)
         val dark = isDarkTheme(context)
@@ -370,15 +354,9 @@ object WidgetRenderer {
 
         val today = LocalDate.now()
         val todayEpoch = today.toEpochDay()
-        val selected = WidgetPrefs.selectedEventsFor(context, appWidgetId)
-        val pool = if (selected.isEmpty()) events else events.filter { it.id in selected }
-        // 与单事件卡片同口径：未到期优先，各自按与今天的距离取最近
-        val sorted = pool.sortedWith(
-            compareBy(
-                { if (it.targetDateEpochDay >= todayEpoch) 0 else 1 },
-                { abs(it.targetDateEpochDay - todayEpoch) }
-            )
-        )
+        // 显示顺序 = 勾选顺序；已删除的事件自动跳过
+        val order = selectedOrder.withIndex().associate { (idx, id) -> id to idx }
+        val sorted = events.filter { it.id in order.keys }.sortedBy { order[it.id] ?: Int.MAX_VALUE }
         val shown = sorted.take(minOf(MAX_LIST_SLOTS, listSlotCount(context, appWidgetId)))
 
         if (shown.isEmpty()) {
@@ -395,7 +373,8 @@ object WidgetRenderer {
             val holidayN = e.linkedFestival?.takeIf { it.isNotBlank() }
                 ?.let { runCatching { container.festivalRepository.holidayDayIndexOf(it, today) }.getOrNull() }
             views.setViewVisibility(listSlotRoots[i], android.view.View.VISIBLE)
-            views.setTextViewText(listSlotTitles[i], e.title)
+            // 行首序号标记：顺序即用户勾选顺序
+            views.setTextViewText(listSlotTitles[i], "${i + 1}. ${e.title}")
             views.setTextViewText(
                 listSlotDays[i],
                 when {
@@ -426,8 +405,9 @@ object WidgetRenderer {
     /**
      * 高度能容纳的行数：widget 实际高度（dp）减卡内 padding，每行至少 LIST_MIN_ROW_DP。
      * 系统不报高度时回退 provider 声明的 minHeight；两者都拿不到时给满槽位。
+     * 配置页复用同一口径计算勾选上限。
      */
-    private fun listSlotCount(context: Context, appWidgetId: Int): Int {
+    fun listSlotCount(context: Context, appWidgetId: Int): Int {
         val manager = AppWidgetManager.getInstance(context)
         val heightDp = manager.getAppWidgetOptions(appWidgetId)
             .getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
