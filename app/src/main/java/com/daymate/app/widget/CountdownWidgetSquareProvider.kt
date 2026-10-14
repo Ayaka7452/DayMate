@@ -30,4 +30,24 @@ class CountdownWidgetSquareProvider : AppWidgetProvider() {
         AppLogger.log(context, "Square", "onDeleted ids=${appWidgetIds.joinToString()}")
         appWidgetIds.forEach { WidgetPrefs.clearWidget(context, it) }
     }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle
+    ) {
+        AppLogger.log(context, "Square", "onAppWidgetOptionsChanged id=$appWidgetId")
+        // 拉伸会改变高度：多事件列表的行数由高度决定，必须重渲染
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                WidgetRenderer.renderOne(
+                    context.applicationContext, manager, appWidgetId, WidgetRenderer.Style.SQUARE
+                )
+            } catch (t: Throwable) {
+                AppLogger.logError(context, "Square", "onAppWidgetOptionsChanged 重渲染异常 id=$appWidgetId", t)
+            } finally {
+                pending.finish()
+            }
+        }
+        super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions)
+    }
 }

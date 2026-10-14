@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,9 +52,13 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+/** 多事件模式勾选上限，与渲染层槽位上限保持一致。 */
+private const val MULTI_LIMIT = 4
+
 /**
- * 小组件部署/重新配置页：添加小组件到桌面时弹出，选择该小组件显示的事件。
- * 选择「自动」则跟随最近倒数日；选择具体事件则固定显示该事件。
+ * 小组件部署/重新配置页：添加小组件到桌面时弹出。
+ * - 显示方式二选一：多个事件（默认，空间不够自动只放 1 个）或固定单个事件；
+ * - 多事件模式可勾选要显示的事件（上限 4 个），不勾选则自动挑选最近的。
  */
 class WidgetConfigActivity : ComposeActivity() {
 
@@ -144,7 +149,9 @@ private fun WidgetConfigScreen(
     val events by remember { container.eventRepository.observeAll() }
         .collectAsState(initial = emptyList())
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    var mode by remember { mutableStateOf(WidgetPrefs.modeFor(ctx, appWidgetId)) }
     var selected by remember { mutableStateOf(WidgetPrefs.eventForWidget(ctx, appWidgetId)) }
+    var checkedIds by remember { mutableStateOf(WidgetPrefs.selectedEventsFor(ctx, appWidgetId)) }
     var opacity by remember { mutableStateOf(WidgetPrefs.opacityFor(ctx, appWidgetId).toFloat()) }
 
     Scaffold(
@@ -167,7 +174,13 @@ private fun WidgetConfigScreen(
             ) {
                 Button(onClick = {
                     // 两项配置都只写入该组件实例，与其他小组件互不影响
-                    WidgetPrefs.setEventForWidget(ctx, appWidgetId, selected)
+                    WidgetPrefs.setModeFor(ctx, appWidgetId, mode)
+                    if (mode == WidgetPrefs.WidgetMode.MULTI) {
+                        WidgetPrefs.setSelectedEventsFor(ctx, appWidgetId, checkedIds)
+                        WidgetPrefs.setEventForWidget(ctx, appWidgetId, 0L)
+                    } else {
+                        WidgetPrefs.setEventForWidget(ctx, appWidgetId, selected)
+                    }
                     WidgetPrefs.setOpacityFor(ctx, appWidgetId, opacity.toInt())
                     onConfirm(appWidgetId)
                 }) {
@@ -184,30 +197,88 @@ private fun WidgetConfigScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                Tr.s(R.string.widget_config_pick),
+                Tr.s(R.string.widget_config_mode_title),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                item {
-                    OptionRow(
-                        title = Tr.s(R.string.widget_config_auto),
-                        subtitle = Tr.s(R.string.widget_config_auto_desc),
-                        selected = selected == 0L,
-                        onClick = { selected = 0L }
-                    )
+            OptionRow(
+                title = Tr.s(R.string.widget_config_mode_multi),
+                subtitle = Tr.s(R.string.widget_config_mode_multi_desc),
+                selected = mode == WidgetPrefs.WidgetMode.MULTI,
+                onClick = { mode = WidgetPrefs.WidgetMode.MULTI }
+            )
+            OptionRow(
+                title = Tr.s(R.string.widget_config_mode_single),
+                subtitle = null,
+                selected = mode == WidgetPrefs.WidgetMode.SINGLE,
+                onClick = { mode = WidgetPrefs.WidgetMode.SINGLE }
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            if (mode == WidgetPrefs.WidgetMode.MULTI) {
+                Text(
+                    Tr.s(R.string.widget_config_multi_pick),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+                    items(events, key = { it.id }) { ev ->
+                        val id = ev.id
+                        val checked = checkedIds.contains(id)
+                        // 勾满上限后未勾选项置灰，点击不生效
+                        val enabled = checked || checkedIds.size < MULTI_LIMIT
+                        CheckRow(
+                            title = ev.title,
+                            subtitle = LocalDate.ofEpochDay(ev.targetDateEpochDay)
+                                .format(DateTimeFormatter.ofPattern("yyyy/M/d")),
+                            checked = checked,
+                            enabled = enabled,
+                            onCheck = { want ->
+                                checkedIds = when {
+                                    !want -> checkedIds - id
+                                    checkedIds.size < MULTI_LIMIT -> checkedIds + id
+                                    else -> checkedIds
+                                }
+                            }
+                        )
+                    }
                 }
-                items(events, key = { it.id }) { ev ->
-                    OptionRow(
-                        title = ev.title,
-                        subtitle = LocalDate.ofEpochDay(ev.targetDateEpochDay)
-                            .format(DateTimeFormatter.ofPattern("yyyy/M/d")),
-                        selected = selected == ev.id,
-                        onClick = { selected = ev.id }
-                    )
+                Text(
+                    Tr.s(R.string.widget_config_multi_limit),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(Modifier.padding(vertical = 4.dp))
+            } else {
+                Text(
+                    Tr.s(R.string.widget_config_pick),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+                    item {
+                        OptionRow(
+                            title = Tr.s(R.string.widget_config_auto),
+                            subtitle = Tr.s(R.string.widget_config_auto_desc),
+                            selected = selected == 0L,
+                            onClick = { selected = 0L }
+                        )
+                    }
+                    items(events, key = { it.id }) { ev ->
+                        OptionRow(
+                            title = ev.title,
+                            subtitle = LocalDate.ofEpochDay(ev.targetDateEpochDay)
+                                .format(DateTimeFormatter.ofPattern("yyyy/M/d")),
+                            selected = selected == ev.id,
+                            onClick = { selected = ev.id }
+                        )
+                    }
                 }
             }
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Text(Tr.s(R.string.widget_config_opacity), style = MaterialTheme.typography.labelMedium)
@@ -240,7 +311,7 @@ private fun WidgetConfigScreen(
 }
 
 @Composable
-private fun OptionRow(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
+private fun OptionRow(title: String, subtitle: String?, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -252,6 +323,41 @@ private fun OptionRow(title: String, subtitle: String, selected: Boolean, onClic
         Spacer(Modifier.width(8.dp))
         Column {
             Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheck: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onCheck(!checked) }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = { onCheck(it) }, enabled = enabled)
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.outline
+            )
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,

@@ -58,6 +58,19 @@ class CountdownWidgetProvider : AppWidgetProvider() {
         context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle
     ) {
         AppLogger.log(context, "Wide", "onAppWidgetOptionsChanged id=$appWidgetId")
+        // 拉伸会改变高度：多事件列表的行数由高度决定，必须重渲染
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                WidgetRenderer.renderOne(
+                    context.applicationContext, manager, appWidgetId, WidgetRenderer.Style.WIDE
+                )
+            } catch (t: Throwable) {
+                AppLogger.logError(context, "Wide", "onAppWidgetOptionsChanged 重渲染异常 id=$appWidgetId", t)
+            } finally {
+                pending.finish()
+            }
+        }
         super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions)
     }
 

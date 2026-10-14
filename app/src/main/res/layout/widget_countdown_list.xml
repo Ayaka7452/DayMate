@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面小组件（方形 2×2 · 多事件列表）：「自动」模式下显示最近的若干个事件 -->
+<!-- 桌面小组件（多事件列表，三种尺寸共用）：若干事件槽位 weight=1 平均分割，
+     行间 1dp 浅色分割线（最后一行不画），点击行进对应事件详情。
+     行数由渲染层按 widget 实际高度决定（每行至少 30dp，槽位上限 4）。
+     RemoteViews 布局白名单不含裸 <View>，卡片背景层与分割线均用 FrameLayout 实现。 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- RemoteViews 布局白名单不含裸 <View>，卡片背景层必须用 FrameLayout -->
     <FrameLayout
         android:id="@+id/widget_card"
         android:layout_width="match_parent"
@@ -21,21 +23,209 @@
         android:paddingTop="8dp"
         android:paddingBottom="8dp">
 
-        <ListView
-            android:id="@+id/widget_list"
+        <FrameLayout
+            android:id="@+id/list_row_0"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:divider="@null"
-            android:dividerHeight="0dp" />
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
-        <TextView
-            android:id="@+id/widget_empty"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp">
+
+                <TextView
+                    android:id="@+id/list_row_0_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:textColor="#1C1B1F"
+                    android:text="" />
+
+                <TextView
+                    android:id="@+id/list_row_0_days"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:maxLines="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="15sp"
+                    android:textColor="#1E78D0"
+                    android:text="" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/list_row_0_divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_gravity="bottom|fill_horizontal"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
+                android:background="@drawable/widget_divider_light" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/list_row_1"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:textSize="13sp"
-            android:text="暂无倒数日" />
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp">
+
+                <TextView
+                    android:id="@+id/list_row_1_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:textColor="#1C1B1F"
+                    android:text="" />
+
+                <TextView
+                    android:id="@+id/list_row_1_days"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:maxLines="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="15sp"
+                    android:textColor="#1E78D0"
+                    android:text="" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/list_row_1_divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_gravity="bottom|fill_horizontal"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
+                android:background="@drawable/widget_divider_light" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/list_row_2"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp">
+
+                <TextView
+                    android:id="@+id/list_row_2_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:textColor="#1C1B1F"
+                    android:text="" />
+
+                <TextView
+                    android:id="@+id/list_row_2_days"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:maxLines="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="15sp"
+                    android:textColor="#1E78D0"
+                    android:text="" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/list_row_2_divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_gravity="bottom|fill_horizontal"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
+                android:background="@drawable/widget_divider_light" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/list_row_3"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp">
+
+                <TextView
+                    android:id="@+id/list_row_3_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:textColor="#1C1B1F"
+                    android:text="" />
+
+                <TextView
+                    android:id="@+id/list_row_3_days"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:maxLines="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="15sp"
+                    android:textColor="#1E78D0"
+                    android:text="" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/list_row_3_divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_gravity="bottom|fill_horizontal"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
+                android:background="@drawable/widget_divider_light" />
+        </FrameLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:textSize="13sp"
+        android:textColor="#7A7570"
+        android:text="@string/widget_no_events"
+        android:visibility="gone" />
 
     <!-- 节日角标（休/班） -->
     <TextView
