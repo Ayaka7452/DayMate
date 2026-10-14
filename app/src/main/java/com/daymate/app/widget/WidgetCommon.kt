@@ -329,7 +329,7 @@ object WidgetRenderer {
     /**
      * 多事件列表视图（槽位式，三种尺寸共用同一布局，高度由 widget 实际尺寸决定）：
      *  - 行数 = min(勾选数, 槽位上限 4, 高度能容纳的行数)，每行 weight=1 平均分割；
-     *  - 显示顺序 = 用户勾选顺序，行首带序号标记；行间 1dp 浅色分割线，点击行直达详情。
+     *  - 显示顺序 = 用户勾选顺序（不带序号，序号仅在设置页显示）；行间 1dp 浅色分割线，点击行直达详情。
      */
     private suspend fun buildListViews(
         context: Context,
@@ -373,8 +373,7 @@ object WidgetRenderer {
             val holidayN = e.linkedFestival?.takeIf { it.isNotBlank() }
                 ?.let { runCatching { container.festivalRepository.holidayDayIndexOf(it, today) }.getOrNull() }
             views.setViewVisibility(listSlotRoots[i], android.view.View.VISIBLE)
-            // 行首序号标记：顺序即用户勾选顺序
-            views.setTextViewText(listSlotTitles[i], "${i + 1}. ${e.title}")
+            views.setTextViewText(listSlotTitles[i], e.title)
             views.setTextViewText(
                 listSlotDays[i],
                 when {

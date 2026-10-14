@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,7 +59,7 @@ private const val MULTI_LIMIT = 4
 /**
  * 小组件部署/重新配置页：添加小组件到桌面时弹出。
  * 只有一份事件多选清单：不勾选显示最近的一个倒数日；勾一个以单卡片显示；
- * 勾多个成列表，顺序即勾选顺序，行首带序号。勾选上限按该组件当前尺寸算。
+ * 勾多个成列表，顺序即勾选顺序（序号仅在本页已勾选行尾显示）。勾选上限按该组件当前尺寸算。
  */
 class WidgetConfigActivity : ComposeActivity() {
 
@@ -213,11 +214,23 @@ private fun WidgetConfigScreen(
                     val enabled = checked || checkedOrder.size < limit
                     val seq = checkedOrder.indexOf(id)
                     CheckRow(
-                        title = if (seq >= 0) "${seq + 1}. ${ev.title}" else ev.title,
+                        title = ev.title,
                         subtitle = LocalDate.ofEpochDay(ev.targetDateEpochDay)
                             .format(DateTimeFormatter.ofPattern("yyyy/M/d")),
                         checked = checked,
                         enabled = enabled,
+                        // 序号只在本页展示：已勾选的行尾显示勾选顺序，即 widget 列表的显示顺序
+                        trailing = if (seq >= 0) {
+                            {
+                                Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                    Text(
+                                        "${seq + 1}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                            }
+                        } else null,
                         onCheck = { want ->
                             checkedOrder = when {
                                 want -> checkedOrder + id
@@ -276,7 +289,8 @@ private fun CheckRow(
     subtitle: String,
     checked: Boolean,
     enabled: Boolean,
-    onCheck: (Boolean) -> Unit
+    onCheck: (Boolean) -> Unit,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -299,6 +313,10 @@ private fun CheckRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )
+        }
+        if (trailing != null) {
+            Spacer(Modifier.weight(1f))
+            trailing()
         }
     }
 }
