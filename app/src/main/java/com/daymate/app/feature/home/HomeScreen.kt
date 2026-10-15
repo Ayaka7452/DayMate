@@ -2064,18 +2064,22 @@ fun EventGridItem(
                     }
                 }
                 val absDays = kotlin.math.abs(days)
+                // 就是今天：徽章不再显示「0」，改成实心圆点（今天标记，与下方「就是今天」呼应）
+                val isToday = days == 0L
                 Box(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(eventColor.copy(alpha = 0.16f)),
+                        .background(if (isToday) eventColor else eventColor.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (absDays > 999) "999+" else absDays.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = eventColor
-                    )
+                    if (!isToday) {
+                        Text(
+                            text = if (absDays > 999) "999+" else absDays.toString(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = eventColor
+                        )
+                    }
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(

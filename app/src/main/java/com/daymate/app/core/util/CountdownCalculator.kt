@@ -69,6 +69,8 @@ object CountdownCalculator {
     fun formatCountdown(targetEpochDay: Long, unit: String?, refDays: Int? = null): String {
         val today = LocalDate.now()
         val diffDays = targetEpochDay - today.toEpochDay()
+        // 目标日期就是今天：不显示「还有 0 天」，直接给当天文案（与详情页大字同一句）
+        if (diffDays == 0L) return Tr.s(R.string.detail_today)
         val isFuture = diffDays >= 0
         val period = if (isFuture) {
             Period.between(today, LocalDate.ofEpochDay(targetEpochDay))

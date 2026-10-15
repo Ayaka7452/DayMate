@@ -435,19 +435,28 @@ fun EventCountdownCard(
                 )
             }
             Row(horizontalArrangement = Arrangement.End) {
-                Text(
-                    days.toString(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = if (past) MaterialTheme.colorScheme.secondary
-                    else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.alignByBaseline()
-                )
-                Text(
-                    stringResource(R.string.unit_days),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.alignByBaseline()
-                )
+                if (days == 0 && !past) {
+                    // 就是今天：整句顶掉「0 天」
+                    Text(
+                        Tr.s(R.string.detail_today),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Text(
+                        days.toString(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = if (past) MaterialTheme.colorScheme.secondary
+                        else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.alignByBaseline()
+                    )
+                    Text(
+                        stringResource(R.string.unit_days),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.alignByBaseline()
+                    )
+                }
             }
         }
     }

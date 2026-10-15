@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.util.TypedValue
 import android.widget.RemoteViews
 import com.ayaka7452.daymate.DayMateApp
 import com.ayaka7452.daymate.MainActivity
@@ -134,7 +135,9 @@ object WidgetRenderer {
         val title: String,
         val subtitle: String,
         val number: String,
-        val unit: String
+        val unit: String,
+        /** 目标日期就是今天：数字位放的是当天整句，需要按尺寸压字号（见 buildViews）。 */
+        val isToday: Boolean = false
     )
 
     enum class Style { WIDE, SMALL, SQUARE }
@@ -257,6 +260,18 @@ object WidgetRenderer {
             )
         }
 
+        // 目标日期就是今天：数字位直接给当天整句（单位留空），不再显示「0 天」；
+        // 副标题只留日期，避免与整句重复
+        if (diff == 0) {
+            return WidgetModel(
+                title = picked.title,
+                subtitle = dateStr,
+                number = Tr.s(R.string.detail_today),
+                unit = "",
+                isToday = true
+            )
+        }
+
         // 数字与单位：跟随事件的显示单位（月/年不足 1 时自动退回更小单位）
         var number = abs(diff).toString()
         var unit = Tr.s(R.string.unit_days)
@@ -280,6 +295,16 @@ object WidgetRenderer {
             number = number,
             unit = unit
         )
+    }
+
+    /**
+     * 「就是今天」这类整词替换数字时的字号：各尺寸按最小宽度压到放得下为止
+     * （宽版 3×1 180dp / 迷你 2×1 110dp / 方形 2×2 110dp），数字本身仍用 XML 字阶。
+     */
+    private fun todayTextSizeSp(style: Style): Float = when (style) {
+        Style.WIDE -> 22f
+        Style.SMALL -> 15f
+        Style.SQUARE -> 18f
     }
 
     private fun isDarkTheme(context: Context): Boolean =
@@ -378,7 +403,8 @@ object WidgetRenderer {
                 listSlotDays[i],
                 when {
                     holidayN != null -> Tr.s(R.string.unit_holiday_day_n, holidayN)
-                    diff >= 0 -> Tr.s(R.string.unit_days_future, diff)
+                    diff == 0 -> Tr.s(R.string.detail_today)
+                    diff > 0 -> Tr.s(R.string.unit_days_future, diff)
                     else -> Tr.s(R.string.unit_days_past, -diff)
                 }
             )
@@ -480,6 +506,15 @@ object WidgetRenderer {
             views.setTextViewText(R.id.widget_subtitle, model.subtitle)
             views.setTextViewText(R.id.widget_days_number, model.number)
             views.setTextViewText(R.id.widget_days_unit, model.unit)
+            // 「就是今天」是整词不是数字：按尺寸压字号，否则窄尺寸里会把标题挤没。
+            // 每次 update 都重新 inflate 布局、字号回到 XML 默认，无需手动还原。
+            if (model.isToday) {
+                views.setTextViewTextSize(
+                    R.id.widget_days_number,
+                    TypedValue.COMPLEX_UNIT_SP,
+                    todayTextSizeSp(style)
+                )
+            }
         }
 
         // 整卡点击直达当前显示事件的详情页

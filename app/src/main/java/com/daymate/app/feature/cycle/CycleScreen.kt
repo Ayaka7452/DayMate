@@ -2570,8 +2570,12 @@ internal fun describeDay(
         phase == CycleCalculator.Phase.PREDICTED_PERIOD ->
             Tr.s(R.string.cycle_predict_period) to Tr.s(
                 R.string.cycle_predict_not_logged,
-                if (day > today) Tr.s(R.string.unit_days_future, day - today)
-                else Tr.s(R.string.unit_days_past, today - day)
+                when {
+                    day > today -> Tr.s(R.string.unit_days_future, day - today)
+                    // 预测日恰是今天：不给「已过 0 天」，与事件侧同口径
+                    day == today -> Tr.s(R.string.detail_today)
+                    else -> Tr.s(R.string.unit_days_past, today - day)
+                }
             )
         day == ovu ->
             Tr.s(R.string.cycle_ovulation_day) to Tr.s(

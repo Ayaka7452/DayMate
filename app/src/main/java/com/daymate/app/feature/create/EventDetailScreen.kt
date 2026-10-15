@@ -260,6 +260,16 @@ fun EventDetailBody(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
                 )
+            } else if (cd.isToday) {
+                // 就是今天：整句占大字号位（不拆数字+单位、不再附小字说明）。
+                // 字号比 64sp 数字小一档——「就是今天」是整词，64sp 在窄屏会顶到边。
+                Text(
+                    cd.number,
+                    fontSize = 40.sp,
+                    lineHeight = 46.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             } else {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
@@ -354,7 +364,13 @@ private fun refUnitLabel(unit: String?): String = when (unit) {
 }
 
 /** 详情页大数字：按显示单位取整数，不足一个单位时逐级退回（与 formatCountdown 规则一致）。 */
-private data class CountdownDisplay(val number: String, val unit: String, val caption: String)
+private data class CountdownDisplay(
+    val number: String,
+    val unit: String,
+    val caption: String,
+    /** 目标日期就是今天：大字号整句显示、不带单位也不附小字说明。 */
+    val isToday: Boolean = false
+)
 
 private fun countdownDisplay(
     data: EventDetailData,
@@ -384,6 +400,15 @@ private fun countdownDisplay(
     }
     val today = now.toLocalDate()
     val diffDays = data.targetDateEpochDay - today.toEpochDay()
+    // 目标日期就是今天：大字号直接给当天整句，既不显示「0 天」也不再加小字说明
+    if (diffDays == 0L) {
+        return CountdownDisplay(
+            number = Tr.s(R.string.detail_today),
+            unit = "",
+            caption = "",
+            isToday = true
+        )
+    }
     val isFuture = diffDays >= 0
     val period = if (isFuture) {
         Period.between(today, LocalDate.ofEpochDay(data.targetDateEpochDay))
@@ -407,10 +432,7 @@ private fun countdownDisplay(
     }
     // 已过且有对照值时数字区显示 X/N（对照值单位跟随显示单位）
     val number = if (!isFuture && hasRef) "$n / ${data.refDays}" else "$n"
-    val caption = when {
-        diffDays == 0L -> Tr.s(R.string.detail_today)
-        isFuture -> Tr.s(R.string.detail_until)
-        else -> Tr.s(R.string.detail_past)
-    }
+    // 今天的分支已在上面提前返回，这里只剩「未到 / 已过」两种
+    val caption = if (isFuture) Tr.s(R.string.detail_until) else Tr.s(R.string.detail_past)
     return CountdownDisplay(number = number, unit = u, caption = caption)
 }
