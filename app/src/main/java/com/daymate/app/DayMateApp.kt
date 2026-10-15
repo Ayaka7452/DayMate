@@ -47,7 +47,22 @@ class DayMateApp : Application() {
             // 事件——滚动要找「该节日的下一次日期」，依赖刚下载到的当年数据。
             runCatching {
                 val festival = container.festivalRepository
-                if (festival.shouldAutoUpdateCurrent()) {
+                if (festival.isFirstRun()) {
+                    // 首次安装：无任何缓存且从未尝试过下载 → 按当前界面语言自动选数据源并拉取一次
+                    // （去年 + 今年）。与「自动补下」开关无关，新用户打开 app 即有数据可用。
+                    val region = com.ayaka7452.daymate.data.festival.FestivalRegion.forLanguage(
+                        com.ayaka7452.daymate.core.i18n.LocaleWrap.effective(applicationContext).language
+                    )
+                    festival.setRegion(region)
+                    festival.markAutoTried()
+                    if (festival.updateFromNetwork().success) {
+                        com.ayaka7452.daymate.core.log.AppLogger.log(
+                            "Festival", "首次安装按语言自动下载节假日数据成功（${region.name}），重锚定跟随事件"
+                        )
+                        container.eventRepository.reanchorFestivalEstimates(festival)
+                        com.ayaka7452.daymate.widget.WidgetRenderer.refreshAll(this@DayMateApp)
+                    }
+                } else if (festival.shouldAutoUpdateCurrent()) {
                     festival.markAutoTried()
                     if (festival.updateFromNetwork().success) {
                         com.ayaka7452.daymate.core.log.AppLogger.log("Festival", "启动自动补下节假日数据成功，重锚定跟随事件")

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -134,6 +135,7 @@ fun SettingsScreen(
     var festivalYears by remember { mutableStateOf(festivalRepo.selectedYears()) }
     var festivalOffsetDraft by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var autoUpdateCurrent by remember { mutableStateOf(festivalRepo.autoUpdateCurrent()) }
+    var showFestivalClearDialog by remember { mutableStateOf(false) }
     var showBadgeEmojiDialog by remember { mutableStateOf(false) }
 
     // ===== 图标模式方块间隔 =====
@@ -787,6 +789,34 @@ fun SettingsScreen(
                     }
                 )
             }
+            // 清除所有节日数据缓存：危险操作（红色 + 确认弹窗）。删除的是缓存文件，
+            // 不碰任何事件；清完后 festivalVersion 变更会自动刷新上面的「源名/缓存状态」。
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showFestivalClearDialog = true }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        stringResource(R.string.settings_festival_clear),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        stringResource(R.string.settings_festival_clear_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
             // 「休息及补班提醒」开关：补班是中国调休特有，数据源里没有「调休上班日」条目时
             // （美日韩源 / 纯假日自定义源）整组隐藏。跟随节日数据版本号重算，换源/下载后即时生效。
             val makeupSupported = remember(festivalVersion) {
@@ -1171,13 +1201,13 @@ fun SettingsScreen(
         )
     }
 
-    // 图标模式方块间隔弹窗：预设四档（含当前默认 8dp）+ 自定义 0–24 dp。
+    // 图标模式方块间隔弹窗：预设四档（含当前默认 12dp）+ 自定义 0–24 dp。
     // 预设选中即改选中态，按「确定」统一落盘；自定义走数字键盘，非法输入在 supportingText 位置标红不关窗。
     if (showGridSpacingDialog) {
         val presets = listOf(
             4 to R.string.settings_grid_preset_compact,
-            8 to R.string.settings_grid_preset_default,
-            12 to R.string.settings_grid_preset_relaxed,
+            8 to R.string.settings_grid_preset_moderate,
+            12 to R.string.settings_grid_preset_default,
             16 to R.string.settings_grid_preset_extra
         )
         val presetValues = presets.map { it.first }
@@ -1391,6 +1421,38 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showFestivalCustomInput = false }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
+    }
+
+    // 清除所有节日数据缓存确认弹窗：确认后删除全部缓存文件并 Toast 汇报数量。
+    if (showFestivalClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showFestivalClearDialog = false },
+            title = { Text(stringResource(R.string.settings_festival_clear_title)) },
+            text = { Text(stringResource(R.string.settings_festival_clear_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showFestivalClearDialog = false
+                    scope.launch {
+                        val deleted = festivalRepo.clearAllCache()
+                        Toast.makeText(
+                            ctx,
+                            Tr.s(R.string.settings_festival_clear_done, deleted),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }) {
+                    Text(
+                        stringResource(R.string.settings_festival_clear_confirm),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFestivalClearDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             }
         )
     }

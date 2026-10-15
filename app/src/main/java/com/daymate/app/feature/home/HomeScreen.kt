@@ -431,7 +431,7 @@ fun HomeScreen(
     val homeViewMode by container.settingsRepository.homeViewMode
         .collectAsState(initial = homeViewModeInit)
 
-    // 图标模式方块间隔：同款就近同步预载（冷启动首帧即真实值，避免 8dp 默认值的间隔跳动）。
+    // 图标模式方块间隔：同款就近同步预载（冷启动首帧即真实值，避免 12dp 默认值的间隔跳动）。
     val gridSpacingInit = remember {
         runCatching {
             kotlinx.coroutines.runBlocking {

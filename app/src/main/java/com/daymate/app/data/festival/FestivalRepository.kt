@@ -309,6 +309,13 @@ class FestivalRepository(private val appContext: Context) {
     }
 
     /**
+     * 是否首次安装：无任何缓存且从未尝试过自动下载。
+     * 首次打开时按当前界面语言自动选数据源并拉取一次（与「自动补下」开关无关）。
+     */
+    fun isFirstRun(): Boolean =
+        !hasData() && prefs.getLong(KEY_LAST_AUTO_TRY, 0L) == 0L
+
+    /**
      * 是否需要自动补下当年数据：开关已打开 + 当年无缓存 + 距上次尝试超过 24 小时。
      * 当年数据缺失时小组件与「下一个节日」会取不到值，跨年后尤其明显。
      */
@@ -336,6 +343,19 @@ class FestivalRepository(private val appContext: Context) {
         }
         // 删了文件，进程内缓存必须跟着失效
         invalidateMemoryCache()
+    }
+
+    /**
+     * 清空全部节日数据缓存：删除缓存目录下所有数据源的所有年份文件。
+     * 返回实际删除的文件数；随后失效内存缓存并广播版本变更（设置页状态即时刷新）。
+     */
+    fun clearAllCache(): Int {
+        val deleted = cacheDir.listFiles()
+            ?.count { runCatching { it.delete() }.getOrDefault(false) }
+            ?: 0
+        invalidateMemoryCache()
+        changed()
+        return deleted
     }
 
     /** 当前数据源对应的缓存键：内置区域用区域名，自定义 URL 统一用 CUSTOM。 */

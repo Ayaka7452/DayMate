@@ -53,8 +53,8 @@
     <string name="settings_grid_spacing_desc">ホームの中アイコン・大アイコン表示で、タイル同士の間隔の広さ。</string>
     <string name="settings_grid_dialog_title">間隔を設定</string>
     <string name="settings_grid_preset_compact">狭め</string>
+    <string name="settings_grid_preset_moderate">ふつう</string>
     <string name="settings_grid_preset_default">標準</string>
-    <string name="settings_grid_preset_relaxed">広め</string>
     <string name="settings_grid_preset_extra">とても広い</string>
     <string name="settings_grid_custom">カスタム</string>
     <string name="settings_grid_custom_desc">範囲: 0～24 dp</string>
@@ -137,6 +137,12 @@
     <string name="settings_vault_screenshot_off">スクリーンショット、録画、最近のタスクのサムネイルをブロック。</string>
     <string name="settings_festival_section">祝日データ</string>
     <string name="settings_festival_desc">アプリが選択したソースからダウンロードし、端末にキャッシュします。祝日の追跡や祝日バッジなどの機能に必要です。</string>
+    <string name="settings_festival_clear">祝日データのキャッシュを削除</string>
+    <string name="settings_festival_clear_desc">すべてのソース・すべての年の祝日キャッシュを削除します。保存したイベントには影響しません。</string>
+    <string name="settings_festival_clear_title">祝日データのキャッシュを削除しますか？</string>
+    <string name="settings_festival_clear_body">キャッシュされた祝日データをすべて削除します。再ダウンロードするまで、祝日カードや休日リマインダーにデータが表示されません。</string>
+    <string name="settings_festival_clear_confirm">削除</string>
+    <string name="settings_festival_clear_done">%1$d 件のキャッシュファイルを削除しました。</string>
     <string name="settings_source_section">データソース</string>
     <string name="settings_source_current">現在：%1$s</string>
     <string name="settings_cache_years_section">キャッシュする年</string>

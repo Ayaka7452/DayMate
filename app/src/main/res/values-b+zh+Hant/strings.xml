@@ -53,8 +53,8 @@
     <string name="settings_grid_spacing_desc">主頁中圖示與大圖示檢視裏，方塊之間的間隔寬度。</string>
     <string name="settings_grid_dialog_title">設定間隔寬度</string>
     <string name="settings_grid_preset_compact">緊湊</string>
+    <string name="settings_grid_preset_moderate">適中</string>
     <string name="settings_grid_preset_default">預設</string>
-    <string name="settings_grid_preset_relaxed">寬鬆</string>
     <string name="settings_grid_preset_extra">特寬</string>
     <string name="settings_grid_custom">自訂</string>
     <string name="settings_grid_custom_desc">範圍 0–24 dp</string>
@@ -137,6 +137,12 @@
     <string name="settings_vault_screenshot_off">已阻止截圖、錄屏與最近任務縮圖。</string>
     <string name="settings_festival_section">節假日資料</string>
     <string name="settings_festival_desc">由應用從所選資料源下載並快取到本機。跟隨節日與節日角標等功能需要該資料。</string>
+    <string name="settings_festival_clear">清除節日資料快取</string>
+    <string name="settings_festival_clear_desc">刪除所有資料源、所有年份的節假日快取。已儲存的事件不受影響。</string>
+    <string name="settings_festival_clear_title">清除節日資料快取？</string>
+    <string name="settings_festival_clear_body">將刪除全部節假日快取檔案，重新下載前節日卡片與假期提醒暫無資料可用。</string>
+    <string name="settings_festival_clear_confirm">清空</string>
+    <string name="settings_festival_clear_done">已清除 %1$d 個快取檔案。</string>
     <string name="settings_source_section">資料來源</string>
     <string name="settings_source_current">目前：%1$s</string>
     <string name="settings_cache_years_section">快取年份</string>

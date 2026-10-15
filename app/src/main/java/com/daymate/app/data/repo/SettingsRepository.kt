@@ -47,7 +47,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val UPDATE_LAST_CHECK = longPreferencesKey("update_last_check")              // 上次检查时间戳（节流用）
         private val UPDATE_SKIPPED = stringPreferencesKey("update_skipped_version")          // 用户点过「稍后」的版本
         private val HOME_VIEW_MODE = stringPreferencesKey("home_view_mode")                  // 主页视图：list(列表) / medium(中图标) / large(大图标)
-        private val HOME_GRID_SPACING = intPreferencesKey("home_grid_spacing")               // 图标模式方块间隔 dp（默认 8）
+        private val HOME_GRID_SPACING = intPreferencesKey("home_grid_spacing")               // 图标模式方块间隔 dp（默认 12）
         private val CALENDAR_LONG_PRESS = booleanPreferencesKey("calendar_long_press_enabled") // 长按主页加号在展开面板显示「日历预览」入口（默认开）
 
         /** 主页视图模式取值：列表 / 中图标(3列) / 大图标(2列)。 */
@@ -56,7 +56,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         const val VIEW_MODE_LARGE = "large"
 
         /** 图标模式方块间隔的默认值与可设范围（dp）。 */
-        const val GRID_SPACING_DEFAULT = 8
+        const val GRID_SPACING_DEFAULT = 12
         const val GRID_SPACING_MIN = 0
         const val GRID_SPACING_MAX = 24
 
@@ -115,7 +115,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[HOME_VIEW_MODE] = mode }
     }
 
-    /** 图标模式（中图标 3 列 / 大图标 2 列）网格中方块之间的间隔，单位 dp（默认 8）。 */
+    /** 图标模式（中图标 3 列 / 大图标 2 列）网格中方块之间的间隔，单位 dp（默认 12）。 */
     val homeGridSpacing: Flow<Int> =
         dataStore.data.map { it[HOME_GRID_SPACING] ?: GRID_SPACING_DEFAULT }
 
