@@ -789,34 +789,6 @@ fun SettingsScreen(
                     }
                 )
             }
-            // 清除所有节日数据缓存：危险操作（红色 + 确认弹窗）。删除的是缓存文件，
-            // 不碰任何事件；清完后 festivalVersion 变更会自动刷新上面的「源名/缓存状态」。
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showFestivalClearDialog = true }
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error
-                )
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(
-                        stringResource(R.string.settings_festival_clear),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Text(
-                        stringResource(R.string.settings_festival_clear_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
             // 「休息及补班提醒」开关：补班是中国调休特有，数据源里没有「调休上班日」条目时
             // （美日韩源 / 纯假日自定义源）整组隐藏。跟随节日数据版本号重算，换源/下载后即时生效。
             val makeupSupported = remember(festivalVersion) {
@@ -879,6 +851,34 @@ fun SettingsScreen(
                         onCheckedChange = { enabled ->
                             scope.launch { container.settingsRepository.setHolidaySpanTotal(enabled) }
                         }
+                    )
+                }
+            }
+            // 清除所有节日数据缓存：危险操作（红色 + 确认弹窗），收在本分组末尾。
+            // 删除的是缓存文件，不碰任何事件；清完后 festivalVersion 变更会自动刷新「源名/缓存状态」。
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showFestivalClearDialog = true }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        stringResource(R.string.settings_festival_clear),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        stringResource(R.string.settings_festival_clear_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
