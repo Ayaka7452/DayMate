@@ -952,11 +952,20 @@ fun HomeScreen(
                     var dragOffset by remember { mutableFloatStateOf(0f) }
                     // 各行布局 y（不含 graphicsLayer 偏移），相邻差即拖拽步长
                     val rowYs = remember { mutableStateListOf<Float>() }
-                    Column {
+                    // 间隔作用点（v1.23.6 重发修「只有中间行距可调」）：每条分割线上下各 spacing/2，
+                    // 末行下方同样留 spacing/2；独立卡片无行首分割线时首行上方留 spacing/2——首中尾全部受设置控制。
+                    val halfSpacing = if (pinnedSpacing > 0) pinnedSpacing.dp / 2 else 0.dp
+                    Column(
+                        Modifier.padding(
+                            top = if (leadingDivider) 0.dp else halfSpacing,
+                            bottom = halfSpacing
+                        )
+                    ) {
                         // 置顶卡内分割线比全局 ListItemDivider 更浅一档（用户反馈 0.3 → 0.2），只影响置顶卡。
                         if (leadingDivider) Box(
                             Modifier
                                 .padding(horizontal = 12.dp)
+                                .padding(vertical = halfSpacing)
                                 .fillMaxWidth()
                                 .height(1.dp)
                                 .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
@@ -966,7 +975,7 @@ fun HomeScreen(
                             if (i > 0) Box(
                                 Modifier
                                     .padding(horizontal = 12.dp)
-                                    .padding(vertical = if (pinnedSpacing > 0) pinnedSpacing.dp / 2 else 0.dp)
+                                    .padding(vertical = halfSpacing)
                                     .fillMaxWidth()
                                     .height(1.dp)
                                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
