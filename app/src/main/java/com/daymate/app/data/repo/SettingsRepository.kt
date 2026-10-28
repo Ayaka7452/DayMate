@@ -62,8 +62,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         const val GRID_SPACING_MIN = 0
         const val GRID_SPACING_MAX = 24
 
-        /** 置顶卡内行与行间隔的默认值与可设范围（dp）。 */
-        const val PINNED_SPACING_DEFAULT = 0
+        /** 置顶卡内行与行间隔的默认值与可设范围（dp）。默认 8（用户拍板：0 比紧凑档还挤，不合理）。 */
+        const val PINNED_SPACING_DEFAULT = 8
         const val PINNED_SPACING_MIN = 0
         const val PINNED_SPACING_MAX = 24
 

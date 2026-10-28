@@ -467,7 +467,7 @@ fun HomeScreen(
     val gridSpacing by container.settingsRepository.homeGridSpacing
         .collectAsState(initial = gridSpacingInit)
 
-    // 置顶卡内行间隔：同款就近同步预载（默认 0，改大后冷启动首帧不跳）。
+    // 置顶卡内行间隔：同款就近同步预载（默认 8，改大改小冷启动首帧都不跳）。
     val pinnedSpacingInit = remember {
         runCatching {
             kotlinx.coroutines.runBlocking {
@@ -962,7 +962,7 @@ fun HomeScreen(
                                 .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                         )
                         order.forEachIndexed { i, pe ->
-                            // 行间隔：分割线上下各留 spacing/2（默认 0 = 紧贴）；拖拽步长用 rowYs 实测差，自动适配。
+                            // 行间隔：分割线上下各留 spacing/2（默认 8）；拖拽步长用 rowYs 实测差，自动适配。
                             if (i > 0) Box(
                                 Modifier
                                     .padding(horizontal = 12.dp)

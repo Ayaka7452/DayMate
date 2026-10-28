@@ -145,7 +145,7 @@ fun SettingsScreen(
     var showGridSpacingDialog by remember { mutableStateOf(false) }
 
     // ===== 置顶模式间隔 =====
-    // 置顶卡内事件行与行的间距；默认 0 = 紧贴分割线的现有样式，预设四档 + 手填 0–24 dp。
+    // 置顶卡内事件行与行的间距；默认 8dp（用户拍板），预设四档 + 手填 0–24 dp。
     val pinnedSpacing by container.settingsRepository.homePinnedSpacing
         .collectAsState(initial = SettingsRepository.PINNED_SPACING_DEFAULT)
     var showPinnedSpacingDialog by remember { mutableStateOf(false) }
@@ -1334,13 +1334,13 @@ fun SettingsScreen(
         )
     }
 
-    // 置顶模式间隔弹窗：预设四档（0=默认紧贴 / 4 / 8 / 12）+ 自定义 0–24 dp。
+    // 置顶模式间隔弹窗：预设四档（0 紧凑 / 4 适中 / 8 默认 / 12 特宽）+ 自定义 0–24 dp。
     // 交互与图标间隔弹窗一致：预设选中即改选中态，「确定」统一落盘；非法输入标红不关窗。
     if (showPinnedSpacingDialog) {
         val presets = listOf(
-            0 to R.string.settings_grid_preset_default,
-            4 to R.string.settings_grid_preset_compact,
-            8 to R.string.settings_grid_preset_moderate,
+            0 to R.string.settings_grid_preset_compact,
+            4 to R.string.settings_grid_preset_moderate,
+            8 to R.string.settings_grid_preset_default,
             12 to R.string.settings_grid_preset_extra
         )
         val presetValues = presets.map { it.first }
