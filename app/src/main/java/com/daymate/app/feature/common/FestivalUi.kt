@@ -190,8 +190,8 @@ fun FestivalCountdownCard(
                         }
                 }
             }
-            footer?.invoke()
         }
+        footer?.invoke()
     }
 }
 
