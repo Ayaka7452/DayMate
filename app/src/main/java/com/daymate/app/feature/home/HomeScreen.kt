@@ -903,17 +903,20 @@ fun HomeScreen(
                             .filter { it.isPinned && it.specialType == null }
                             .sortedBy { it.targetDateEpochDay }
                     }
-                    val pinnedFooter: (@Composable () -> Unit)? = if (pinnedEvents.isEmpty()) null
-                    else @Composable {
-                        Column {
-                            ListItemDivider()
-                            pinnedEvents.forEachIndexed { i, pe ->
-                                if (i > 0) ListItemDivider()
-                                PinnedEventRow(
-                                    event = pe,
-                                    festivalRepo = festivalRepo,
-                                    onClick = { onNavigate("event_detail?eventId=${pe.id}") }
-                                )
+                    val pinnedFooter: (@Composable () -> Unit)? = if (pinnedEvents.isEmpty()) {
+                        null
+                    } else {
+                        {
+                            Column {
+                                ListItemDivider()
+                                pinnedEvents.forEachIndexed { i, pe ->
+                                    if (i > 0) ListItemDivider()
+                                    PinnedEventRow(
+                                        event = pe,
+                                        festivalRepo = festivalRepo,
+                                        onClick = { onNavigate("event_detail?eventId=${pe.id}") }
+                                    )
+                                }
                             }
                         }
                     }
