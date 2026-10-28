@@ -942,9 +942,22 @@ fun HomeScreen(
                     // 各行布局 y（不含 graphicsLayer 偏移），相邻差即拖拽步长
                     val rowYs = remember { mutableStateListOf<Float>() }
                     Column {
-                        if (leadingDivider) ListItemDivider(inset = 12.dp)
+                        // 置顶卡内分割线比全局 ListItemDivider 更浅一档（用户反馈 0.3 → 0.2），只影响置顶卡。
+                        if (leadingDivider) Box(
+                            Modifier
+                                .padding(horizontal = 12.dp)
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        )
                         order.forEachIndexed { i, pe ->
-                            if (i > 0) ListItemDivider(inset = 12.dp)
+                            if (i > 0) Box(
+                                Modifier
+                                    .padding(horizontal = 12.dp)
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                            )
                             var rowModifier: Modifier = Modifier.onGloballyPositioned { coords ->
                                 val y = coords.positionInParent().y
                                 if (i < rowYs.size) rowYs[i] = y else rowYs.add(y)
@@ -1119,7 +1132,7 @@ fun HomeScreen(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        top = if (hasHeader) 0.dp else padding.calculateTopPadding(),
+                        top = if (hasHeader || pinnedEvents.isNotEmpty()) 0.dp else padding.calculateTopPadding(),
                         bottom = padding.calculateBottomPadding()
                     ),
                     verticalArrangement = Arrangement.spacedBy(0.dp)
@@ -1213,7 +1226,7 @@ fun HomeScreen(
                         end = 12.dp,
                         // 顶部卡片与第一行方块的间距也跟随间隔设置：卡片自身 bottom padding 4dp，
                         // 网格补足剩余（gridSpacing−4，最小 0）——默认 8dp 时恰为原来的 4dp，零变化
-                        top = (if (hasHeader) 0.dp else padding.calculateTopPadding()) +
+                        top = (if (hasHeader || pinnedEvents.isNotEmpty()) 0.dp else padding.calculateTopPadding()) +
                             (gridSpacing - 4).coerceAtLeast(0).dp,
                         bottom = padding.calculateBottomPadding() + 80.dp
                     ),
