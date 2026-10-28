@@ -56,6 +56,8 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -916,122 +918,124 @@ fun HomeScreen(
                 // 对齐项目（v1.15.0 的 16/12 双值）会让切视图时卡片宽度跟着变，列表模式
                 // 还比原来窄一圈，观感更差；统一宽度优先于逐模式对齐。
                 val hasHeader = homeTopCard != "off"
-                if (hasHeader) {
-                    val headerHpad = 12.dp
-                    // 固定事件 footer：并入顶部卡片本体（灰实线分割），节日/最近倒数日两种模式都显示。
-                    // 顺序 = 新置顶（目标日升序，插最上）+ 手动拖拽保存的顺序；派生自已预载的 allEvents，无冷启动闪烁。
-                    val pinnedAll = remember(allEvents) {
-                        allEvents
-                            .filter { it.isPinned && it.specialType == null }
-                    }
-                    val pinnedEvents = remember(pinnedAll, pinnedOrder) {
-                        val knownIds = pinnedOrder.toSet()
-                        val manual = pinnedOrder.mapNotNull { id -> pinnedAll.firstOrNull { it.id == id } }
-                        val fresh = pinnedAll.filter { it.id !in knownIds }.sortedBy { it.targetDateEpochDay }
-                        fresh + manual
-                    }
-                    val pinnedFooter: (@Composable () -> Unit)? = if (pinnedEvents.isEmpty()) {
-                        null
-                    } else {
-                        {
-                            // 长按拖拽排序：手势挂在「位置」上（slot 不随交换移动），数据在 order 里实时换位；
-                            // 拖拽行用 graphicsLayer 跟手指，交换时 translationY 同步补偿一个行距 → 屏幕位置连续。
-                            val haptic = LocalHapticFeedback.current
-                            val order = remember(pinnedEvents) { pinnedEvents.toMutableStateList() }
-                            var dragIndex by remember { mutableStateOf(-1) }
-                            var dragOffset by remember { mutableFloatStateOf(0f) }
-                            // 各行布局 y（不含 graphicsLayer 偏移），相邻差即拖拽步长
-                            val rowYs = remember { mutableStateListOf<Float>() }
-                            Column {
-                                ListItemDivider(inset = 12.dp)
-                                order.forEachIndexed { i, pe ->
-                                    if (i > 0) ListItemDivider(inset = 12.dp)
-                                    var rowModifier: Modifier = Modifier.onGloballyPositioned { coords ->
-                                        val y = coords.positionInParent().y
-                                        if (i < rowYs.size) rowYs[i] = y else rowYs.add(y)
+                val headerHpad = 12.dp
+                // 固定事件行：有顶部卡片时并入卡片本体（灰实线分割，footer）；顶部卡片关闭时改用独立卡片承载。
+                // 顺序 = 新置顶（目标日升序，插最上）+ 手动拖拽保存的顺序；派生自已预载的 allEvents，无冷启动闪烁。
+                val pinnedAll = remember(allEvents) {
+                    allEvents
+                        .filter { it.isPinned && it.specialType == null }
+                }
+                val pinnedEvents = remember(pinnedAll, pinnedOrder) {
+                    val knownIds = pinnedOrder.toSet()
+                    val manual = pinnedOrder.mapNotNull { id -> pinnedAll.firstOrNull { it.id == id } }
+                    val fresh = pinnedAll.filter { it.id !in knownIds }.sortedBy { it.targetDateEpochDay }
+                    fresh + manual
+                }
+                // leadingDivider = true 时行首带分割线（并入卡片 footer 用）；独立卡片时不带。
+                val pinnedRows: @Composable (Boolean) -> Unit = { leadingDivider ->
+                    // 长按拖拽排序：手势挂在「位置」上（slot 不随交换移动），数据在 order 里实时换位；
+                    // 拖拽行用 graphicsLayer 跟手指，交换时 translationY 同步补偿一个行距 → 屏幕位置连续。
+                    val haptic = LocalHapticFeedback.current
+                    val order = remember(pinnedEvents) { pinnedEvents.toMutableStateList() }
+                    var dragIndex by remember { mutableStateOf(-1) }
+                    var dragOffset by remember { mutableFloatStateOf(0f) }
+                    // 各行布局 y（不含 graphicsLayer 偏移），相邻差即拖拽步长
+                    val rowYs = remember { mutableStateListOf<Float>() }
+                    Column {
+                        if (leadingDivider) ListItemDivider(inset = 12.dp)
+                        order.forEachIndexed { i, pe ->
+                            if (i > 0) ListItemDivider(inset = 12.dp)
+                            var rowModifier: Modifier = Modifier.onGloballyPositioned { coords ->
+                                val y = coords.positionInParent().y
+                                if (i < rowYs.size) rowYs[i] = y else rowYs.add(y)
+                            }
+                            if (order.size >= 2) {
+                                rowModifier = rowModifier
+                                    .zIndex(if (dragIndex == i) 1f else 0f)
+                                    .graphicsLayer {
+                                        if (dragIndex == i) {
+                                            translationY = dragOffset
+                                            scaleX = 1.02f
+                                            scaleY = 1.02f
+                                        } else {
+                                            translationY = 0f
+                                            scaleX = 1f
+                                            scaleY = 1f
+                                        }
                                     }
-                                    if (order.size >= 2) {
-                                        rowModifier = rowModifier
-                                            .zIndex(if (dragIndex == i) 1f else 0f)
-                                            .graphicsLayer {
-                                                if (dragIndex == i) {
-                                                    translationY = dragOffset
-                                                    scaleX = 1.02f
-                                                    scaleY = 1.02f
-                                                } else {
-                                                    translationY = 0f
-                                                    scaleX = 1f
-                                                    scaleY = 1f
+                                if (dragIndex == i) {
+                                    // 浮起：阴影 + 不透明底（盖住重叠行）+ 描边
+                                    rowModifier = rowModifier
+                                        .shadow(8.dp, RoundedCornerShape(12.dp))
+                                        .background(
+                                            MaterialTheme.colorScheme.surface,
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .border(
+                                            1.5.dp,
+                                            MaterialTheme.colorScheme.primary,
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                }
+                                rowModifier = rowModifier.pointerInput(order.size) {
+                                    if (order.size < 2) return@pointerInput
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            dragIndex = i
+                                            dragOffset = 0f
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        },
+                                        onDrag = { change, amount ->
+                                            change.consume()
+                                            if (dragIndex < 0) return@detectDragGesturesAfterLongPress
+                                            dragOffset += amount.y
+                                            val step = if (rowYs.size >= 2) rowYs[1] - rowYs[0] else 0f
+                                            if (step > 0f) {
+                                                while (dragIndex < order.lastIndex && dragOffset > step * 0.5f) {
+                                                    order.add(dragIndex + 1, order.removeAt(dragIndex))
+                                                    dragOffset -= step
+                                                    dragIndex += 1
+                                                }
+                                                while (dragIndex > 0 && dragOffset < -step * 0.5f) {
+                                                    order.add(dragIndex - 1, order.removeAt(dragIndex))
+                                                    dragOffset += step
+                                                    dragIndex -= 1
                                                 }
                                             }
-                                        if (dragIndex == i) {
-                                            // 浮起：阴影 + 不透明底（盖住重叠行）+ 描边
-                                            rowModifier = rowModifier
-                                                .shadow(8.dp, RoundedCornerShape(12.dp))
-                                                .background(
-                                                    MaterialTheme.colorScheme.surface,
-                                                    RoundedCornerShape(12.dp)
-                                                )
-                                                .border(
-                                                    1.5.dp,
-                                                    MaterialTheme.colorScheme.primary,
-                                                    RoundedCornerShape(12.dp)
-                                                )
-                                        }
-                                        rowModifier = rowModifier.pointerInput(order.size) {
-                                            if (order.size < 2) return@pointerInput
-                                            detectDragGesturesAfterLongPress(
-                                                onDragStart = {
-                                                    dragIndex = i
-                                                    dragOffset = 0f
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                },
-                                                onDrag = { change, amount ->
-                                                    change.consume()
-                                                    if (dragIndex < 0) return@detectDragGesturesAfterLongPress
-                                                    dragOffset += amount.y
-                                                    val step = if (rowYs.size >= 2) rowYs[1] - rowYs[0] else 0f
-                                                    if (step > 0f) {
-                                                        while (dragIndex < order.lastIndex && dragOffset > step * 0.5f) {
-                                                            order.add(dragIndex + 1, order.removeAt(dragIndex))
-                                                            dragOffset -= step
-                                                            dragIndex += 1
-                                                        }
-                                                        while (dragIndex > 0 && dragOffset < -step * 0.5f) {
-                                                            order.add(dragIndex - 1, order.removeAt(dragIndex))
-                                                            dragOffset += step
-                                                            dragIndex -= 1
-                                                        }
-                                                    }
-                                                },
-                                                onDragEnd = {
-                                                    if (dragIndex >= 0) {
-                                                        val ids = order.map { it.id }
-                                                        dragIndex = -1
-                                                        dragOffset = 0f
-                                                        pinnedOrder = ids
-                                                        scope.launch {
-                                                            container.settingsRepository.setHomePinnedOrder(ids)
-                                                        }
-                                                    }
-                                                },
-                                                onDragCancel = {
-                                                    dragIndex = -1
-                                                    dragOffset = 0f
+                                        },
+                                        onDragEnd = {
+                                            if (dragIndex >= 0) {
+                                                val ids = order.map { it.id }
+                                                dragIndex = -1
+                                                dragOffset = 0f
+                                                pinnedOrder = ids
+                                                scope.launch {
+                                                    container.settingsRepository.setHomePinnedOrder(ids)
                                                 }
-                                            )
+                                            }
+                                        },
+                                        onDragCancel = {
+                                            dragIndex = -1
+                                            dragOffset = 0f
                                         }
-                                    }
-                                    PinnedEventRow(
-                                        event = pe,
-                                        festivalRepo = festivalRepo,
-                                        onClick = { onNavigate("event_detail?eventId=${pe.id}") },
-                                        modifier = rowModifier
                                     )
                                 }
                             }
+                            PinnedEventRow(
+                                event = pe,
+                                festivalRepo = festivalRepo,
+                                onClick = { onNavigate("event_detail?eventId=${pe.id}") },
+                                modifier = rowModifier
+                            )
                         }
                     }
+                }
+                val pinnedFooter: (@Composable () -> Unit)? = if (pinnedEvents.isEmpty()) {
+                    null
+                } else {
+                    { pinnedRows(true) }
+                }
+                if (hasHeader) {
                     Column(Modifier.padding(top = padding.calculateTopPadding())) {
                         // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）。
                         // 原独立「班/休」横幅已并入节日卡片底部状态条（today/tomorrowMakeup/spanDays）。
@@ -1088,6 +1092,20 @@ fun HomeScreen(
                                     )
                                 }
                             }
+                        }
+                    }
+                } else if (pinnedEvents.isNotEmpty()) {
+                    // 顶部卡片关闭时，置顶事件改用独立卡片承载（样式与顶部卡片一致），不随之消失。
+                    Column(Modifier.padding(top = padding.calculateTopPadding())) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = headerHpad, vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+                            )
+                        ) {
+                            pinnedRows(false)
                         }
                     }
                 }
