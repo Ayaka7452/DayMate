@@ -2235,7 +2235,10 @@ private fun CycleCalendarMonth(
     onPickMonth: (java.time.YearMonth) -> Unit = {}
 ) {
     var monthOffset by remember { mutableStateOf(0) }
-    val month = LocalDate.now().plusMonths(monthOffset.toLong())
+    // 锚点必须归到 1 号：网格 leading 按「month 所在日的星期」算，若锚在「今天」，
+    // 当月 leading 会随今天的星期漂移，整月错位（v1.22.8 踩坑：10/26 被排到周日列）。
+    // 先归 1 号再偏移，避免 29~31 号在小月溢出滚月。
+    val month = LocalDate.now().withDayOfMonth(1).plusMonths(monthOffset.toLong())
 
     // 主视图顶栏「今天」：回本月 + 选中今天（归零偏移在本组件内，选中动作由宿主注入）
     LaunchedEffect(todayRequest) {
