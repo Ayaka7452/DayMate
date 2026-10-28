@@ -623,6 +623,7 @@
     <string name="detail_ref_value">对照值</string>
     <string name="detail_folder">所在文件夹</string>
     <string name="detail_pinned">置顶</string>
+    <string name="detail_pinned_off">取消置顶</string>
     <string name="detail_pinned_yes">已置顶</string>
     <string name="detail_today">就是今天</string>
     <string name="detail_until">距离目标日期</string>

@@ -47,6 +47,10 @@ interface EventDao {
     @Query("UPDATE events SET folderId = NULL WHERE folderId IN (:folderIds) AND isDeleted = 0")
     suspend fun unparentByFolders(folderIds: List<Long>)
 
+    /** 置顶/取消置顶：驱动详情页顶栏图钉与主页顶部卡片下方的固定事件条。 */
+    @Query("UPDATE events SET isPinned = :pinned, updatedAt = :ts WHERE id = :id")
+    suspend fun setPinned(id: Long, pinned: Boolean, ts: Long)
+
     // 原 restoreByFolders 已删：它无 isDeleted 过滤，而删文件夹只解归属（unparentByFolders）、
     // 不软删事件，恢复时会复活用户单独删过的事件。恢复走 restoreByIds 精确指定 id。
 

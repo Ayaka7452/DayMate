@@ -14,6 +14,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -28,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +42,7 @@ import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.festival.FestivalRepository
+import kotlinx.coroutines.launch
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import java.time.LocalDate
@@ -124,6 +128,24 @@ fun EventDetailScreen(
                     }
                 },
                 actions = {
+                    // 置顶图钉：把事件固定到主页顶部卡片下方（isPinned 列的首个写入入口）。
+                    // 周期管家快捷入口不是真事件，不给图钉；事件未加载完时也不显示。
+                    val e0 = event
+                    if (e0 != null && e0.specialType != "cycle") {
+                        val scope = rememberCoroutineScope()
+                        IconButton(onClick = {
+                            scope.launch { container.eventRepository.setPinned(e0.id, !e0.isPinned) }
+                        }) {
+                            Icon(
+                                if (e0.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                contentDescription = Tr.s(
+                                    if (e0.isPinned) R.string.detail_pinned_off else R.string.detail_pinned
+                                ),
+                                tint = if (e0.isPinned) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, contentDescription = Tr.s(R.string.common_edit))
                     }

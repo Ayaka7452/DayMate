@@ -95,6 +95,17 @@ class EventRepository(
             onChanged(); refreshSignal.tryEmit(Unit)
         }
 
+    /**
+     * 置顶/取消置顶。isPinned 列与列表排序（isPinned DESC）自 v1 就存在，
+     * 但一直没有任何写入入口——本方法是它的第一个 UI 来源（详情页顶栏图钉）。
+     * 置顶不影响倒数数字，widget 无需刷新，只走 onChanged() 让 Room 失效通知各页。
+     */
+    suspend fun setPinned(id: Long, pinned: Boolean) =
+        dao.setPinned(id, pinned, System.currentTimeMillis()).also {
+            AppLogger.log("Data", "置顶事件 id=$id pinned=$pinned")
+            onChanged()
+        }
+
     suspend fun hardDeleteEventsByFolders(folderIds: List<Long>) {
         dao.hardDeleteEventsByFolders(folderIds)
         AppLogger.log("Data", "彻底删除文件夹事件 folderIds=$folderIds")

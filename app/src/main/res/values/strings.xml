@@ -623,6 +623,7 @@
     <string name="detail_ref_value">Reference</string>
     <string name="detail_folder">Folder</string>
     <string name="detail_pinned">Pin</string>
+    <string name="detail_pinned_off">Unpin</string>
     <string name="detail_pinned_yes">Pinned</string>
     <string name="detail_today">Today</string>
     <string name="detail_until">Until target date</string>

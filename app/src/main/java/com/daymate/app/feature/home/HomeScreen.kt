@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
@@ -950,6 +951,31 @@ fun HomeScreen(
                                 }
                             }
                         }
+                        // 固定事件条：置顶事件列在顶部卡片下方（用户拍板：卡片下方、
+                        // 无上限、节日/最近倒数日两种模式都显示；「隐藏」模式被 hasHeader 挡住）。
+                        // 排序按目标日升序（最近的在上）；派生自已预载的 allEvents，无冷启动闪烁。
+                        val pinnedEvents = remember(allEvents) {
+                            allEvents
+                                .filter { it.isPinned && it.specialType == null }
+                                .sortedBy { it.targetDateEpochDay }
+                        }
+                        if (pinnedEvents.isNotEmpty()) {
+                            Column(
+                                Modifier
+                                    .padding(horizontal = headerHpad, vertical = 4.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+                            ) {
+                                pinnedEvents.forEachIndexed { i, pe ->
+                                    if (i > 0) ListItemDivider()
+                                    PinnedEventRow(
+                                        event = pe,
+                                        festivalRepo = festivalRepo,
+                                        onClick = { onNavigate("event_detail?eventId=${pe.id}") }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 Crossfade(
@@ -1595,6 +1621,62 @@ private fun ListItemDivider() {
             .height(1.dp)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     )
+}
+
+/** 顶部卡片下方的固定事件条：小图钉 + 标题 + 天数胶囊，点击进详情。 */
+@Composable
+private fun PinnedEventRow(
+    event: EventEntity,
+    festivalRepo: FestivalRepository?,
+    onClick: () -> Unit
+) {
+    // 与列表行同一套天数口径：假期段「第 x 天」→ 按时间倒数 → formatCountdown（含今天分支）
+    val holidayDayN = remember(event.linkedFestival, LocalDate.now().toEpochDay()) {
+        event.linkedFestival?.takeIf { it.isNotBlank() }
+            ?.let { festivalRepo?.holidayDayIndexOf(it, LocalDate.now()) }
+    }
+    val text = if (holidayDayN != null) Tr.s(R.string.unit_holiday_day_n, holidayDayN)
+    else event.endMinuteOfDay?.let {
+        CountdownCalculator.formatTimedShort(event.targetDateEpochDay, it)
+    } ?: CountdownCalculator.formatCountdown(
+        event.targetDateEpochDay,
+        event.displayUnit,
+        event.refDays
+    )
+    // 胶囊用事件自己的颜色（缺省主题色），浅底 + 同色文字，与网格圆徽章同口径
+    val eventColor = event.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Outlined.PushPin,
+            contentDescription = null,
+            modifier = Modifier.size(13.dp),
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            event.title,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = eventColor,
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(eventColor.copy(alpha = 0.14f))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        )
+    }
 }
 
 @Composable
