@@ -25,6 +25,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val BACKUP_TARGET = stringPreferencesKey("backup_target")      // 备份位置：local / both / cloud
         private val HOME_TOP_CARD = stringPreferencesKey("home_top_card")       // festival / event / off
         private val HOME_BADGE_EMOJI = stringPreferencesKey("home_badge_emoji") // 节日卡片右侧角标，默认 ☀️
+        private val HOME_PINNED_ORDER = stringPreferencesKey("home_pinned_order") // 置顶事件手动顺序：逗号分隔事件 id
         private val COLOR_MODE = stringPreferencesKey("color_mode")            // white(默认) / system / blue / green / orange / purple
         private val CYCLE_CYCLE_DAYS = intPreferencesKey("cycle_days")          // 周期管家：周期天数（默认 28）
         private val CYCLE_PERIOD_DAYS = intPreferencesKey("cycle_period_days")  // 周期管家：经期持续天数（默认 5）
@@ -125,6 +126,18 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     /** 节日卡片右侧角标 emoji（默认 ☀️；卡片只显示放假节日，不需要「休/班」）。 */
     val homeBadgeEmoji: Flow<String> = dataStore.data.map { it[HOME_BADGE_EMOJI] ?: "☀️" }
+
+    /**
+     * 置顶事件的手动排序（主页顶部卡片 footer 内长按拖拽的结果），逗号分隔事件 id。
+     * 只存相对顺序；新置顶（不在列表里）的事件插到最前面，已取消置顶/已删除的 id 读取时自然剔除。
+     */
+    val homePinnedOrder: Flow<List<Long>> = dataStore.data.map { prefs ->
+        prefs[HOME_PINNED_ORDER]?.split(',')?.mapNotNull { it.toLongOrNull() } ?: emptyList()
+    }
+
+    suspend fun setHomePinnedOrder(ids: List<Long>) {
+        dataStore.edit { it[HOME_PINNED_ORDER] = ids.joinToString(",") }
+    }
 
     /**
      * UI 配色方案：white=白底品牌色（默认）/ system=跟随系统壁纸取色（Material You，Android 12+，

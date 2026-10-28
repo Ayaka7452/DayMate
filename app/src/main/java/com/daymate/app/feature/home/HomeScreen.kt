@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
@@ -75,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,16 +86,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.ayaka7452.daymate.Routes
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.CloudBackupState
@@ -187,6 +198,16 @@ fun HomeScreen(
     }
     val homeBadgeEmoji by container.settingsRepository.homeBadgeEmoji
         .collectAsState(initial = homeBadgeEmojiInit)
+    // 置顶事件手动顺序（footer 内长按拖拽的结果）：同步预载，首帧即用户排定的顺序。
+    // 不 collect Flow：这个值只有本屏会写，本地 state 即真源，落定时写回 DataStore。
+    val pinnedOrderInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.homePinnedOrder.first()
+            }
+        }.getOrDefault(emptyList<Long>())
+    }
+    var pinnedOrder by remember { mutableStateOf(pinnedOrderInit) }
     // 周期管家入口按钮：默认关，需在「周期管家 → 设置 → 隐私与快捷事件」里开启
     // 同步预载：开了入口的用户首帧就有按钮，不出现「按钮迟一步弹出来」
     val cycleEntryInit = remember {
@@ -897,24 +918,114 @@ fun HomeScreen(
                 if (hasHeader) {
                     val headerHpad = 12.dp
                     // 固定事件 footer：并入顶部卡片本体（灰实线分割），节日/最近倒数日两种模式都显示。
-                    // 排序按目标日升序（最近的在上）；派生自已预载的 allEvents，无冷启动闪烁。
-                    val pinnedEvents = remember(allEvents) {
+                    // 顺序 = 新置顶（目标日升序，插最上）+ 手动拖拽保存的顺序；派生自已预载的 allEvents，无冷启动闪烁。
+                    val pinnedAll = remember(allEvents) {
                         allEvents
                             .filter { it.isPinned && it.specialType == null }
-                            .sortedBy { it.targetDateEpochDay }
+                    }
+                    val pinnedEvents = remember(pinnedAll, pinnedOrder) {
+                        val knownIds = pinnedOrder.toSet()
+                        val manual = pinnedOrder.mapNotNull { id -> pinnedAll.firstOrNull { it.id == id } }
+                        val fresh = pinnedAll.filter { it.id !in knownIds }.sortedBy { it.targetDateEpochDay }
+                        fresh + manual
                     }
                     val pinnedFooter: (@Composable () -> Unit)? = if (pinnedEvents.isEmpty()) {
                         null
                     } else {
                         {
+                            // 长按拖拽排序：手势挂在「位置」上（slot 不随交换移动），数据在 order 里实时换位；
+                            // 拖拽行用 graphicsLayer 跟手指，交换时 translationY 同步补偿一个行距 → 屏幕位置连续。
+                            val haptic = LocalHapticFeedback.current
+                            val order = remember(pinnedEvents) { pinnedEvents.toMutableStateList() }
+                            var dragIndex by remember { mutableStateOf(-1) }
+                            var dragOffset by remember { mutableFloatStateOf(0f) }
+                            // 各行布局 y（不含 graphicsLayer 偏移），相邻差即拖拽步长
+                            val rowYs = remember { mutableStateListOf<Float>() }
                             Column {
-                                ListItemDivider()
-                                pinnedEvents.forEachIndexed { i, pe ->
-                                    if (i > 0) ListItemDivider()
+                                ListItemDivider(inset = 12.dp)
+                                order.forEachIndexed { i, pe ->
+                                    if (i > 0) ListItemDivider(inset = 12.dp)
+                                    var rowModifier: Modifier = Modifier.onGloballyPositioned { coords ->
+                                        val y = coords.positionInParent().y
+                                        if (i < rowYs.size) rowYs[i] = y else rowYs.add(y)
+                                    }
+                                    if (order.size >= 2) {
+                                        rowModifier = rowModifier
+                                            .zIndex(if (dragIndex == i) 1f else 0f)
+                                            .graphicsLayer {
+                                                if (dragIndex == i) {
+                                                    translationY = dragOffset
+                                                    scaleX = 1.02f
+                                                    scaleY = 1.02f
+                                                } else {
+                                                    translationY = 0f
+                                                    scaleX = 1f
+                                                    scaleY = 1f
+                                                }
+                                            }
+                                        if (dragIndex == i) {
+                                            // 浮起：阴影 + 不透明底（盖住重叠行）+ 描边
+                                            rowModifier = rowModifier
+                                                .shadow(8.dp, RoundedCornerShape(12.dp))
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface,
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .border(
+                                                    1.5.dp,
+                                                    MaterialTheme.colorScheme.primary,
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                        }
+                                        rowModifier = rowModifier.pointerInput(order.size) {
+                                            if (order.size < 2) return@pointerInput
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = {
+                                                    dragIndex = i
+                                                    dragOffset = 0f
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                },
+                                                onDrag = { change, amount ->
+                                                    change.consume()
+                                                    if (dragIndex < 0) return@detectDragGesturesAfterLongPress
+                                                    dragOffset += amount.y
+                                                    val step = if (rowYs.size >= 2) rowYs[1] - rowYs[0] else 0f
+                                                    if (step > 0f) {
+                                                        while (dragIndex < order.lastIndex && dragOffset > step * 0.5f) {
+                                                            order.add(dragIndex + 1, order.removeAt(dragIndex))
+                                                            dragOffset -= step
+                                                            dragIndex += 1
+                                                        }
+                                                        while (dragIndex > 0 && dragOffset < -step * 0.5f) {
+                                                            order.add(dragIndex - 1, order.removeAt(dragIndex))
+                                                            dragOffset += step
+                                                            dragIndex -= 1
+                                                        }
+                                                    }
+                                                },
+                                                onDragEnd = {
+                                                    if (dragIndex >= 0) {
+                                                        val ids = order.map { it.id }
+                                                        dragIndex = -1
+                                                        dragOffset = 0f
+                                                        pinnedOrder = ids
+                                                        scope.launch {
+                                                            container.settingsRepository.setHomePinnedOrder(ids)
+                                                        }
+                                                    }
+                                                },
+                                                onDragCancel = {
+                                                    dragIndex = -1
+                                                    dragOffset = 0f
+                                                }
+                                            )
+                                        }
+                                    }
                                     PinnedEventRow(
                                         event = pe,
                                         festivalRepo = festivalRepo,
-                                        onClick = { onNavigate("event_detail?eventId=${pe.id}") }
+                                        onClick = { onNavigate("event_detail?eventId=${pe.id}") },
+                                        modifier = rowModifier
                                     )
                                 }
                             }
@@ -1615,21 +1726,23 @@ fun FolderRow(
 }
 
 @Composable
-private fun ListItemDivider() {
+private fun ListItemDivider(inset: Dp = 0.dp) {
     Box(
         Modifier
+            .padding(horizontal = inset)
             .fillMaxWidth()
             .height(1.dp)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     )
 }
 
-/** 顶部卡片下方的固定事件条：小图钉 + 标题 + 天数胶囊，点击进详情。 */
+/** 顶部卡片 footer 内的固定事件行：小图钉 + 标题 + 天数胶囊，点击进详情；长按可拖拽排序（修饰符由调用方传入）。 */
 @Composable
 private fun PinnedEventRow(
     event: EventEntity,
     festivalRepo: FestivalRepository?,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     // 与列表行同一套天数口径：假期段「第 x 天」→ 按时间倒数 → formatCountdown（含今天分支）
     val holidayDayN = remember(event.linkedFestival, LocalDate.now().toEpochDay()) {
@@ -1647,7 +1760,7 @@ private fun PinnedEventRow(
     // 胶囊用事件自己的颜色（缺省主题色），浅底 + 同色文字，与网格圆徽章同口径
     val eventColor = event.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
