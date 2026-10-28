@@ -624,7 +624,6 @@
     <string name="detail_folder">폴더</string>
     <string name="detail_pinned">고정</string>
     <string name="detail_pinned_off">고정 해제</string>
-    <string name="detail_pinned_yes">고정됨</string>
     <string name="detail_today">오늘입니다</string>
     <string name="detail_until">목표일까지</string>
     <string name="detail_past">목표일이 지났습니다</string>

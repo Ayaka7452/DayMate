@@ -896,6 +896,27 @@ fun HomeScreen(
                 val hasHeader = homeTopCard != "off"
                 if (hasHeader) {
                     val headerHpad = 12.dp
+                    // 固定事件 footer：并入顶部卡片本体（灰实线分割），节日/最近倒数日两种模式都显示。
+                    // 排序按目标日升序（最近的在上）；派生自已预载的 allEvents，无冷启动闪烁。
+                    val pinnedEvents = remember(allEvents) {
+                        allEvents
+                            .filter { it.isPinned && it.specialType == null }
+                            .sortedBy { it.targetDateEpochDay }
+                    }
+                    val pinnedFooter: (@Composable () -> Unit)? = if (pinnedEvents.isEmpty()) null
+                    else @Composable {
+                        Column {
+                            ListItemDivider()
+                            pinnedEvents.forEachIndexed { i, pe ->
+                                if (i > 0) ListItemDivider()
+                                PinnedEventRow(
+                                    event = pe,
+                                    festivalRepo = festivalRepo,
+                                    onClick = { onNavigate("event_detail?eventId=${pe.id}") }
+                                )
+                            }
+                        }
+                    }
                     Column(Modifier.padding(top = padding.calculateTopPadding())) {
                         // 主页顶部卡片：模式由设置控制（festival=下一节日[默认] / event=最近倒数日 / off=隐藏）。
                         // 原独立「班/休」横幅已并入节日卡片底部状态条（today/tomorrowMakeup/spanDays）。
@@ -921,7 +942,8 @@ fun HomeScreen(
                                 tomorrowMakeup = tomorrowMakeup,
                                 spanDays = festivalSpanDays,
                                 spanRemaining = festivalSpanRemaining,
-                                showSpanTotal = holidaySpanTotal
+                                showSpanTotal = holidaySpanTotal,
+                                footer = pinnedFooter
                             )
                             "event" -> {
                                 // 最近倒数日：优先取剩余天数最少的未过期事件；全部已过期则取最近过期的
@@ -946,32 +968,8 @@ fun HomeScreen(
                                             if (show.specialType == "cycle") onNavigate("cycle")
                                             else onNavigate("event_detail?eventId=${show.id}")
                                         },
-                                        modifier = Modifier.padding(horizontal = headerHpad, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                        // 固定事件条：置顶事件列在顶部卡片下方（用户拍板：卡片下方、
-                        // 无上限、节日/最近倒数日两种模式都显示；「隐藏」模式被 hasHeader 挡住）。
-                        // 排序按目标日升序（最近的在上）；派生自已预载的 allEvents，无冷启动闪烁。
-                        val pinnedEvents = remember(allEvents) {
-                            allEvents
-                                .filter { it.isPinned && it.specialType == null }
-                                .sortedBy { it.targetDateEpochDay }
-                        }
-                        if (pinnedEvents.isNotEmpty()) {
-                            Column(
-                                Modifier
-                                    .padding(horizontal = headerHpad, vertical = 4.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
-                            ) {
-                                pinnedEvents.forEachIndexed { i, pe ->
-                                    if (i > 0) ListItemDivider()
-                                    PinnedEventRow(
-                                        event = pe,
-                                        festivalRepo = festivalRepo,
-                                        onClick = { onNavigate("event_detail?eventId=${pe.id}") }
+                                        modifier = Modifier.padding(horizontal = headerHpad, vertical = 4.dp),
+                                        footer = pinnedFooter
                                     )
                                 }
                             }

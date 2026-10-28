@@ -347,7 +347,6 @@ fun EventDetailBody(
             InfoRow(Tr.s(R.string.detail_ref_value), "${data.refDays} ${refUnitLabel(data.displayUnit)}")
         }
         if (data.folderLabel != null) InfoRow(Tr.s(R.string.detail_folder), data.folderLabel)
-        if (data.isPinned) InfoRow(Tr.s(R.string.detail_pinned), Tr.s(R.string.detail_pinned_yes))
         Spacer(Modifier.height(16.dp))
     }
 }

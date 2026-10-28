@@ -92,7 +92,9 @@ fun FestivalCountdownCard(
     tomorrowMakeup: FestivalDay? = null,
     spanDays: Int = 0,
     spanRemaining: Int = 0,
-    showSpanTotal: Boolean = false
+    showSpanTotal: Boolean = false,
+    /** 卡片底部附加内容（如固定事件条）：渲染在状态条之后，与卡片同底色，自带分割线。 */
+    footer: (@Composable () -> Unit)? = null
 ) {
     Card(
         onClick = onClick,
@@ -188,6 +190,7 @@ fun FestivalCountdownCard(
                         }
                 }
             }
+            footer?.invoke()
         }
     }
 }
@@ -403,7 +406,9 @@ fun EventCountdownCard(
     days: Int,
     past: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 卡片底部附加内容（如固定事件条）：与卡片同底色，自带分割线。 */
+    footer: (@Composable () -> Unit)? = null
 ) {
     Card(
         onClick = onClick,
@@ -459,5 +464,6 @@ fun EventCountdownCard(
                 }
             }
         }
+        footer?.invoke()
     }
 }

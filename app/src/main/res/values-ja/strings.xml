@@ -624,7 +624,6 @@
     <string name="detail_folder">フォルダ</string>
     <string name="detail_pinned">ピン留め</string>
     <string name="detail_pinned_off">ピン留めを解除</string>
-    <string name="detail_pinned_yes">ピン留め済み</string>
     <string name="detail_today">今日です</string>
     <string name="detail_until">目標日まで</string>
     <string name="detail_past">目標日が過ぎました</string>
