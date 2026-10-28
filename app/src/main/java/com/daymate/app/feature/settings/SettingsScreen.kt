@@ -150,6 +150,12 @@ fun SettingsScreen(
         .collectAsState(initial = SettingsRepository.PINNED_SPACING_DEFAULT)
     var showPinnedSpacingDialog by remember { mutableStateOf(false) }
 
+    // ===== 节日卡片与置顶模式间隔 =====
+    // 顶部卡片内容到置顶区首条分割线的固定间距（默认 4dp），不随「置顶模式间隔」缩放。
+    val festivalPinnedGap by container.settingsRepository.homeFestivalPinnedGap
+        .collectAsState(initial = SettingsRepository.FESTIVAL_PINNED_GAP_DEFAULT)
+    var showFestivalPinnedGapDialog by remember { mutableStateOf(false) }
+
     // ===== 检查更新 =====
     // 默认开启（启动时按 24h 节流查一次，有新版本弹窗）；关掉后不发起任何请求，
     // 但下面的「立即检查」仍可手动触发——用户关掉的通常是「自动提醒」，不是「这个功能」。
@@ -440,6 +446,29 @@ fun SettingsScreen(
                 }
                 Text(
                     stringResource(R.string.settings_grid_dp_value, pinnedSpacing),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // ===== 节日卡片与置顶模式间隔（顶部卡片内容到置顶区首条分割线，属主题分组） =====
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showFestivalPinnedGapDialog = true }
+                    .padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_festival_pinned_gap), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.settings_festival_pinned_gap_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Text(
+                    stringResource(R.string.settings_grid_dp_value, festivalPinnedGap),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -1431,6 +1460,109 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showPinnedSpacingDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
+
+    // 节日卡片与置顶模式间隔弹窗：预设四档（0 紧凑 / 4 默认 / 8 适中 / 12 特宽）+ 自定义 0–24 dp。
+    // 交互与置顶间隔弹窗一致；此值只控制顶部卡片内容到首条分割线的间距，不随「置顶模式间隔」缩放。
+    if (showFestivalPinnedGapDialog) {
+        val presets = listOf(
+            0 to R.string.settings_grid_preset_compact,
+            4 to R.string.settings_grid_preset_default,
+            8 to R.string.settings_grid_preset_moderate,
+            12 to R.string.settings_grid_preset_extra
+        )
+        val presetValues = presets.map { it.first }
+        var selectedPreset by remember(showFestivalPinnedGapDialog) {
+            mutableStateOf(if (festivalPinnedGap in presetValues) festivalPinnedGap else null)
+        }
+        var customSelected by remember(showFestivalPinnedGapDialog) {
+            mutableStateOf(festivalPinnedGap !in presetValues)
+        }
+        var customText by remember(showFestivalPinnedGapDialog) { mutableStateOf(festivalPinnedGap.toString()) }
+        var inputError by remember(showFestivalPinnedGapDialog) { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { showFestivalPinnedGapDialog = false },
+            title = { Text(stringResource(R.string.settings_grid_dialog_title)) },
+            text = {
+                Column {
+                    presets.forEach { (dp, labelRes) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedPreset = dp
+                                    customSelected = false
+                                    inputError = false
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = !customSelected && selectedPreset == dp,
+                                onClick = {
+                                    selectedPreset = dp
+                                    customSelected = false
+                                    inputError = false
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                stringResource(R.string.settings_grid_dp_value, dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { customSelected = true },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = customSelected, onClick = { customSelected = true })
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_grid_custom), style = MaterialTheme.typography.bodyLarge)
+                    }
+                    if (customSelected) {
+                        OutlinedTextField(
+                            value = customText,
+                            onValueChange = {
+                                customText = it.filter { ch -> ch.isDigit() }.take(2)
+                                inputError = false
+                            },
+                            singleLine = true,
+                            isError = inputError,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            supportingText = { Text(stringResource(R.string.settings_grid_custom_desc)) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val value = if (customSelected) {
+                        customText.toIntOrNull()?.takeIf {
+                            it in SettingsRepository.FESTIVAL_PINNED_GAP_MIN..SettingsRepository.FESTIVAL_PINNED_GAP_MAX
+                        }
+                    } else {
+                        selectedPreset
+                    }
+                    if (value == null) {
+                        inputError = true
+                    } else {
+                        scope.launch { container.settingsRepository.setHomeFestivalPinnedGap(value) }
+                        showFestivalPinnedGapDialog = false
+                    }
+                }) { Text(stringResource(R.string.common_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFestivalPinnedGapDialog = false }) {
                     Text(stringResource(R.string.common_cancel))
                 }
             }

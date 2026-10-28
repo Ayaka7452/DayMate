@@ -49,7 +49,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val UPDATE_SKIPPED = stringPreferencesKey("update_skipped_version")          // 用户点过「稍后」的版本
         private val HOME_VIEW_MODE = stringPreferencesKey("home_view_mode")                  // 主页视图：list(列表) / medium(中图标) / large(大图标)
         private val HOME_GRID_SPACING = intPreferencesKey("home_grid_spacing")               // 图标模式方块间隔 dp（默认 12）
-        private val HOME_PINNED_SPACING = intPreferencesKey("home_pinned_spacing")           // 置顶卡内行与行间隔 dp（默认 0=紧贴分割线）
+        private val HOME_PINNED_SPACING = intPreferencesKey("home_pinned_spacing")           // 置顶卡内行与行间隔 dp（默认 8）
+        private val HOME_FESTIVAL_PINNED_GAP = intPreferencesKey("home_festival_pinned_gap") // 顶部卡片内容到置顶区首条分割线的间距 dp（默认 4）
         private val CALENDAR_LONG_PRESS = booleanPreferencesKey("calendar_long_press_enabled") // 长按主页加号在展开面板显示「日历预览」入口（默认开）
 
         /** 主页视图模式取值：列表 / 中图标(3列) / 大图标(2列)。 */
@@ -66,6 +67,11 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         const val PINNED_SPACING_DEFAULT = 8
         const val PINNED_SPACING_MIN = 0
         const val PINNED_SPACING_MAX = 24
+
+        /** 顶部卡片内容到置顶区首条分割线的间距（dp）。默认 4；此间距不随「置顶模式间隔」缩放。 */
+        const val FESTIVAL_PINNED_GAP_DEFAULT = 4
+        const val FESTIVAL_PINNED_GAP_MIN = 0
+        const val FESTIVAL_PINNED_GAP_MAX = 24
 
         /** 备份位置取值：仅本地 SAF 文件夹 / 本地 + WebDAV 云端 / 仅 WebDAV 云端。 */
         const val BACKUP_TARGET_LOCAL = "local"
@@ -136,6 +142,14 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setHomePinnedSpacing(dp: Int) {
         dataStore.edit { it[HOME_PINNED_SPACING] = dp.coerceIn(PINNED_SPACING_MIN, PINNED_SPACING_MAX) }
+    }
+
+    /** 顶部卡片内容到置顶区首条分割线的间距，单位 dp（默认 4，不随「置顶模式间隔」缩放）。 */
+    val homeFestivalPinnedGap: Flow<Int> =
+        dataStore.data.map { it[HOME_FESTIVAL_PINNED_GAP] ?: FESTIVAL_PINNED_GAP_DEFAULT }
+
+    suspend fun setHomeFestivalPinnedGap(dp: Int) {
+        dataStore.edit { it[HOME_FESTIVAL_PINNED_GAP] = dp.coerceIn(FESTIVAL_PINNED_GAP_MIN, FESTIVAL_PINNED_GAP_MAX) }
     }
 
     /** 节日卡片右侧角标 emoji（默认 ☀️；卡片只显示放假节日，不需要「休/班」）。 */

@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -477,6 +478,17 @@ fun HomeScreen(
     }
     val pinnedSpacing by container.settingsRepository.homePinnedSpacing
         .collectAsState(initial = pinnedSpacingInit)
+
+    // 顶部卡片内容到置顶区首条分割线的间距：同款就近同步预载（默认 4）。
+    val festivalPinnedGapInit = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                container.settingsRepository.homeFestivalPinnedGap.first()
+            }
+        }.getOrDefault(SettingsRepository.FESTIVAL_PINNED_GAP_DEFAULT)
+    }
+    val festivalPinnedGap by container.settingsRepository.homeFestivalPinnedGap
+        .collectAsState(initial = festivalPinnedGapInit)
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -962,10 +974,12 @@ fun HomeScreen(
                         )
                     ) {
                         // 置顶卡内分割线比全局 ListItemDivider 更浅一档（用户反馈 0.3 → 0.2），只影响置顶卡。
+                        // 分割线上方（顶部卡片内容 → 第一条横线）由「节日卡片与置顶模式间隔」独立控制（默认 4dp），
+                        // 不随「置顶模式间隔」缩放；下方受「置顶模式间隔」控制。
                         if (leadingDivider) Box(
                             Modifier
                                 .padding(horizontal = 12.dp)
-                                .padding(vertical = halfSpacing)
+                                .padding(top = festivalPinnedGap.dp, bottom = halfSpacing)
                                 .fillMaxWidth()
                                 .height(1.dp)
                                 .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
@@ -1823,7 +1837,10 @@ private fun PinnedEventRow(
         Icon(
             Icons.Outlined.PushPin,
             contentDescription = null,
-            modifier = Modifier.size(13.dp),
+            // PushPin 字形在框内光学偏高（用户反馈「偏高一丢丢」），下移 1dp 对齐文字中心线。
+            modifier = Modifier
+                .size(13.dp)
+                .offset(y = 1.dp),
             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
         )
         Spacer(Modifier.width(8.dp))

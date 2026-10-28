@@ -61,6 +61,8 @@
     <string name="settings_grid_dp_value">%1$d dp</string>
     <string name="settings_pinned_spacing">置頂模式間隔</string>
     <string name="settings_pinned_spacing_desc">主頁置頂卡片裏，事件行之間的間隔寬度。</string>
+    <string name="settings_festival_pinned_gap">節日卡片與置頂模式間隔</string>
+    <string name="settings_festival_pinned_gap_desc">主頁頂部卡片和置頂區第一條分割線之間的固定間距。</string>
     <string name="home_batch_manage">批量管理</string>
     <string name="home_cycle_tracker">週期管家</string>
     <string name="home_vault">Vault</string>

@@ -61,6 +61,8 @@
     <string name="settings_grid_dp_value">%1$d dp</string>
     <string name="settings_pinned_spacing">ピン留め行の間隔</string>
     <string name="settings_pinned_spacing_desc">ホームのピン留めカードで、イベント行同士の間隔の広さ。</string>
+    <string name="settings_festival_pinned_gap">カードとピン留めの間隔</string>
+    <string name="settings_festival_pinned_gap_desc">ホームの上部カードとピン留めエリア最初の仕切り線の間の固定間隔。</string>
     <string name="home_batch_manage">一括管理</string>
     <string name="home_cycle_tracker">サイクル管理</string>
     <string name="home_vault">Vault</string>

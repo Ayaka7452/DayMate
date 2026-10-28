@@ -61,6 +61,8 @@
     <string name="settings_grid_dp_value">%1$d dp</string>
     <string name="settings_pinned_spacing">Pinned row spacing</string>
     <string name="settings_pinned_spacing_desc">Spacing between rows in the pinned events card on the home screen.</string>
+    <string name="settings_festival_pinned_gap">Card to pinned divider gap</string>
+    <string name="settings_festival_pinned_gap_desc">Fixed space between the top card content and the first divider above the pinned rows.</string>
     <string name="home_batch_manage">Batch manage</string>
     <string name="home_cycle_tracker">Cycle Tracker</string>
     <string name="home_vault">Vault</string>
