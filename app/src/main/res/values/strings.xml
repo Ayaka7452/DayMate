@@ -59,6 +59,8 @@
     <string name="settings_grid_custom">Custom</string>
     <string name="settings_grid_custom_desc">Range: 0–24 dp</string>
     <string name="settings_grid_dp_value">%1$d dp</string>
+    <string name="settings_pinned_spacing">Pinned row spacing</string>
+    <string name="settings_pinned_spacing_desc">Spacing between rows in the pinned events card on the home screen.</string>
     <string name="home_batch_manage">Batch manage</string>
     <string name="home_cycle_tracker">Cycle Tracker</string>
     <string name="home_vault">Vault</string>

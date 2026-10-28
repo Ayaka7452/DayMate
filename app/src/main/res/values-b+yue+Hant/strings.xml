@@ -59,6 +59,8 @@
     <string name="settings_grid_custom">自訂</string>
     <string name="settings_grid_custom_desc">範圍 0–24 dp</string>
     <string name="settings_grid_dp_value">%1$d dp</string>
+    <string name="settings_pinned_spacing">置頂模式間隔</string>
+    <string name="settings_pinned_spacing_desc">主頁置頂卡片入面，事件行之間嘅間隔闊度。</string>
     <string name="home_batch_manage">批量管理</string>
     <string name="home_cycle_tracker">經期管家</string>
     <string name="home_vault">Vault</string>

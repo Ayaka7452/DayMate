@@ -49,6 +49,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         private val UPDATE_SKIPPED = stringPreferencesKey("update_skipped_version")          // 用户点过「稍后」的版本
         private val HOME_VIEW_MODE = stringPreferencesKey("home_view_mode")                  // 主页视图：list(列表) / medium(中图标) / large(大图标)
         private val HOME_GRID_SPACING = intPreferencesKey("home_grid_spacing")               // 图标模式方块间隔 dp（默认 12）
+        private val HOME_PINNED_SPACING = intPreferencesKey("home_pinned_spacing")           // 置顶卡内行与行间隔 dp（默认 0=紧贴分割线）
         private val CALENDAR_LONG_PRESS = booleanPreferencesKey("calendar_long_press_enabled") // 长按主页加号在展开面板显示「日历预览」入口（默认开）
 
         /** 主页视图模式取值：列表 / 中图标(3列) / 大图标(2列)。 */
@@ -60,6 +61,11 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         const val GRID_SPACING_DEFAULT = 12
         const val GRID_SPACING_MIN = 0
         const val GRID_SPACING_MAX = 24
+
+        /** 置顶卡内行与行间隔的默认值与可设范围（dp）。 */
+        const val PINNED_SPACING_DEFAULT = 0
+        const val PINNED_SPACING_MIN = 0
+        const val PINNED_SPACING_MAX = 24
 
         /** 备份位置取值：仅本地 SAF 文件夹 / 本地 + WebDAV 云端 / 仅 WebDAV 云端。 */
         const val BACKUP_TARGET_LOCAL = "local"
@@ -122,6 +128,14 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setHomeGridSpacing(dp: Int) {
         dataStore.edit { it[HOME_GRID_SPACING] = dp.coerceIn(GRID_SPACING_MIN, GRID_SPACING_MAX) }
+    }
+
+    /** 置顶卡内事件行与行之间的间隔，单位 dp（默认 0=现在的紧贴分割线样式）。 */
+    val homePinnedSpacing: Flow<Int> =
+        dataStore.data.map { it[HOME_PINNED_SPACING] ?: PINNED_SPACING_DEFAULT }
+
+    suspend fun setHomePinnedSpacing(dp: Int) {
+        dataStore.edit { it[HOME_PINNED_SPACING] = dp.coerceIn(PINNED_SPACING_MIN, PINNED_SPACING_MAX) }
     }
 
     /** 节日卡片右侧角标 emoji（默认 ☀️；卡片只显示放假节日，不需要「休/班」）。 */
