@@ -232,6 +232,10 @@
     <string name="settings_abnormal">異常：%1$s</string>
     <string name="cycle_title">週期管家</string>
     <string name="cycle_predicted_period_day">已到預測經期日（%1$s）</string>
+    <string name="cycle_overdue_choice_title">本次經期尚未登記</string>
+    <string name="cycle_overdue_choice_msg">已超過預測開始日（%1$s），從哪天開始記錄？</string>
+    <string name="cycle_start_from_today">從今天開始</string>
+    <string name="cycle_start_from_predicted">從預測日開始</string>
     <string name="cycle_register_improve_accuracy">登記實際開始日期可提高推算準確度。</string>
     <string name="cycle_register_this_period">登記本次經期</string>
     <string name="cycle_view_ring">圓環</string>

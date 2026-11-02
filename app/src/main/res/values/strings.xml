@@ -232,6 +232,10 @@
     <string name="settings_abnormal">Abnormal: %1$s</string>
     <string name="cycle_title">Cycle Tracker</string>
     <string name="cycle_predicted_period_day">Predicted period day reached (%1$s)</string>
+    <string name="cycle_overdue_choice_title">This period is not logged yet</string>
+    <string name="cycle_overdue_choice_msg">The predicted start date (%1$s) has passed. When did this period start?</string>
+    <string name="cycle_start_from_today">Start from today</string>
+    <string name="cycle_start_from_predicted">Start from predicted date</string>
     <string name="cycle_register_improve_accuracy">Registering the actual start date improves prediction accuracy.</string>
     <string name="cycle_register_this_period">Log this period</string>
     <string name="cycle_view_ring">Ring</string>

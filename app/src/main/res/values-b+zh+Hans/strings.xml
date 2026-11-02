@@ -232,6 +232,10 @@
     <string name="settings_abnormal">异常：%1$s</string>
     <string name="cycle_title">周期管家</string>
     <string name="cycle_predicted_period_day">已到预测经期日（%1$s）</string>
+    <string name="cycle_overdue_choice_title">本次经期尚未登记</string>
+    <string name="cycle_overdue_choice_msg">已超过预测开始日（%1$s），从哪天开始记录？</string>
+    <string name="cycle_start_from_today">从今天开始</string>
+    <string name="cycle_start_from_predicted">从预测日开始</string>
     <string name="cycle_register_improve_accuracy">登记实际开始日期可提高推算准确度。</string>
     <string name="cycle_register_this_period">登记本次经期</string>
     <string name="cycle_view_ring">圆环</string>

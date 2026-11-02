@@ -232,6 +232,10 @@
     <string name="settings_abnormal">異常: %1$s</string>
     <string name="cycle_title">サイクル管理</string>
     <string name="cycle_predicted_period_day">予測生理日になりました（%1$s）</string>
+    <string name="cycle_overdue_choice_title">今回の生理はまだ記録されていません</string>
+    <string name="cycle_overdue_choice_msg">予測開始日（%1$s）を過ぎています。いつから記録しますか？</string>
+    <string name="cycle_start_from_today">今日から記録</string>
+    <string name="cycle_start_from_predicted">予測日から記録</string>
     <string name="cycle_register_improve_accuracy">実際の開始日を登録すると予測精度が向上します。</string>
     <string name="cycle_register_this_period">今回の生理を記録</string>
     <string name="cycle_view_ring">リング</string>

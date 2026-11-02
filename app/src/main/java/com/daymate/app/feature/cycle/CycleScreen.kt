@@ -317,6 +317,9 @@ private fun CycleOverviewScreen(
     // 从预测经期日的「登记本次经期」进来时预选的日期；顶栏直接点「登记经期」则为 null
     // （弹窗默认落在今天）。用完即清，免得下次打开还带着上次那个日子。
     var registerPreset by remember { mutableStateOf<Long?>(null) }
+    // 逾期三选框：已超过预测开始日时，「开始新经期」先问从哪天记起（今天 / 预测日），再进登记弹窗。
+    // 预测开始日 = 今天时不弹（两选项等价），直接开登记弹窗。
+    var showOverdueChoice by remember { mutableStateOf(false) }
     var showAddNote by remember { mutableStateOf(false) }
     var showDeleteNote by remember { mutableStateOf(false) }
     // 正在修改的那条日常记录（null = 未打开修改弹窗）。修改入口挂在选中日详情区的每一行右侧。
@@ -516,7 +519,8 @@ private fun CycleOverviewScreen(
                         .padding(14.dp)
                 ) {
                     // 逾期提醒并入按钮卡（2026-11-02 用户拍板方案 C）：已到预测经期日时，
-                    // 标题+说明+登记入口放在按钮区上方，同一张卡内闭环，页面顶部不再单独立卡。
+                    // 标题+说明放在按钮区上方，同一张卡内闭环，页面顶部不再单独立卡。
+                    // 说明区不放按钮——「开始新经期」在逾期时会弹「从哪天开始」三选框，一入口就够（2026-11-02 用户拍板）。
                     if (overdue && lastLog != null) {
                         val predicted = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
                         Text(
@@ -531,11 +535,6 @@ private fun CycleOverviewScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
-                        Spacer(Modifier.height(10.dp))
-                        Button(
-                            onClick = { showRegister = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text(stringResource(R.string.cycle_register_this_period)) }
                         Spacer(Modifier.height(12.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                         Spacer(Modifier.height(12.dp))
@@ -585,6 +584,12 @@ private fun CycleOverviewScreen(
                                     )
                                     scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
                                 }
+                            } else if (lastLog != null && overdue &&
+                                CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays) < today
+                            ) {
+                                // 已超过预测开始日：实际开始可能是预测那天、也可能更晚，让用户选（2026-11-02 用户拍板）。
+                                // 预测开始日 = 今天时两选项等价，直接开登记弹窗。
+                                showOverdueChoice = true
                             } else {
                                 showRegister = true
                             }
@@ -773,6 +778,39 @@ private fun CycleOverviewScreen(
             },
             dismissButton = { TextButton(onClick = dismissRegister) { Text(stringResource(R.string.common_cancel)) } }
         ) { DatePicker(state = registerState) }
+    }
+
+    // 逾期三选框：已超过预测开始日时，「开始新经期」先问从哪天记起（2026-11-02 用户拍板）。
+    // 「从预测日开始」走 registerPreset 预选预测那天，与详情区预测日补录入口同一机制；
+    // 「从今天开始」即原直达路径。取消则什么都不做。
+    if (showOverdueChoice && lastLog != null) {
+        val predicted = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
+        AlertDialog(
+            onDismissRequest = { showOverdueChoice = false },
+            title = { Text(stringResource(R.string.cycle_overdue_choice_title)) },
+            text = {
+                Text(stringResource(R.string.cycle_overdue_choice_msg, formatDate(predicted)))
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = {
+                        showOverdueChoice = false
+                        registerPreset = predicted
+                        showRegister = true
+                    }) { Text(stringResource(R.string.cycle_start_from_predicted)) }
+                    TextButton(onClick = {
+                        showOverdueChoice = false
+                        registerPreset = null
+                        showRegister = true
+                    }) { Text(stringResource(R.string.cycle_start_from_today)) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOverdueChoice = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
     }
 
     // 补记历史经期：区间选择（几号到几号），纯补充记录

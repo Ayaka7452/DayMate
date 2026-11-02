@@ -232,6 +232,10 @@
     <string name="settings_abnormal">비정상: %1$s</string>
     <string name="cycle_title">사이클 관리</string>
     <string name="cycle_predicted_period_day">예측 생리일에 도달했습니다(%1$s)</string>
+    <string name="cycle_overdue_choice_title">이번 생리가 아직 기록되지 않았습니다</string>
+    <string name="cycle_overdue_choice_msg">예상 시작일(%1$s)이 지났습니다. 언제부터 기록할까요?</string>
+    <string name="cycle_start_from_today">오늘부터 기록</string>
+    <string name="cycle_start_from_predicted">예상일부터 기록</string>
     <string name="cycle_register_improve_accuracy">실제 시작일을 등록하면 예측 정확도가 향상됩니다.</string>
     <string name="cycle_register_this_period">이번 생리 기록</string>
     <string name="cycle_view_ring">링</string>
