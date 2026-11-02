@@ -236,7 +236,6 @@
     <string name="cycle_register_this_period">Log this period</string>
     <string name="cycle_view_ring">Ring</string>
     <string name="cycle_view_calendar">Calendar</string>
-    <string name="cycle_period_ended">This period has ended</string>
     <string name="cycle_recorded_today">Recorded up to today</string>
     <string name="cycle_end_period">End this period</string>
     <string name="cycle_in_period">Period in progress</string>

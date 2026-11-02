@@ -365,40 +365,6 @@ private fun CycleOverviewScreen(
         ) {
             Spacer(Modifier.height(12.dp))
 
-            // ===== 逾期提醒卡：已到预测经期日，引导登记实际日期 =====
-            if (overdue && lastLog != null) {
-                val predicted = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        Text(
-                            stringResource(R.string.cycle_predicted_period_day, formatDate(predicted)),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            stringResource(R.string.cycle_register_improve_accuracy),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Button(onClick = { showRegister = true }) { Text(stringResource(R.string.cycle_register_this_period)) }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-
             // ===== 圆环周期图 / 日历视图 =====
             // 首帧即按默认视图渲染（偏好已在上方同步读取），无闪变
             // Crossfade 内部按 TopStart 摆放子项，必须包一层全宽居中 Box，否则切换瞬间圆环会在左侧闪现
@@ -549,6 +515,31 @@ private fun CycleOverviewScreen(
                         .fillMaxWidth()
                         .padding(14.dp)
                 ) {
+                    // 逾期提醒并入按钮卡（2026-11-02 用户拍板方案 C）：已到预测经期日时，
+                    // 标题+说明+登记入口放在按钮区上方，同一张卡内闭环，页面顶部不再单独立卡。
+                    if (overdue && lastLog != null) {
+                        val predicted = CycleCalculator.nextStartAfter(lastLog.startDateEpochDay, cycleDays)
+                        Text(
+                            stringResource(R.string.cycle_predicted_period_day, formatDate(predicted)),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            stringResource(R.string.cycle_register_improve_accuracy),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = { showRegister = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(stringResource(R.string.cycle_register_this_period)) }
+                        Spacer(Modifier.height(12.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                        Spacer(Modifier.height(12.dp))
+                    }
             if (lastLog != null) {
                 val endDay = activeLog?.let { it.startDateEpochDay + it.periodDays - 1 }
                 val ongoing = endDay != null && today < endDay
@@ -560,11 +551,15 @@ private fun CycleOverviewScreen(
                 // 经期持续天数上限 10 天，到顶就不再提供（详情面板的加号同样是这个上限）。
                 val canContinue = alreadyToday && activeLog != null &&
                     activeLog.periodDays + 1 <= CycleCalculator.MAX_PERIOD_DAYS
+                // 左按钮只在「本次经期确实进行中/今天刚记录」时出现。已过结束日（pastEnd）时，
+                // activeLog 其实是上一次的记录，「本次经期已结束」既撒谎（本次根本没开始）又无操作价值，
+                // 直接不渲染——按钮区回到「黄体期」单按钮形态，「开始新经期」独占整行（2026-11-02 用户拍板 A）。
+                val showEndButton = activeLog != null && activeDiff != null && !pastEnd
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (activeLog != null && activeDiff != null) {
+                    if (showEndButton) {
                         Button(
                             onClick = { showEndConfirm = true },
                             enabled = ongoing,
@@ -572,7 +567,6 @@ private fun CycleOverviewScreen(
                         ) {
                             Text(
                                 when {
-                                    pastEnd -> stringResource(R.string.cycle_period_ended)
                                     alreadyToday -> stringResource(R.string.cycle_recorded_today)
                                     else -> stringResource(R.string.cycle_end_period)
                                 },
@@ -596,7 +590,7 @@ private fun CycleOverviewScreen(
                             }
                         },
                         enabled = !ongoing && (!alreadyToday || canContinue),
-                        modifier = Modifier.weight(1f)
+                        modifier = if (showEndButton) Modifier.weight(1f) else Modifier.fillMaxWidth()
                     ) {
                         Text(
                             when {
