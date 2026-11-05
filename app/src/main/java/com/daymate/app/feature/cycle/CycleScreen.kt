@@ -2778,16 +2778,17 @@ internal fun CycleDayDetail(
      */
     onBackfill: ((Long) -> Unit)? = null,
     /**
-     * 调整某条**已登记经期**的起止日期（铅笔）。选中区间内任一天都会出现——最近一条和以往的
-     * 历史记录都能改（2026-10-07 用户确认）。**预测经期不在其列**：预测是系统推算的产物，
+     * 调整某条**已登记经期**的起止日期（钢笔）。按钮在管家侧常驻，选中区间内任一天点亮——
+     * 最近一条和以往的历史记录都能改（2026-10-07 用户确认）；没有记录的日期置灰不可点，
+     * 未来日置灰但点击弹提示。**预测经期不在其列**：预测是系统推算的产物，
      * 只能靠上面的「登记本次经期」把它转成实记录，不能直接改。
      * 日历记事不传（那是管家的数据，日历记事只看不改，与 [canDelete] 同一原则）。
      */
     onAdjustPeriod: ((CycleLogEntity) -> Unit)? = null,
     /**
      * 删除某条经期的首日 / 末日（垃圾桶）；回调第二参 = 是否删首日。
-     * 落在某条经期区间内就常驻显示；不是首/末日或删完会跌破最少天数时置灰而非消失
-     * （2026-11-05 用户拍板）。未来日也常驻置灰，点击只弹提示、不落库。
+     * 按钮在管家侧常驻；没有记录、不是首/末日或删完会跌破最少天数时置灰而非消失
+     * （2026-11-05 用户拍板）。未来日也置灰，点击只弹提示、不落库。
      * 宿主要弹确认再落库（改动区间会连带影响全部预测）。
      * 日历记事不传。
      */
@@ -2812,15 +2813,15 @@ internal fun CycleDayDetail(
         date.dayOfWeek.getDisplayName(TextStyle.FULL, LocaleWrap.locale())
 
     // ===== 经期区间快捷操作（仅周期管家：三个回调都不传时整行不出现）=====
-    // 铅笔：选中任一「已登记经期」区间内的一天；垃圾桶：只在首/末日；加号：只在区间外紧挨着的一天。
+    // 钢笔：选中任一「已登记经期」区间内的一天；垃圾桶：只在首/末日；加号：只在区间外紧挨着的一天。
     // 一律排除单日特殊情况记录（periodDays == 1）——那是单日出血标记，不是一段经期。
     //
     // ⚠️ 未来日不能真的改数据（2026-10-07 用户报告）：一条记录的区间会延伸到今天之后——
     // 用户点「继续经期记录」把结束日顺延到明天后，明天的格子仍落在区间内、且正好是「末日」。
     // 没到的日子没有「这天算不算」的事实依据，所以取记录的判定统一以 day <= today 为前提。
-    // **但图标不再整行隐藏**（2026-11-05 用户改口径）：未来日用户点名的三颗
-    // （月亮／钢笔／垃圾桶）常驻、统一置灰，点任一颗只弹「不能提前记录未来的日期」提示，
-    // 视觉稳定且把原因说清；加号维持原条件。
+    // **但图标不再隐藏**（2026-11-05 用户改口径）：用户点名的三颗（月亮／钢笔／垃圾桶）
+    // 在管家侧无条件常驻，只按情况切换亮／灰；未来日三颗统一置灰，点任一颗只弹
+    // 「不能提前记录未来的日期」提示，视觉稳定且把原因说清；加号维持原条件。
     val dayReached = day <= today
     val isFutureDay = day > today
     val periodLog = if (dayReached) logs.firstOrNull {
@@ -2845,15 +2846,16 @@ internal fun CycleDayDetail(
     }
     val canExtend = extendLog != null &&
         extendLog.periodDays + 1 <= CycleCalculator.MAX_PERIOD_DAYS && !extendOverlaps
-    // 未来日取不到 periodLog，但用户点名的三颗（月亮／钢笔／垃圾桶）仍要常驻，故这三项的
-    // 显示条件额外放行 isFutureDay；动作由 PeriodIconButton 的 blockedByFuture 拦下，
-    // 不会带着 null 记录去落库。加号不在此列，维持原来的边界条件（未来日照旧不显示）。
-    val showAdjust = onAdjustPeriod != null && (periodLog != null || isFutureDay)
-    // 垃圾桶只要落在某条经期区间内就常驻；不可删时由 canRemoveEdge 置灰，不再整颗消失。
-    val showRemove = onRemovePeriodEdge != null && (periodLog != null || isFutureDay)
+    // 用户点名的三颗（月亮／钢笔／垃圾桶）在管家侧无条件常驻，只按情况切换亮／灰
+    // （2026-11-05 用户确认「无论如何都会显示」）；日历记事侧不传回调，整行照旧不出现。
+    // 未来日没有 periodLog / extendLog，动作由 PeriodIconButton 的 blockedByFuture 拦下，
+    // 不会带着 null 记录去落库。加号不在此列，维持原来的边界条件。
+    val showAdjust = onAdjustPeriod != null
+    val showRemove = onRemovePeriodEdge != null
     val showExtend = onExtendPeriod != null && extendLog != null
-    // 月亮按钮常驻（钢笔不常驻，不能跟着它走，否则空白历史日没有补记入口）；
-    // 但落在已有记录里的那天不能再补记，按 2026-11-05 的口径置灰而不消失（与垃圾桶一致）。
+    // 月亮按钮常驻且空白日点亮（钢笔/垃圾桶虽也常驻，但空白日会灰掉，不能跟着它们走，
+    // 否则空白历史日没有补记入口）；但落在已有记录里的那天不能再补记，
+    // 按 2026-11-05 的口径置灰而不消失（与垃圾桶一致）。
     // 单日经期标记（periodDays == 1）同样算「已记录」，一并计入，所以不复用排除单日的 periodLog。
     val dayInRecordedPeriod = logs.any {
         day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
@@ -2914,10 +2916,9 @@ internal fun CycleDayDetail(
                 }
             }
 
-            // 经期区间快捷操作：月亮（补记一段经期，常驻最左；已记录日置灰）／铅笔（改起止）
-            // ／垃圾桶（砍首末一天）／加号（并入相邻一天）。后三者按是否落在边界出现，
-            // 垃圾桶不可用时置灰而不消失。未来日用户点名的三颗（月亮／钢笔／垃圾桶）
-            // 统一置灰且不隐藏，点击只弹提示、不落库；加号维持原条件。
+            // 经期区间快捷操作：月亮（补记一段经期，常驻最左；已记录日置灰）／钢笔（改起止）
+            // ／垃圾桶（砍首末一天）／加号（并入相邻一天）。前三颗无条件常驻、按情况亮／灰；
+            // 未来日三颗统一置灰且点击只弹提示、不落库；加号按是否落在边界出现。
             if (showPeriodActions) {
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2934,6 +2935,7 @@ internal fun CycleDayDetail(
                         PeriodIconButton(
                             icon = Icons.Default.Edit,
                             contentDescription = stringResource(R.string.cycle_adjust_period_range),
+                            enabled = periodLog != null,
                             blockedByFuture = isFutureDay,
                             onClick = { periodLog?.let { onAdjustPeriod?.invoke(it) } }
                         )
