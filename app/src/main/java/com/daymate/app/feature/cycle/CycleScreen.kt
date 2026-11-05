@@ -953,6 +953,8 @@ private fun CycleOverviewScreen(
         val log = target.log
         val newStart = if (target.removeFirst) log.startDateEpochDay + 1 else log.startDateEpochDay
         val newDays = log.periodDays - 1
+        // 删到只剩 1 天时不写「X月X日 ~ X月X日」，避免同一天重复两遍
+        val rangeText = if (newDays == 1) formatDate(newStart) else formatRange(newStart, newDays)
         AlertDialog(
             onDismissRequest = { removePeriodEdge = null },
             title = {
@@ -964,7 +966,7 @@ private fun CycleOverviewScreen(
                 )
             },
             text = {
-                Text(stringResource(R.string.cycle_remove_day_confirm_text, formatRange(newStart, newDays), newDays))
+                Text(stringResource(R.string.cycle_remove_day_confirm_text, rangeText, newDays))
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -2800,18 +2802,19 @@ internal fun CycleDayDetail(
      */
     onBackfill: ((Long) -> Unit)? = null,
     /**
-     * 调整某条**已登记经期**的起止日期（钢笔）。按钮在管家侧常驻，选中区间内任一天点亮——
-     * 最近一条和以往的历史记录都能改（2026-10-07 用户确认）；没有记录的日期置灰不可点，
-     * 未来日置灰但点击弹提示。**预测经期不在其列**：预测是系统推算的产物，
+     * 调整某条**已登记记录**的起止日期（钢笔）。按钮在管家侧常驻，选中区间内任一天点亮——
+     * 最近一条、以往的历史记录、以及单日出血标记都能改（2026-10-07 用户确认历史记录可改，
+     * 2026-11-05 补齐单日标记）；没有记录的日期置灰不可点，未来日置灰但点击弹提示。
+     * **预测经期不在其列**：预测是系统推算的产物，
      * 只能靠上面的「登记本次经期」把它转成实记录，不能直接改。
      * 日历记事不传（那是管家的数据，日历记事只看不改，与 [canDelete] 同一原则）。
      */
     onAdjustPeriod: ((CycleLogEntity) -> Unit)? = null,
     /**
      * 删除某条经期的首日 / 末日（垃圾桶）；回调第二参 = 是否删首日。
-     * 按钮在管家侧常驻；没有记录、不是首/末日或删完会跌破最少天数时置灰而非消失
-     * （2026-11-05 用户拍板）。未来日也置灰，点击只弹提示、不落库。
-     * 宿主要弹确认再落库（改动区间会连带影响全部预测）。
+     * 按钮在管家侧常驻；没有记录、不是首/末日时置灰而非消失（2026-11-05 用户拍板）。
+     * 两天经期的首末日都可删，删完剩 1 天写成单日出血标记；单日标记本身不可删（会变 0 天）。
+     * 未来日也置灰，点击只弹提示、不落库。宿主要弹确认再落库（改动区间会连带影响全部预测）。
      * 日历记事不传。
      */
     onRemovePeriodEdge: ((CycleLogEntity, Boolean) -> Unit)? = null,
@@ -2843,8 +2846,9 @@ internal fun CycleDayDetail(
         date.dayOfWeek.getDisplayName(TextStyle.FULL, LocaleWrap.locale())
 
     // ===== 经期区间快捷操作（仅周期管家：三个回调都不传时整行不出现）=====
-    // 钢笔：选中任一「已登记经期」区间内的一天；垃圾桶：只在首/末日；加号：只在区间外紧挨着的一天。
-    // 一律排除单日特殊情况记录（periodDays == 1）——那是单日出血标记，不是一段经期。
+    // 钢笔：选中任一「已登记记录」区间内的一天（含单日出血标记，可把它修订成一段经期）；
+    // 垃圾桶：只在首/末日；加号：只在区间外紧挨着的一天。
+    // 垃圾桶/加号排除单日标记（periodDays == 1）——删掉唯一一天会留下 0 天的非法记录。
     //
     // ⚠️ 未来日不能真的改数据（2026-10-07 用户报告）：一条记录的区间会延伸到今天之后——
     // 用户点「继续经期记录」把结束日顺延到明天后，明天的格子仍落在区间内、且正好是「末日」。
@@ -2858,13 +2862,21 @@ internal fun CycleDayDetail(
         it.periodDays > 1 &&
             day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
     } else null
+    // 钢笔用另一套定位：单日出血标记（periodDays == 1）也是一条真实记录，应能点开修订弹窗
+    // 把它改成一段正式经期（2026-11-05 用户报告「两天经期的钢笔不能修改」时一并补齐）。
+    // 垃圾桶/加号仍只用 periodLog，避免删出 0 天记录。
+    val editableLog = if (dayReached) logs.firstOrNull {
+        day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
+    } else null
     val removeIsFirst = periodLog != null && day == periodLog.startDateEpochDay
     val removeIsLast = periodLog != null &&
         day == periodLog.startDateEpochDay + periodLog.periodDays - 1
-    // 删完不能跌破最少天数（项目硬规则 2 天），否则会留下全库唯一一条不合法记录。
+    // 删完至少还要剩 1 天：剩 1 天是合法的「单日出血标记」（特殊情况记录就是这么落库的），
+    // 不进均值、不参与预测，日历上仍显示经期色；0 天才是非法记录。
+    // 两天的经期首日和末日因此都可删（2026-11-05 用户拍板：两端都应激活）。
     // 这里用置灰而不是弹窗——视线已经在图标上，灰掉比多问一句更直观。
     val canRemoveEdge = periodLog != null && (removeIsFirst || removeIsLast) &&
-        periodLog.periodDays - 1 >= CycleCalculator.MIN_PERIOD_DAYS
+        periodLog.periodDays - 1 >= 1
     val extendLog = if (dayReached) logs.firstOrNull {
         it.periodDays > 1 &&
             (day == it.startDateEpochDay - 1 || day == it.startDateEpochDay + it.periodDays)
@@ -2984,9 +2996,9 @@ internal fun CycleDayDetail(
                         PeriodIconButton(
                             icon = Icons.Default.Edit,
                             contentDescription = stringResource(R.string.cycle_adjust_period_range),
-                            enabled = periodLog != null,
+                            enabled = editableLog != null,
                             blockedByFuture = isFutureDay,
-                            onClick = { periodLog?.let { onAdjustPeriod?.invoke(it) } }
+                            onClick = { editableLog?.let { onAdjustPeriod?.invoke(it) } }
                         )
                     }
                     if (showRemove) {
