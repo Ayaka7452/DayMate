@@ -2770,7 +2770,9 @@ internal fun CycleDayDetail(
     /**
      * 补记历史经期（月亮按钮）。非空时在所有「已到达」的日期都显示，点它带着所点那天作为
      * 区间起点打开补记弹窗——替代原来操作区的「补记历史」按钮（2026-11-05 用户拍板）。
-     * 未来日不显示（没到的日子没有「这天算不算」的事实依据）。日历记事不传（只看不改）。
+     * 未来日不显示（没到的日子没有「这天算不算」的事实依据）；落在已登记经期内的那天只置灰、
+     * 不可点——那天已经有记录了，再补记一段只会和它重叠（2026-11-05 用户报告）。
+     * 日历记事不传（只看不改）。
      */
     onBackfill: ((Long) -> Unit)? = null,
     /**
@@ -2842,7 +2844,12 @@ internal fun CycleDayDetail(
     // 垃圾桶只要落在某条经期区间内就常驻；不可删时由 canRemoveEdge 置灰，不再整颗消失。
     val showRemove = onRemovePeriodEdge != null && periodLog != null
     val showExtend = onExtendPeriod != null && extendLog != null
-    // 月亮按钮在「已到达」的日期常驻（钢笔不常驻，不能跟着它走，否则空白历史日没有补记入口）。
+    // 月亮按钮在「已到达」的日期常驻（钢笔不常驻，不能跟着它走，否则空白历史日没有补记入口）；
+    // 但落在已有记录里的那天不能再补记，按 2026-11-05 的口径置灰而不消失（与垃圾桶一致）。
+    // 单日经期标记（periodDays == 1）同样算「已记录」，一并计入，所以不复用排除单日的 periodLog。
+    val dayInRecordedPeriod = logs.any {
+        day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
+    }
     val showBackfillAction = onBackfill != null && dayReached
     val showPeriodActions = showBackfillAction || showAdjust || showRemove || showExtend
 
@@ -2899,8 +2906,9 @@ internal fun CycleDayDetail(
                 }
             }
 
-            // 经期区间快捷操作：月亮（补记一段经期，常驻最左）／铅笔（改起止）／垃圾桶（砍首末一天）
-            // ／加号（并入相邻一天）。后三者按是否落在边界出现，垃圾桶不可用时置灰而不消失。
+            // 经期区间快捷操作：月亮（补记一段经期，常驻最左；已记录日置灰）／铅笔（改起止）
+            // ／垃圾桶（砍首末一天）／加号（并入相邻一天）。后三者按是否落在边界出现，
+            // 垃圾桶不可用时置灰而不消失。
             if (showPeriodActions) {
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2908,6 +2916,7 @@ internal fun CycleDayDetail(
                         PeriodIconButton(
                             icon = Icons.Filled.Bedtime,
                             contentDescription = stringResource(R.string.cycle_backfill_history_period),
+                            enabled = !dayInRecordedPeriod,
                             onClick = { onBackfill?.invoke(day) }
                         )
                     }
