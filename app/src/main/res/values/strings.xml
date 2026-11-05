@@ -37,6 +37,7 @@
     <string name="common_title">Title</string>
     <string name="common_move_to">Move to</string>
     <string name="common_collapse">Collapse</string>
+    <string name="common_expand">Expand</string>
     <string name="home_manual_sort_toast">Please switch to manual sorting in Settings first.</string>
     <string name="home_selected_n">%1$d selected</string>
     <string name="home_move_into_folder">Move into folder</string>

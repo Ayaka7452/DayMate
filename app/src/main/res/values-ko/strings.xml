@@ -37,6 +37,7 @@
     <string name="common_title">제목</string>
     <string name="common_move_to">이동 위치</string>
     <string name="common_collapse">접기</string>
+    <string name="common_expand">펼치기</string>
     <string name="home_manual_sort_toast">설정에서 먼저 수동 정렬로 전환하세요.</string>
     <string name="home_selected_n">%1$d개 선택됨</string>
     <string name="home_move_into_folder">폴더로 이동</string>

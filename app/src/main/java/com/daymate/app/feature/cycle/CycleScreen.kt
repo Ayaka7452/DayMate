@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -499,48 +500,83 @@ private fun CycleOverviewScreen(
 
                     // ===== 选中日详情段：嵌入本卡，与操作段用浅分割线分区（2026-11-05 用户拍板方案 1）=====
                     // 只改管家侧：日历记事那套常驻详情栏仍走独立卡片。
-                    // 动画沿用原来两层（AnimatedVisibility + Column(animateContentSize)），刻意不叠 AnimatedContent。
-                    AnimatedVisibility(
-                        visible = showCalendar && detailExpanded,
-                        enter = expandVertically(
-                            expandFrom = Alignment.Top,
-                            animationSpec = tween(260, easing = FastOutSlowInEasing)
-                        ) + fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)),
-                        exit = shrinkVertically(
-                            shrinkTowards = Alignment.Top,
-                            animationSpec = tween(260, easing = FastOutSlowInEasing)
-                        ) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
-                    ) {
-                        // 退出动画期间 detailExpanded 已置 false，用「最后一次看的日期」兜底渲染，避免内容中途跳变
-                        val detailDay = selectedDay ?: lastDetailDay ?: today
-                        val detailNotes = notes.trackerNotes().filter { it.dateEpochDay == detailDay }
-                        Column(Modifier.animateContentSize()) {
+                    // 折叠态不再只剩两颗底部按钮：保留日期/阶段摘要行，箭头改朝下，点一下展开并选中今天；
+                    // 图标行、补登记、当日记录与「添加/删除记录」只在展开态出现（2026-11-05 用户拍板）。
+                    // 分割线恒在，把摘要/详情与下方「结束经期」等操作按钮隔开。
+                    // 两个互斥的 AnimatedVisibility 各带进出动画，刻意不叠 AnimatedContent（避免同帧组两份内容）。
+                    if (showCalendar) {
+                        AnimatedVisibility(
+                            visible = !detailExpanded,
+                            enter = expandVertically(
+                                expandFrom = Alignment.Top,
+                                animationSpec = tween(260, easing = FastOutSlowInEasing)
+                            ) + fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)),
+                            exit = shrinkVertically(
+                                shrinkTowards = Alignment.Top,
+                                animationSpec = tween(260, easing = FastOutSlowInEasing)
+                            ) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
+                        ) {
+                            // 没选中任何日期时摘要就是今天（带「今天 ·」前缀）；选中过某天后收起，
+                            // 摘要跟着那天走，与日历高亮保持一致。点向下箭头一律回到今天。
                             CycleDayDetail(
-                                day = detailDay,
+                                day = selectedDay ?: today,
                                 logs = logs,
-                                dayNotes = detailNotes,
+                                dayNotes = emptyList(),
                                 cycleDays = cycleDays,
                                 today = today,
                                 // 不画自己的卡壳：本卡就是它的框体
                                 embedded = true,
-                                // 当天没有任何日常记录时「删除记录」置灰——没有可删的东西就不该能点
-                                canDelete = detailNotes.isNotEmpty(),
-                                onCollapse = { detailExpanded = false },
-                                // 预测经期日就地补登记：带着那天的日期打开登记弹窗
-                                onRegisterPeriod = { d -> registerPreset = d; showRegister = true },
-                                // 月亮按钮：补记历史经期，带着所点那天作为区间起点预选
-                                onBackfill = { d -> backfillPreset = d; showBackfill = true },
-                                onAdjustPeriod = { log -> editingLog = log },
-                                onRemovePeriodEdge = { log, first -> removePeriodEdge = PendingEdgeRemoval(log, first) },
-                                onExtendPeriod = { log, d -> extendPeriodDay = PendingExtension(log, d) },
-                                onAdd = { showAddNote = true },
-                                onEdit = { editingNote = it },
-                                onDelete = { showDeleteNote = true }
+                                collapsed = true,
+                                onExpand = {
+                                    selectedDay = today
+                                    lastDetailDay = today
+                                    detailExpanded = true
+                                    todayRequest += 1   // 与顶栏「今天」同一套请求：回本月并选中今天
+                                }
                             )
-                            Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                            Spacer(Modifier.height(12.dp))
                         }
+                        AnimatedVisibility(
+                            visible = detailExpanded,
+                            enter = expandVertically(
+                                expandFrom = Alignment.Top,
+                                animationSpec = tween(260, easing = FastOutSlowInEasing)
+                            ) + fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)),
+                            exit = shrinkVertically(
+                                shrinkTowards = Alignment.Top,
+                                animationSpec = tween(260, easing = FastOutSlowInEasing)
+                            ) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
+                        ) {
+                            // 退出动画期间 detailExpanded 已置 false，用「最后一次看的日期」兜底渲染，避免内容中途跳变
+                            val detailDay = selectedDay ?: lastDetailDay ?: today
+                            val detailNotes = notes.trackerNotes().filter { it.dateEpochDay == detailDay }
+                            Column(Modifier.animateContentSize()) {
+                                CycleDayDetail(
+                                    day = detailDay,
+                                    logs = logs,
+                                    dayNotes = detailNotes,
+                                    cycleDays = cycleDays,
+                                    today = today,
+                                    // 不画自己的卡壳：本卡就是它的框体
+                                    embedded = true,
+                                    // 当天没有任何日常记录时「删除记录」置灰——没有可删的东西就不该能点
+                                    canDelete = detailNotes.isNotEmpty(),
+                                    onCollapse = { detailExpanded = false },
+                                    // 预测经期日就地补登记：带着那天的日期打开登记弹窗
+                                    onRegisterPeriod = { d -> registerPreset = d; showRegister = true },
+                                    // 月亮按钮：补记历史经期，带着所点那天作为区间起点预选
+                                    onBackfill = { d -> backfillPreset = d; showBackfill = true },
+                                    onAdjustPeriod = { log -> editingLog = log },
+                                    onRemovePeriodEdge = { log, first -> removePeriodEdge = PendingEdgeRemoval(log, first) },
+                                    onExtendPeriod = { log, d -> extendPeriodDay = PendingExtension(log, d) },
+                                    onAdd = { showAddNote = true },
+                                    onEdit = { editingNote = it },
+                                    onDelete = { showDeleteNote = true }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                        Spacer(Modifier.height(12.dp))
                     }
             if (lastLog != null) {
                 val endDay = activeLog?.let { it.startDateEpochDay + it.periodDays - 1 }
@@ -2738,9 +2774,11 @@ private fun DetailFrame(
  *  - [showNoteTags]：经期管家登记的自定义记录标签；
  *  - [showPrediction]：周期阶段 chip 与经期预测副文案。
  *
- * **收起按钮只在周期管家显示**（传 [onCollapse]），位于标题行右上角、与阶段 chip 同排；
+ * **收起/展开按钮只在周期管家显示**（传 [onCollapse] / [onExpand]），位于标题行右上角、与阶段 chip 同排；
  * 日历记事的详情栏是常驻的，不传即为无按钮。
- * 管家侧无论是否选中某天都能收起（收起后详情区整体隐去，点任意格子再展开）。
+ * 管家侧收起（[collapsed]）不再整段隐去：保留日期 + 阶段摘要与向下箭头，点箭头展开并选中今天；
+ * 图标行、补登记、当日记录与添加/删除按钮只在展开态出现，避免折叠后只剩底部两颗按钮显得空荡
+ * （2026-11-05 用户拍板）。
  */
 @Composable
 internal fun CycleDayDetail(
@@ -2799,10 +2837,17 @@ internal fun CycleDayDetail(
      * 日历记事不传。
      */
     onExtendPeriod: ((CycleLogEntity, Long) -> Unit)? = null,
-    onAdd: () -> Unit,
+    onAdd: () -> Unit = {},
     /** 修改某一条已有记录（入口就挂在那一行右侧）。 */
-    onEdit: (CycleNoteEntity) -> Unit,
-    onDelete: () -> Unit
+    onEdit: (CycleNoteEntity) -> Unit = {},
+    onDelete: () -> Unit = {},
+    /**
+     * true = 折叠摘要态：只画日期/阶段标题行，图标行、补登记、当日记录与添加/删除记录全部不渲染
+     * （2026-11-05 用户拍板）。日历记事侧常驻详情栏不用（默认 false）。
+     */
+    collapsed: Boolean = false,
+    /** 折叠态标题行右侧的向下箭头：非空时显示，点它展开并选中今天。 */
+    onExpand: (() -> Unit)? = null
 ) {
     val (phaseLabel, sub) = describeDay(day, logs, cycleDays, today)
     val (chipBg, chipFg) = phaseChipColors(phaseLabel)
@@ -2880,8 +2925,8 @@ internal fun CycleDayDetail(
                         )
                     }
                 }
-                // 右侧一排：阶段 chip + 折叠按钮同排（2026-11-05 用户拍板）。
-                // 折叠按钮取代原来底部那颗「收起」文字按钮，展开后顶部第一眼即可关，卡内少一排按钮。
+                // 右侧一排：阶段 chip + 折叠/展开按钮同排（2026-11-05 用户拍板）。
+                // 展开态向上（收起）、折叠态向下（展开并选中今天）；取代原来底部那颗「收起」文字按钮。
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -2896,18 +2941,23 @@ internal fun CycleDayDetail(
                             Text(phaseLabel, style = MaterialTheme.typography.labelSmall, color = chipFg)
                         }
                     }
-                    if (onCollapse != null) {
+                    if (onCollapse != null || onExpand != null) {
                         Box(
                             Modifier
                                 .size(28.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                                .clickable { onCollapse?.invoke() },
+                                .clickable {
+                                    if (collapsed) onExpand?.invoke() else onCollapse?.invoke()
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.KeyboardArrowUp,
-                                contentDescription = stringResource(R.string.common_collapse),
+                                if (collapsed) Icons.Default.KeyboardArrowDown
+                                else Icons.Default.KeyboardArrowUp,
+                                contentDescription = stringResource(
+                                    if (collapsed) R.string.common_expand else R.string.common_collapse
+                                ),
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -2916,6 +2966,9 @@ internal fun CycleDayDetail(
                 }
             }
 
+            // ===== 展开态专属区：折叠态只保留上面的日期/阶段摘要行 =====
+            // 内部沿用原缩进，避免整段重排。
+            if (!collapsed) {
             // 经期区间快捷操作：月亮（补记一段经期，常驻最左；已记录日置灰）／钢笔（改起止）
             // ／垃圾桶（砍首末一天）／加号（并入相邻一天）。前三颗无条件常驻、按情况亮／灰；
             // 未来日三颗统一置灰且点击只弹提示、不落库；加号按是否落在边界出现。
@@ -3016,6 +3069,7 @@ internal fun CycleDayDetail(
                     Text(stringResource(R.string.cycle_delete_record), maxLines = 1)
                 }
             }
+            } // if (!collapsed)
     }
 }
 

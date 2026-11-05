@@ -37,6 +37,7 @@
     <string name="common_title">標題</string>
     <string name="common_move_to">移動到</string>
     <string name="common_collapse">收起</string>
+    <string name="common_expand">展開</string>
     <string name="home_manual_sort_toast">請先在設定中切換為手動排序。</string>
     <string name="home_selected_n">已選 %1$d 項</string>
     <string name="home_move_into_folder">移入資料夾</string>
