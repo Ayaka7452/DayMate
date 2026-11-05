@@ -276,7 +276,7 @@
     <string name="cycle_disclaimer_calendar">カレンダー式の予測は参考程度で、避妊や医学的診断の根拠にはなりません。</string>
     <string name="cycle_select_period_range">今回の生理の開始日と終了日を選択。</string>
     <string name="cycle_period_days_range">期間は %1$d～%2$d 日である必要があります。</string>
-    <string name="cycle_overlap_early_note">既存の記録と日付が重複しているか早すぎます。保存時に特別なケースとして記録するか確認してください。</string>
+    <string name="cycle_overlap_early_note">既存の記録と日付が重複している、記録済みの周期の内側にある、または早すぎます。保存時に特別なケースとして記録するか確認してください。</string>
     <string name="cycle_will_record_n">%1$s を記録します（合計 %2$d 日）</string>
     <string name="cycle_default_special_note">生理以外の出血の可能性</string>
     <string name="cycle_confirm_special">特別なケースとして記録しますか？</string>
@@ -519,6 +519,7 @@
     <string name="cycle_warn_overlap">既存の月経記録と日付が重なっています</string>
     <string name="cycle_warn_too_close">既存の記録（%1$s）からわずか %2$d 日です。%3$d 日未満の間隔での出血は通常、独立した月経ではなく不正出血の可能性があります。医師への相談をおすすめします。</string>
     <string name="cycle_warn_too_early">予測された次の月経（%1$s）より %2$d 日早いです。%3$d 日を超える早まりは異常出血の範囲です。医師への相談をおすすめします。</string>
+    <string name="cycle_warn_within_cycle">この日付の前後にはすでに月経の記録があります。1周期に満たない間隔の出血は、通常別の月経ではなく不正出血の可能性があります。医師への相談をおすすめします。</string>
     <string name="db_t_events">カウントダウン</string>
     <string name="db_t_folders">フォルダ</string>
     <string name="db_t_vault_events">Vault の項目</string>

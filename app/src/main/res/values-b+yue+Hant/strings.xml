@@ -276,7 +276,7 @@
     <string name="cycle_disclaimer_calendar">月曆法推算只供參考，唔可以作為避孕或者醫學診斷依據。</string>
     <string name="cycle_select_period_range">揀選今次經期嘅開始同結束日期。</string>
     <string name="cycle_period_days_range">持續日數需要喺 %1$d~%2$d 日之間。</string>
-    <string name="cycle_overlap_early_note">日期同已有記錄重疊或者提前太多，保存嗰陣要確認係咪當做特殊情況記錄。</string>
+    <string name="cycle_overlap_early_note">日期同已有記錄重疊、喺已記錄嘅週期入面，或者提前太多，保存嗰陣要確認係咪當做特殊情況記錄。</string>
     <string name="cycle_will_record_n">將會記錄 %1$s，合共 %2$d 日</string>
     <string name="cycle_default_special_note">可能係非經期出血</string>
     <string name="cycle_confirm_special">確認當做特殊情況記錄？</string>
@@ -519,6 +519,7 @@
     <string name="cycle_warn_overlap">同已有嘅經期記錄撞期</string>
     <string name="cycle_warn_too_close">同已有嘅經期記錄（%1$s）只差 %2$d 日。相隔唔夠 %3$d 日嘅兩次出血，通常唔係兩次獨立經期，可能係非經期出血。建議去睇醫生。</string>
     <string name="cycle_warn_too_early">比預測嘅下次經期（%1$s）早咗 %2$d 日。早過 %3$d 日就屬於異常出血，建議去睇醫生。</string>
+    <string name="cycle_warn_within_cycle">呢日前後都已有經期記錄。相隔唔夠一個週期嘅兩次出血，通常唔係兩次獨立經期，可能係非經期出血。建議去睇醫生。</string>
     <string name="db_t_events">倒數日</string>
     <string name="db_t_folders">資料夾</string>
     <string name="db_t_vault_events">Vault 項目</string>

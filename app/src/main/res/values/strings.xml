@@ -276,7 +276,7 @@
     <string name="cycle_disclaimer_calendar">Calendar-based predictions are for reference only and are not a basis for contraception or medical diagnosis.</string>
     <string name="cycle_select_period_range">Select the start and end dates of this period.</string>
     <string name="cycle_period_days_range">Duration must be between %1$d and %2$d days.</string>
-    <string name="cycle_overlap_early_note">The dates overlap with an existing record or are too early. On saving, confirm whether to log it as a special case.</string>
+    <string name="cycle_overlap_early_note">The dates overlap an existing record, fall inside an already recorded cycle, or are too early. On saving, confirm whether to log it as a special case.</string>
     <string name="cycle_will_record_n">Will record %1$s, %2$d days total</string>
     <string name="cycle_default_special_note">Possibly non-period bleeding</string>
     <string name="cycle_confirm_special">Confirm logging as a special case?</string>
@@ -519,6 +519,7 @@
     <string name="cycle_warn_overlap">Overlaps an existing period record</string>
     <string name="cycle_warn_too_close">Only %2$d days after an existing record (%1$s). Two bleeds less than %3$d days apart are usually not separate periods — it may be intermenstrual bleeding. Consider seeing a doctor.</string>
     <string name="cycle_warn_too_early">%2$d days earlier than the predicted next period (%1$s). More than %3$d days early falls outside the normal range — consider seeing a doctor.</string>
+    <string name="cycle_warn_within_cycle">There are period records both before and after this date. Bleeding less than one cycle apart is usually not a separate period — consider seeing a doctor.</string>
     <string name="db_t_events">Countdowns</string>
     <string name="db_t_folders">Folders</string>
     <string name="db_t_vault_events">Vault items</string>

@@ -237,6 +237,8 @@ private fun CycleOverviewScreen(
     //  ① 与已有记录重叠：同一时段重复登记经期通常不合理
     //  ② 与任一真实经期首日间隔不足 MIN_PERIOD_INTERVAL_DAYS 天（不重叠）：两次独立经期不可能这么近
     //  ③ 比预测下次经期提前超过 EARLY_PERIOD_THRESHOLD_DAYS 天（FIGO：相邻周期波动 ≤7~9 天属正常）
+    //  ④ 落在两条已登记经期之间的空白日：这个周期已经记录过，中间的出血不该再算一次独立经期
+    //     （2026-11-05 用户报告：从日历中段的空白日点月亮补记，①②③ 全落空，直接写成了一条经期记录）
     fun unreasonableLogReason(day: Long, days: Int): String? { // TODO(i18n): 见 skipped
         val last = logs.firstOrNull()?.startDateEpochDay
             ?: return null
@@ -261,6 +263,21 @@ private fun CycleOverviewScreen(
                 gap,
                 CycleCalculator.MIN_PERIOD_INTERVAL_DAYS
             )
+        }
+        // ④ 前后都有真实经期记录、且与任一相邻首日的间隔不足一个完整周期：
+        // 这段周期已经被记录过，中间的空白日再补一段经期属于特殊情况。
+        // ② 只覆盖 15 天以内，③ 只管「比最近一条记录更晚」的方向，所以周期中段的空白日
+        // 会全部落空。补记一段确实漏掉的历史经期时，与前后首日的间隔接近一个完整周期，
+        // 不会被这条拦下。单日特殊情况标记（periodDays == 1）不作为周期边界参与判断。
+        val realLogs = logs.filter { it.periodDays > 1 }
+        val withinRecordedCycle = realLogs.any { it.startDateEpochDay < day } &&
+            realLogs.any { it.startDateEpochDay > day } &&
+            realLogs.any {
+                kotlin.math.abs(it.startDateEpochDay - day) <
+                    (cycleDays - CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS).toLong()
+            }
+        if (withinRecordedCycle) {
+            return Tr.s(R.string.cycle_warn_within_cycle)
         }
         val next = CycleCalculator.nextStartAfter(last, cycleDays)
         if (day > last && day < next - CycleCalculator.EARLY_PERIOD_THRESHOLD_DAYS) {

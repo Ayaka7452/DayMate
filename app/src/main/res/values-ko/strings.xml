@@ -276,7 +276,7 @@
     <string name="cycle_disclaimer_calendar">달력 기반 예측은 참고용이며 피임이나 의학적 진단의 근거가 될 수 없습니다.</string>
     <string name="cycle_select_period_range">이번 생리의 시작일과 종료일 선택.</string>
     <string name="cycle_period_days_range">기간은 %1$d~%2$d일 사이여야 합니다.</string>
-    <string name="cycle_overlap_early_note">날짜가 기존 기록과 겹치거나 너무 빠릅니다. 저장 시 특수 사례로 기록할지 확인하세요.</string>
+    <string name="cycle_overlap_early_note">날짜가 기존 기록과 겹치거나, 이미 기록된 주기 안에 있거나 너무 빠릅니다. 저장 시 특수 사례로 기록할지 확인하세요.</string>
     <string name="cycle_will_record_n">%1$s 기록, 총 %2$d일</string>
     <string name="cycle_default_special_note">생리 외 출혈 가능성</string>
     <string name="cycle_confirm_special">특수 사례로 기록할까요?</string>
@@ -519,6 +519,7 @@
     <string name="cycle_warn_overlap">기존 월경 기록과 날짜가 겹칩니다</string>
     <string name="cycle_warn_too_close">기존 기록(%1$s)과 불과 %2$d일 차이입니다. %3$d일 미만 간격의 두 출혈은 대개 독립된 월경이 아니며 비정상 출혈일 수 있습니다. 진료를 권장합니다.</string>
     <string name="cycle_warn_too_early">예상 다음 월경(%1$s)보다 %2$d일 빠릅니다. %3$d일 이상 빠르면 비정상 출혈 범위에 해당합니다. 진료를 권장합니다.</string>
+    <string name="cycle_warn_within_cycle">이 날짜 전후에 이미 월경 기록이 있습니다. 한 주기보다 짧은 간격의 출혈은 보통 별개의 월경이 아니며 비정상 출혈일 수 있습니다. 진료를 권장합니다.</string>
     <string name="db_t_events">디데이</string>
     <string name="db_t_folders">폴더</string>
     <string name="db_t_vault_events">Vault 항목</string>

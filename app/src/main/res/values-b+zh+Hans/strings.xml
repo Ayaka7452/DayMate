@@ -276,7 +276,7 @@
     <string name="cycle_disclaimer_calendar">日历法推算仅供参考，不能作为避孕或医学诊断依据。</string>
     <string name="cycle_select_period_range">选择这次经期的开始与结束日期。</string>
     <string name="cycle_period_days_range">持续天数需在 %1$d~%2$d 天之间。</string>
-    <string name="cycle_overlap_early_note">日期与已有记录重叠或提前过多，保存时需确认是否作为特殊情况记录。</string>
+    <string name="cycle_overlap_early_note">日期与已有记录重叠、落在已记录的周期内或提前过多，保存时需确认是否作为特殊情况记录。</string>
     <string name="cycle_will_record_n">将记录 %1$s，共 %2$d 天</string>
     <string name="cycle_default_special_note">可能为非经期出血</string>
     <string name="cycle_confirm_special">确认作为特殊情况记录？</string>
@@ -519,6 +519,7 @@
     <string name="cycle_warn_overlap">与已有经期记录日期重叠</string>
     <string name="cycle_warn_too_close">与已有经期记录（%1$s）仅相差 %2$d 天。间隔不足 %3$d 天的两次出血通常不是两次独立经期，可能是非经期出血。建议咨询医生。</string>
     <string name="cycle_warn_too_early">比预测下次经期（%1$s）提前 %2$d 天。提前超过 %3$d 天属异常出血范围，建议咨询医生。</string>
+    <string name="cycle_warn_within_cycle">该日期前后已有经期记录。相隔不足一个周期的两次出血通常不是两次独立经期，可能是非经期出血。建议咨询医生。</string>
     <string name="db_t_events">倒数日</string>
     <string name="db_t_folders">文件夹</string>
     <string name="db_t_vault_events">Vault 条目</string>
