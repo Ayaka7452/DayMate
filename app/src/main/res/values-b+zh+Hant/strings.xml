@@ -276,13 +276,12 @@
     <string name="cycle_disclaimer_calendar">日曆法推算僅供參考，不能作為避孕或醫學診斷依據。</string>
     <string name="cycle_select_period_range">選擇這次經期的開始與結束日期。</string>
     <string name="cycle_period_days_range">持續天數需在 %1$d~%2$d 天之間。</string>
-    <string name="cycle_overlap_early_note">日期與已有記錄重疊、落在已記錄的週期內或提前過多，保存時需確認是否作為特殊情況記錄。</string>
+    <string name="cycle_overlap_early_note">日期與已有記錄重疊、落在已記錄的週期內或提前過多，保存時需確認是否改為日曆記錄。</string>
     <string name="cycle_will_record_n">將記錄 %1$s，共 %2$d 天</string>
-    <string name="cycle_default_special_note">可能為非經期出血</string>
-    <string name="cycle_confirm_special">確認作為特殊情況記錄？</string>
-    <string name="cycle_special_note_suffix">。\n特殊情況僅標記當天，不按經期天數向後延伸。可附備註說明。</string>
+    <string name="cycle_confirm_special">改為日曆記錄？</string>
+    <string name="cycle_special_note_suffix">。\n將在這天新增一條「%1$s」日曆記錄，不記為經期，亦不影響預測。</string>
     <string name="cycle_note_optional_label">備註（可選）</string>
-    <string name="cycle_save_as_special">作為特殊情況記錄</string>
+    <string name="cycle_save_as_special">記錄到日曆</string>
     <string name="cycle_end_period_confirm_title">結束本次經期？</string>
     <string name="cycle_end_period_confirm_text">將把本次經期記錄為 %1$s，共 %2$d 天。今天（%3$s）計為最後一天。如有錯誤，可進行補記或修訂。</string>
     <string name="cycle_confirm_end">確認結束</string>

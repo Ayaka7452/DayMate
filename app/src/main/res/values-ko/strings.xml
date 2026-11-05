@@ -276,13 +276,12 @@
     <string name="cycle_disclaimer_calendar">달력 기반 예측은 참고용이며 피임이나 의학적 진단의 근거가 될 수 없습니다.</string>
     <string name="cycle_select_period_range">이번 생리의 시작일과 종료일 선택.</string>
     <string name="cycle_period_days_range">기간은 %1$d~%2$d일 사이여야 합니다.</string>
-    <string name="cycle_overlap_early_note">날짜가 기존 기록과 겹치거나, 이미 기록된 주기 안에 있거나 너무 빠릅니다. 저장 시 특수 사례로 기록할지 확인하세요.</string>
+    <string name="cycle_overlap_early_note">날짜가 기존 기록과 겹치거나, 이미 기록된 주기 안에 있거나 너무 빠릅니다. 저장 시 캘린더 기록으로 남길지 확인하세요.</string>
     <string name="cycle_will_record_n">%1$s 기록, 총 %2$d일</string>
-    <string name="cycle_default_special_note">생리 외 출혈 가능성</string>
-    <string name="cycle_confirm_special">특수 사례로 기록할까요?</string>
-    <string name="cycle_special_note_suffix">.\n특수 사례는 해당 일만 표시되며 생리 일수만큼 연장되지 않습니다. 메모를 추가할 수 있습니다.</string>
+    <string name="cycle_confirm_special">캘린더 기록으로 할까요?</string>
+    <string name="cycle_special_note_suffix">.\n이 날짜에 「%1$s」 캘린더 기록을 1건 추가하며 월경으로 기록하지 않습니다. 예측은 바뀌지 않습니다.</string>
     <string name="cycle_note_optional_label">메모(선택)</string>
-    <string name="cycle_save_as_special">특수 사례로 기록</string>
+    <string name="cycle_save_as_special">캘린더에 기록</string>
     <string name="cycle_end_period_confirm_title">이번 생리를 종료할까요?</string>
     <string name="cycle_end_period_confirm_text">이번 생리는 %1$s(으)로 기록되며 총 %2$d일입니다. 오늘(%3$s)이 마지막 날로 계산됩니다. 오류가 있으면 소급 기록하거나 수정할 수 있습니다.</string>
     <string name="cycle_confirm_end">종료 확인</string>

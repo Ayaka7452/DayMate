@@ -276,13 +276,12 @@
     <string name="cycle_disclaimer_calendar">カレンダー式の予測は参考程度で、避妊や医学的診断の根拠にはなりません。</string>
     <string name="cycle_select_period_range">今回の生理の開始日と終了日を選択。</string>
     <string name="cycle_period_days_range">期間は %1$d～%2$d 日である必要があります。</string>
-    <string name="cycle_overlap_early_note">既存の記録と日付が重複している、記録済みの周期の内側にある、または早すぎます。保存時に特別なケースとして記録するか確認してください。</string>
+    <string name="cycle_overlap_early_note">既存の記録と日付が重複している、記録済みの周期の内側にある、または早すぎます。保存時にカレンダー記録として残すか確認してください。</string>
     <string name="cycle_will_record_n">%1$s を記録します（合計 %2$d 日）</string>
-    <string name="cycle_default_special_note">生理以外の出血の可能性</string>
-    <string name="cycle_confirm_special">特別なケースとして記録しますか？</string>
-    <string name="cycle_special_note_suffix">。\n特別なケースはその日のみをマークし、生理の日数分は延長しません。備考を追加できます。</string>
+    <string name="cycle_confirm_special">カレンダー記録にしますか？</string>
+    <string name="cycle_special_note_suffix">。\nこの日には「%1$s」のカレンダー記録を1件追加し、月経としては記録しません。予測は変わりません。</string>
     <string name="cycle_note_optional_label">備考（任意）</string>
-    <string name="cycle_save_as_special">特別なケースとして記録</string>
+    <string name="cycle_save_as_special">カレンダーに記録</string>
     <string name="cycle_end_period_confirm_title">今回の生理を終了しますか？</string>
     <string name="cycle_end_period_confirm_text">今回の生理は %1$s として記録され、合計 %2$d 日です。今日（%3$s）が最終日となります。間違いがある場合は、遡って記録または編集できます。</string>
     <string name="cycle_confirm_end">終了を確認</string>

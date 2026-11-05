@@ -203,8 +203,12 @@ fun CycleScreen(
     }
 }
 
-/** 登记/补记在不合理时间时（与已有记录重叠 / 比预测经期提前超过阈值）的二次确认信息。 */
-private data class PendingSpecialLog(val startDay: Long, val days: Int, val reason: String)
+/**
+ * 登记/补记落在不合理时间时的二次确认信息：只带所选起始日与原因。
+ * 确认后不再是经期，而是按「出血与分泌物」记一条普通日历记录（2026-11-05 用户拍板），
+ * 因此不需要带用户选的经期天数。
+ */
+private data class PendingSpecialLog(val startDay: Long, val reason: String)
 
 /** 日期选择器共用：禁选未来日期——经期的开始不可能是未来（登记/补记/修订统一限制）。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -759,7 +763,7 @@ private fun CycleOverviewScreen(
                                 )
                                 scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
                             }
-                            else -> pendingSpecial = PendingSpecialLog(day, periodDays, prompt)
+                            else -> pendingSpecial = PendingSpecialLog(day, prompt)
                         }
                     }
                     showRegister = false
@@ -833,7 +837,7 @@ private fun CycleOverviewScreen(
                                     )
                                     scope.launch { runCatching { container.cycleEventBridge.syncEvent() } }
                                 }
-                                else -> pendingSpecial = PendingSpecialLog(startDay, days, prompt)
+                                else -> pendingSpecial = PendingSpecialLog(startDay, prompt)
                             }
                         }
                         dismissBackfill()
@@ -874,43 +878,40 @@ private fun CycleOverviewScreen(
         }
     }
 
-    // 重叠二次确认弹窗：登记/补记区间与已有记录重叠时出现，可选填备注作为特殊情况保存
+    // 不合理时间的二次确认：不再写成一条经期，改为按「出血与分泌物」记一条普通日历记录
+    // （2026-11-05 用户拍板）。日历记录不参与周期/排卵推算，也不改变日历预测着色。
     pendingSpecial?.let { pending ->
-        // remember 的 calculation 是 @DisallowComposableCalls，这里不能调 stringResource；
-        // 用 Tr.s 取（等价、且非 Composable 位置通用）。
-        var noteText by remember(pending) { mutableStateOf(Tr.s(R.string.cycle_default_special_note)) }
         AlertDialog(
             onDismissRequest = { pendingSpecial = null },
             title = { Text(stringResource(R.string.cycle_confirm_special)) },
             text = {
-                Column {
-                    // 三种 reason 文案结尾并不统一（「日期重叠」无句号，另两种自带句号），
-                    // 直接拼接会产出「。。」——统一去掉结尾句号后由此处补一个
-                    // 六语言 reason 的句末标点各不相同（中文日文用「。」，英文韩文用「.」），
-                    // 只 trim 中文句号会让英文/韩文界面拼出「..」双句点——suffix 本身已带句号或分隔符
-                    Text(pending.reason.trimEnd('。', '.', '！', '!', '？', '?', ' ') + stringResource(R.string.cycle_special_note_suffix))
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = noteText,
-                        onValueChange = { noteText = it.take(50) },
-                        label = { Text(stringResource(R.string.cycle_note_optional_label)) },
-                        singleLine = true
-                    )
-                }
+                // 四种 reason 文案结尾并不统一（「日期重叠」无句号，另三种自带句号），
+                // 直接拼接会产出「。。」——统一去掉结尾标点后由 suffix 补一个；
+                // 六语言 reason 的句末标点各不相同（中文日文用「。」，英文韩文用「.」），
+                // suffix 本身已带对应句点或分隔符。
+                Text(
+                    pending.reason.trimEnd('。', '.', '！', '!', '？', '?', ' ') +
+                        stringResource(
+                            R.string.cycle_special_note_suffix,
+                            stringResource(R.string.note_bleed_spotting)
+                        )
+                )
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val note = noteText.trim().ifEmpty { null }
                     scope.launch {
-                        // 特殊情况（非经期出血等）只标记当天：单日记录，不污染经期天数均值与预测
-                        container.cycleRepository.add(
-                            CycleLogEntity(
-                                startDateEpochDay = pending.startDay,
-                                periodDays = 1,
-                                note = note
+                        // 与「点日历 → 添加记录」落同一种实体：出血与分泌物大类的「点滴出血」预置项。
+                        // 只记所选起始日那一天；不写 cycle_logs，故不进经期均值、不需要同步经期事件。
+                        container.cycleNoteRepository.addAll(
+                            listOf(
+                                CycleNoteEntity(
+                                    dateEpochDay = pending.startDay,
+                                    category = NoteCatalog.Category.BLEED.key,
+                                    presetKey = "bleed_spotting",
+                                    label = Tr.s(R.string.note_bleed_spotting)
+                                )
                             )
                         )
-                        runCatching { container.cycleEventBridge.syncEvent() }
                     }
                     pendingSpecial = null
                 }) { Text(stringResource(R.string.cycle_save_as_special)) }
