@@ -1,6 +1,7 @@
 package com.ayaka7452.daymate.feature.cycle
 
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.Canvas
@@ -2768,10 +2769,11 @@ internal fun CycleDayDetail(
      */
     onRegisterPeriod: ((Long) -> Unit)? = null,
     /**
-     * 补记历史经期（月亮按钮）。非空时在所有「已到达」的日期都显示，点它带着所点那天作为
-     * 区间起点打开补记弹窗——替代原来操作区的「补记历史」按钮（2026-11-05 用户拍板）。
-     * 未来日不显示（没到的日子没有「这天算不算」的事实依据）；落在已登记经期内的那天只置灰、
-     * 不可点——那天已经有记录了，再补记一段只会和它重叠（2026-11-05 用户报告）。
+     * 补记历史经期（月亮按钮）。非空时常驻，点它带着所点那天作为区间起点打开补记弹窗——
+     * 替代原来操作区的「补记历史」按钮（2026-11-05 用户拍板）。
+     * 落在已登记经期内的那天只置灰、不可点——那天已经有记录了，再补记一段只会和它重叠
+     * （2026-11-05 用户报告）。未来日同样置灰，但改为可点并弹「不能提前记录未来的日期」
+     * 提示（2026-11-05 用户改口径：不隐藏、点一下把原因说清）。
      * 日历记事不传（只看不改）。
      */
     onBackfill: ((Long) -> Unit)? = null,
@@ -2785,7 +2787,7 @@ internal fun CycleDayDetail(
     /**
      * 删除某条经期的首日 / 末日（垃圾桶）；回调第二参 = 是否删首日。
      * 落在某条经期区间内就常驻显示；不是首/末日或删完会跌破最少天数时置灰而非消失
-     * （2026-11-05 用户拍板）。未来日仍不显示。
+     * （2026-11-05 用户拍板）。未来日也常驻置灰，点击只弹提示、不落库。
      * 宿主要弹确认再落库（改动区间会连带影响全部预测）。
      * 日历记事不传。
      */
@@ -2813,11 +2815,14 @@ internal fun CycleDayDetail(
     // 铅笔：选中任一「已登记经期」区间内的一天；垃圾桶：只在首/末日；加号：只在区间外紧挨着的一天。
     // 一律排除单日特殊情况记录（periodDays == 1）——那是单日出血标记，不是一段经期。
     //
-    // ⚠️ **还没到来的日子一律不给这三个图标**（2026-10-07 用户报告）：一条记录的区间会延伸到
-    // 今天之后——用户点「继续经期记录」把结束日顺延到明天后，明天的格子仍落在区间内、且正好是
-    // 「末日」，于是垃圾桶出现在一个**还没发生**的日子上。没到的日子没有「这天算不算」的事实依据，
-    // 也不该替用户预支（想延长就等那天到了再点），所以判定统一以 day <= today 为前提。
+    // ⚠️ 未来日不能真的改数据（2026-10-07 用户报告）：一条记录的区间会延伸到今天之后——
+    // 用户点「继续经期记录」把结束日顺延到明天后，明天的格子仍落在区间内、且正好是「末日」。
+    // 没到的日子没有「这天算不算」的事实依据，所以取记录的判定统一以 day <= today 为前提。
+    // **但图标不再整行隐藏**（2026-11-05 用户改口径）：未来日用户点名的三颗
+    // （月亮／钢笔／垃圾桶）常驻、统一置灰，点任一颗只弹「不能提前记录未来的日期」提示，
+    // 视觉稳定且把原因说清；加号维持原条件。
     val dayReached = day <= today
+    val isFutureDay = day > today
     val periodLog = if (dayReached) logs.firstOrNull {
         it.periodDays > 1 &&
             day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
@@ -2840,17 +2845,20 @@ internal fun CycleDayDetail(
     }
     val canExtend = extendLog != null &&
         extendLog.periodDays + 1 <= CycleCalculator.MAX_PERIOD_DAYS && !extendOverlaps
-    val showAdjust = onAdjustPeriod != null && periodLog != null
+    // 未来日取不到 periodLog，但用户点名的三颗（月亮／钢笔／垃圾桶）仍要常驻，故这三项的
+    // 显示条件额外放行 isFutureDay；动作由 PeriodIconButton 的 blockedByFuture 拦下，
+    // 不会带着 null 记录去落库。加号不在此列，维持原来的边界条件（未来日照旧不显示）。
+    val showAdjust = onAdjustPeriod != null && (periodLog != null || isFutureDay)
     // 垃圾桶只要落在某条经期区间内就常驻；不可删时由 canRemoveEdge 置灰，不再整颗消失。
-    val showRemove = onRemovePeriodEdge != null && periodLog != null
+    val showRemove = onRemovePeriodEdge != null && (periodLog != null || isFutureDay)
     val showExtend = onExtendPeriod != null && extendLog != null
-    // 月亮按钮在「已到达」的日期常驻（钢笔不常驻，不能跟着它走，否则空白历史日没有补记入口）；
+    // 月亮按钮常驻（钢笔不常驻，不能跟着它走，否则空白历史日没有补记入口）；
     // 但落在已有记录里的那天不能再补记，按 2026-11-05 的口径置灰而不消失（与垃圾桶一致）。
     // 单日经期标记（periodDays == 1）同样算「已记录」，一并计入，所以不复用排除单日的 periodLog。
     val dayInRecordedPeriod = logs.any {
         day >= it.startDateEpochDay && day < it.startDateEpochDay + it.periodDays
     }
-    val showBackfillAction = onBackfill != null && dayReached
+    val showBackfillAction = onBackfill != null
     val showPeriodActions = showBackfillAction || showAdjust || showRemove || showExtend
 
     DetailFrame(embedded = embedded) {
@@ -2908,7 +2916,8 @@ internal fun CycleDayDetail(
 
             // 经期区间快捷操作：月亮（补记一段经期，常驻最左；已记录日置灰）／铅笔（改起止）
             // ／垃圾桶（砍首末一天）／加号（并入相邻一天）。后三者按是否落在边界出现，
-            // 垃圾桶不可用时置灰而不消失。
+            // 垃圾桶不可用时置灰而不消失。未来日用户点名的三颗（月亮／钢笔／垃圾桶）
+            // 统一置灰且不隐藏，点击只弹提示、不落库；加号维持原条件。
             if (showPeriodActions) {
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2917,17 +2926,19 @@ internal fun CycleDayDetail(
                             icon = Icons.Filled.Bedtime,
                             contentDescription = stringResource(R.string.cycle_backfill_history_period),
                             enabled = !dayInRecordedPeriod,
+                            blockedByFuture = isFutureDay,
                             onClick = { onBackfill?.invoke(day) }
                         )
                     }
-                    if (onAdjustPeriod != null && periodLog != null) {
+                    if (showAdjust) {
                         PeriodIconButton(
                             icon = Icons.Default.Edit,
                             contentDescription = stringResource(R.string.cycle_adjust_period_range),
-                            onClick = { onAdjustPeriod(periodLog) }
+                            blockedByFuture = isFutureDay,
+                            onClick = { periodLog?.let { onAdjustPeriod?.invoke(it) } }
                         )
                     }
-                    if (onRemovePeriodEdge != null && showRemove && periodLog != null) {
+                    if (showRemove) {
                         PeriodIconButton(
                             icon = Icons.Default.Delete,
                             contentDescription = stringResource(
@@ -2935,7 +2946,8 @@ internal fun CycleDayDetail(
                                 else R.string.cycle_remove_last_day
                             ),
                             enabled = canRemoveEdge,
-                            onClick = { onRemovePeriodEdge(periodLog, removeIsFirst) }
+                            blockedByFuture = isFutureDay,
+                            onClick = { periodLog?.let { onRemovePeriodEdge?.invoke(it, removeIsFirst) } }
                         )
                     }
                     if (onExtendPeriod != null && showExtend && extendLog != null) {
@@ -3006,36 +3018,56 @@ internal fun CycleDayDetail(
 }
 
 /**
- * 详情面板里的方形图标按钮（经期区间的铅笔 / 垃圾桶 / 加号）。
+ * 详情面板里的方形图标按钮（月亮 / 钢笔 / 垃圾桶 / 加号）。
  *
  * 用浅主题色底表达「会改数据的次级动作」——比实心 `Button` 轻、比 `TextButton` 显眼，
- * 一排三个不抢底部「添加记录 / 删除记录」的视线。禁用态只降不透明度、不另加说明文字：
+ * 一排不抢底部「添加记录 / 删除记录」的视线。禁用态只降不透明度、不另加说明文字：
  * 视线已经停在图标上，灰掉比多弹一句提示更直接。
+ *
+ * [blockedByFuture] 是例外：未来日的月亮／钢笔／垃圾桶要「灰但可点」，点击不执行动作，
+ * 只弹一句 Toast 把原因说清（2026-11-05 用户口径）。视觉走禁用态、但点击保持开启，
+ * 否则点了没反应、用户不知道为什么不能记。
  */
 @Composable
 private fun PeriodIconButton(
     icon: ImageVector,
     contentDescription: String,
     enabled: Boolean = true,
+    blockedByFuture: Boolean = false,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val dimmed = !enabled || blockedByFuture
     Box(
         modifier = Modifier
             .size(40.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)
+                if (dimmed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)
+                else MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
             )
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(
+                enabled = enabled || blockedByFuture,
+                onClick = {
+                    if (blockedByFuture) {
+                        Toast.makeText(
+                            context,
+                            Tr.s(R.string.cycle_future_date_blocked),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        onClick()
+                    }
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
             modifier = Modifier.size(18.dp),
-            tint = if (enabled) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+            tint = if (dimmed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+            else MaterialTheme.colorScheme.primary
         )
     }
 }

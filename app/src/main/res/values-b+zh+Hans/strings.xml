@@ -255,6 +255,7 @@
     <string name="cycle_remove_last_day_confirm_title">删除最后一天？</string>
     <string name="cycle_remove_day_confirm_text">删除后，经期变为 %1$s，共 %2$d 天。相关预测会自动重算。</string>
     <string name="cycle_backfill_history_period">补记历史经期</string>
+    <string name="cycle_future_date_blocked">不能提前记录未来的日期。</string>
     <string name="cycle_phase_period">月经期</string>
     <string name="cycle_phase_follicular">卵泡期</string>
     <string name="cycle_phase_ovulation">排卵期</string>

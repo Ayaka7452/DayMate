@@ -255,6 +255,7 @@
     <string name="cycle_remove_last_day_confirm_title">마지막 날을 삭제할까요?</string>
     <string name="cycle_remove_day_confirm_text">삭제하면 생리는 %1$s(%2$d일)이 됩니다. 관련 예측이 자동으로 다시 계산됩니다.</string>
     <string name="cycle_backfill_history_period">지난 생리 소급 기록</string>
+    <string name="cycle_future_date_blocked">미래 날짜를 미리 기록할 수 없습니다.</string>
     <string name="cycle_phase_period">월경기</string>
     <string name="cycle_phase_follicular">난포기</string>
     <string name="cycle_phase_ovulation">배란기</string>
