@@ -44,6 +44,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -277,6 +278,8 @@ private fun CycleOverviewScreen(
     val scope = rememberCoroutineScope()
     var showRegister by remember { mutableStateOf(false) }
     var showBackfill by remember { mutableStateOf(false) }
+    // 从日历详情的月亮按钮进入补记时，预选所点的那天；关闭弹窗一并清掉（同 registerPreset 的 pending+消费置空）。
+    var backfillPreset by remember { mutableStateOf<Long?>(null) }
     var showTips by remember { mutableStateOf(false) }
     // 登记/补记与已有记录日期重叠时的二次确认（可能为非经期出血的特殊情况，可附备注）
     var pendingSpecial by remember { mutableStateOf<PendingSpecialLog?>(null) }
@@ -456,10 +459,10 @@ private fun CycleOverviewScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // ===== 操作按钮：2×2 网格，上排「结束 / 开始」对称，下排「修订 / 补记」 =====
+            // ===== 操作按钮：单排「结束 / 开始」；下排「修订 / 补记」两个重复入口已移除（2026-11-05 用户拍板）=====
             // 经期进行中（今天未到记录结束日）：「结束本次经期」可点，「开始新经期」置灰；
             // 已到/已过结束日：结束侧置灰（经期已结束），开始侧恢复可点——两个主按钮恰好一活一灰
-            // 整体包一层浅背景卡片，与下方「选中日详情」同款框体，避免四个按钮裸露平铺显得突兀
+            // 操作段与「选中日详情」段共用同一张浅背景卡片，避免按钮裸露平铺显得突兀
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -524,6 +527,8 @@ private fun CycleOverviewScreen(
                                 onCollapse = { detailExpanded = false },
                                 // 预测经期日就地补登记：带着那天的日期打开登记弹窗
                                 onRegisterPeriod = { d -> registerPreset = d; showRegister = true },
+                                // 月亮按钮：补记历史经期，带着所点那天作为区间起点预选
+                                onBackfill = { d -> backfillPreset = d; showBackfill = true },
                                 onAdjustPeriod = { log -> editingLog = log },
                                 onRemovePeriodEdge = { log, first -> removePeriodEdge = PendingEdgeRemoval(log, first) },
                                 onExtendPeriod = { log, d -> extendPeriodDay = PendingExtension(log, d) },
@@ -604,45 +609,12 @@ private fun CycleOverviewScreen(
                         )
                     }
                 }
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { editingLog = lastLog },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            // 本次还没结束（今天仍在经期内、或今天正好是最后一天）→ 改的是「本次」；
-                            // 已过结束日就成了过去式，叫「上次经期」（2026-10-07 用户要求）
-                            stringResource(
-                                if (endDay != null && today <= endDay) R.string.cycle_edit_current_period
-                                else R.string.cycle_edit_last_period
-                            ),
-                            maxLines = 1
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = { showBackfill = true },
-                        modifier = Modifier.weight(1f)
-                    ) { Text(stringResource(R.string.cycle_backfill_history_period), maxLines = 1) }
-                }
             } else {
-                // 无任何记录时的空状态操作行
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Button(
-                        onClick = { showRegister = true },
-                        modifier = Modifier.weight(1f)
-                    ) { Text(stringResource(R.string.cycle_start_new_period)) }
-                    OutlinedButton(
-                        onClick = { showBackfill = true },
-                        modifier = Modifier.weight(1f)
-                    ) { Text(stringResource(R.string.cycle_backfill_history_period)) }
-                }
+                // 无任何记录时的空状态：只留「开始新经期」；补记历史走日历详情里的月亮按钮
+                Button(
+                    onClick = { showRegister = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(stringResource(R.string.cycle_start_new_period)) }
             }
 
                 } // 关闭操作按钮 Column
@@ -812,7 +784,12 @@ private fun CycleOverviewScreen(
 
     // 补记历史经期：区间选择（几号到几号），纯补充记录
     if (showBackfill) {
-        val rangeState = rememberDateRangePickerState(selectableDates = pastAndTodayOnly)
+        // 关闭时连 preset 一起清掉，免得下次打开还预选着上次从日历点进来的日期
+        val dismissBackfill = { showBackfill = false; backfillPreset = null }
+        val rangeState = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = backfillPreset?.let { it * 86400000L },
+            selectableDates = pastAndTodayOnly
+        )
         val selStart = rangeState.selectedStartDateMillis
         val selEnd = rangeState.selectedEndDateMillis
         val startDay = selStart?.let {
@@ -822,7 +799,7 @@ private fun CycleOverviewScreen(
             ((selEnd - selStart) / 86400000L + 1).toInt() else 0
         val valid = days in CycleCalculator.MIN_PERIOD_DAYS..CycleCalculator.MAX_PERIOD_DAYS
         DatePickerDialog(
-            onDismissRequest = { showBackfill = false },
+            onDismissRequest = dismissBackfill,
             confirmButton = {
                 TextButton(
                     enabled = valid,
@@ -838,11 +815,11 @@ private fun CycleOverviewScreen(
                                 else -> pendingSpecial = PendingSpecialLog(startDay, days, prompt)
                             }
                         }
-                        showBackfill = false
+                        dismissBackfill()
                     }
                 ) { Text(stringResource(R.string.common_save)) }
             },
-            dismissButton = { TextButton(onClick = { showBackfill = false }) { Text(stringResource(R.string.common_cancel)) } }
+            dismissButton = { TextButton(onClick = dismissBackfill) { Text(stringResource(R.string.common_cancel)) } }
         ) {
             Column(
                 modifier = Modifier
@@ -2791,6 +2768,12 @@ internal fun CycleDayDetail(
      */
     onRegisterPeriod: ((Long) -> Unit)? = null,
     /**
+     * 补记历史经期（月亮按钮）。非空时在所有「已到达」的日期都显示，点它带着所点那天作为
+     * 区间起点打开补记弹窗——替代原来操作区的「补记历史」按钮（2026-11-05 用户拍板）。
+     * 未来日不显示（没到的日子没有「这天算不算」的事实依据）。日历记事不传（只看不改）。
+     */
+    onBackfill: ((Long) -> Unit)? = null,
+    /**
      * 调整某条**已登记经期**的起止日期（铅笔）。选中区间内任一天都会出现——最近一条和以往的
      * 历史记录都能改（2026-10-07 用户确认）。**预测经期不在其列**：预测是系统推算的产物，
      * 只能靠上面的「登记本次经期」把它转成实记录，不能直接改。
@@ -2799,7 +2782,8 @@ internal fun CycleDayDetail(
     onAdjustPeriod: ((CycleLogEntity) -> Unit)? = null,
     /**
      * 删除某条经期的首日 / 末日（垃圾桶）；回调第二参 = 是否删首日。
-     * 只在选中「首日」或「末日」时出现——区间是连续的，删中间那天没有意义。
+     * 落在某条经期区间内就常驻显示；不是首/末日或删完会跌破最少天数时置灰而非消失
+     * （2026-11-05 用户拍板）。未来日仍不显示。
      * 宿主要弹确认再落库（改动区间会连带影响全部预测）。
      * 日历记事不传。
      */
@@ -2855,9 +2839,12 @@ internal fun CycleDayDetail(
     val canExtend = extendLog != null &&
         extendLog.periodDays + 1 <= CycleCalculator.MAX_PERIOD_DAYS && !extendOverlaps
     val showAdjust = onAdjustPeriod != null && periodLog != null
-    val showRemove = onRemovePeriodEdge != null && (removeIsFirst || removeIsLast)
+    // 垃圾桶只要落在某条经期区间内就常驻；不可删时由 canRemoveEdge 置灰，不再整颗消失。
+    val showRemove = onRemovePeriodEdge != null && periodLog != null
     val showExtend = onExtendPeriod != null && extendLog != null
-    val showPeriodActions = showAdjust || showRemove || showExtend
+    // 月亮按钮在「已到达」的日期常驻（钢笔不常驻，不能跟着它走，否则空白历史日没有补记入口）。
+    val showBackfillAction = onBackfill != null && dayReached
+    val showPeriodActions = showBackfillAction || showAdjust || showRemove || showExtend
 
     DetailFrame(embedded = embedded) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -2912,11 +2899,18 @@ internal fun CycleDayDetail(
                 }
             }
 
-            // 经期区间快捷操作：铅笔（改起止）／垃圾桶（砍首末一天）／加号（并入相邻一天）。
-            // 三者互斥出现——落在段内给铅笔、正好在边界再加垃圾桶、落在段外紧邻的一天给加号。
+            // 经期区间快捷操作：月亮（补记一段经期，常驻最左）／铅笔（改起止）／垃圾桶（砍首末一天）
+            // ／加号（并入相邻一天）。后三者按是否落在边界出现，垃圾桶不可用时置灰而不消失。
             if (showPeriodActions) {
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (showBackfillAction) {
+                        PeriodIconButton(
+                            icon = Icons.Filled.Bedtime,
+                            contentDescription = stringResource(R.string.cycle_backfill_history_period),
+                            onClick = { onBackfill?.invoke(day) }
+                        )
+                    }
                     if (onAdjustPeriod != null && periodLog != null) {
                         PeriodIconButton(
                             icon = Icons.Default.Edit,
@@ -2967,9 +2961,6 @@ internal fun CycleDayDetail(
 
             if (showNoteTags) {
                 Spacer(Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                Spacer(Modifier.height(10.dp))
-
                 Text(
                     stringResource(R.string.cycle_day_records),
                     style = MaterialTheme.typography.labelMedium,
