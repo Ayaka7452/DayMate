@@ -148,18 +148,21 @@ class AutoBackupManager(
     /**
      * 立即（不防抖）执行一次备份。供 Activity onPause / 即将离开应用时调用，
      * 避免待执行的防抖任务因进程被杀死而丢失最近一次写入的备份。
+     *
+     * @param force 手动触发（主页云备份弹窗的「立即备份」）传 true：忽略「自动备份」开关，
+     * 否则关掉开关后连手动备份都会静默不执行。自动触发一律传 false。
      */
-    fun flush() {
+    fun flush(force: Boolean = false) {
         backupJob?.cancel()
-        scope.launch { runBackup() }
+        scope.launch { runBackup(force) }
     }
 
-    private suspend fun runBackup() {
+    private suspend fun runBackup(force: Boolean = false) {
         // 不能用 runCatching：它捕获 Throwable，会把 CancellationException 一并吞掉，
         // 于是防抖里 backupJob?.cancel() 形同虚设——旧任务照旧跑到上传，
         // 与新任务并发 PUT 到同一远程路径，且用过期的执行结果覆写 _cloudState。
         try {
-            doBackup()
+            doBackup(force)
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Throwable) {
@@ -168,9 +171,9 @@ class AutoBackupManager(
         }
     }
 
-    private suspend fun doBackup() {
-        // 开关关闭时直接跳过
-        if (!settings.autoBackupEnabled.first()) return
+    private suspend fun doBackup(force: Boolean = false) {
+        // 自动触发受开关约束；手动「立即备份」（force）不受开关限制
+        if (!force && !settings.autoBackupEnabled.first()) return
         val internalDb = context.getDatabasePath("daymate.db")
         if (!internalDb.exists()) return
 

@@ -18,28 +18,41 @@ import java.io.File
  * 只含单个 daymate.db；导入 [importExternal] 前应确保主库已关闭（close 容器），再复制文件、
  * 最后 rebuild 容器。导入兼容旧版三文件式备份（-wal / -shm 可选）。
  *
- * 关于重复备份文件：部分 SAF 提供方（SD 卡、第三方文件管理器的 DocumentsProvider）的
- * deleteDocument 会静默失败或延迟生效，此时 createFile 会被系统自动改名成
- * `daymate.db (1)`、`daymate.db (2)` 不断累积。为此本类统一按「命名模式」识别备份文件
- * （见 [BACKUP_NAME_REGEX]），而不是只匹配固定的 `daymate.db`——既保证写入前清理干净，
- * 也保证存在性探测不会因为文件被改名而漏判。
+ * 关于重复备份文件：SAF 的 createFile 遇到同名文件不会覆盖，而是由 DocumentsProvider 自动改名，
+ * 且改名的**位置因提供方而异**（`daymate.db (1)` 或 `daymate (1).db` / `daymate(1).db`），
+ * 于是每备份一次就多一份。早期只识别前一种命名，连「备份是否存在」「空数据护栏」「恢复入口」
+ * 都被连带判错。现在按命名族识别（见 [BACKUP_NAME_REGEX]），并**复用已有主备份文件覆盖写**——
+ * 不新建、也不删除备份目录里的任何文件，从根上杜绝副本堆积，同时不影响用户自己放的文件。
  */
 object StorageBackup {
     /** 主备份文件名。云端备份（[com.ayaka7452.daymate.core.cloud.WebDavStore.REMOTE_DB]）与之同名。 */
     const val DB_NAME = "daymate.db"
 
+    /** 文件名主体与扩展名：从 [DB_NAME] 拆出，避免命名规则与文件名不同步。 */
+    private val DB_STEM = DB_NAME.substringBeforeLast('.')
+    private val DB_EXT = DB_NAME.substringAfterLast('.')
+
+    /** 自动改名编号：可有可无空格，如 `(1)` / ` (12)`。 */
+    private const val COUNTER = "(?:\\s*\\(\\d+\\))?"
+
     private val SUFFIXES = listOf("", "-wal", "-shm")
 
     /**
-     * 备份相关文件的命名模式：
+     * 备份相关文件的命名模式（覆盖两种编号位置）：
      *  - 本体 `daymate.db`；
-     *  - 旧版三文件导出的 `daymate.db-wal` / `daymate.db-shm`；
-     *  - SAF 自动改名产生的 `daymate.db (1)` / `daymate.db-wal (2)` 变体。
+     *  - 编号在末尾 `daymate.db (1)` / `daymate.db(2)`；
+     *  - 编号在扩展名前 `daymate (1).db` / `daymate(2).db`；
+     *  - 旧版三文件导出的 `daymate.db-wal` / `daymate.db-shm` 及其同类变体。
+     *
+     * 用于「找到已有备份并复用」以及导入时的主文件探测，不再用于删除。
+     * 刻意不含 `.bak`：修复前快照由 [SNAPSHOT_REGEX] 单独管理，不会被误认成主备份参与恢复。
      */
-    private val BACKUP_NAME_REGEX =
-        Regex("^" + Regex.escape(DB_NAME) + "(?:-(?:wal|shm))?(?:\\s*\\(\\d+\\))?$")
+    private val BACKUP_NAME_REGEX = Regex(
+        "^" + Regex.escape(DB_STEM) + COUNTER + "\\." + Regex.escape(DB_EXT) +
+            COUNTER + "(?:-(?:wal|shm)" + COUNTER + ")?$"
+    )
 
-    /** 导出互斥：自动备份的 flush() 与手动「立即备份」可能并发，交错执行会撞出重复文件。 */
+    /** 导出互斥：自动备份的 flush() 与手动「立即备份」可能并发，交错执行会互相覆盖。 */
     private val exportLock = Any()
 
     /** 选中文件夹的备份探测结果。 */
@@ -101,7 +114,11 @@ object StorageBackup {
      * 把内部主库导出到已配置的备份文件夹（只写单个 daymate.db 文件）。
      * @param internalDb 内部主库文件（通常 ctx.getDatabasePath("daymate.db")）。
      * 调用前调用方应已对在线容器执行 wal_checkpoint(TRUNCATE)——数据已全部合并进主文件，
-     * 故 -wal / -shm 附属文件无需导出；目标文件夹中旧版三文件式导出残留的附属文件会一并清理。
+     * 故 -wal / -shm 附属文件无需导出。
+     *
+     * 写入策略：**复用目录里已有的主备份文件直接覆盖写**，找不到才 createFile。
+     * 这样 SAF 提供方没有机会自动改名，也就不会再产生 `daymate (1).db` 之类的副本；
+     * 全程不删除备份目录里的任何已有文件。覆盖前把旧内容备份到应用缓存，写入或校验失败时写回。
      */
     fun exportInternal(ctx: Context, internalDb: File, targetUri: Uri? = StorageConfig.backupUri(ctx)) {
         val uri = targetUri ?: return
@@ -109,11 +126,30 @@ object StorageBackup {
         if (!src.exists()) return
         synchronized(exportLock) {
             val root = DocumentFile.fromTreeUri(ctx, uri) ?: return
-            // 不再「先 purge 旧备份、再写新的」：写入途中失败/被中断（IO 错误、SAF 提供方断开、
-            // 存储满、进程被杀）时旧备份已经删掉了，只剩一份半截新文件——等于「备份被自己的
-            // 备份操作弄丢」。改为先写、写完校验通过再清理其余残留；写坏就把这份删掉，
-            // 旧备份原样保留（createFile 通常已把它改名成 "(1)"，purge 不会误删）。
-            val target = root.createFile("application/octet-stream", DB_NAME) ?: return
+            val existing = findMainBackup(root)
+            val target = existing ?: root.createFile("application/octet-stream", DB_NAME) ?: return
+            val isNewFile = existing == null
+
+            // 覆盖写之前先留一份回滚副本（落在应用缓存，不碰备份目录）。
+            // 旧备份读不出来时宁可放弃本次备份，也绝不把用户唯一的备份覆盖坏。
+            val rollback = File(ctx.cacheDir, "daymate_local_rollback.db")
+            var hasRollback = false
+            if (!isNewFile) {
+                hasRollback = runCatching {
+                    var copied = false
+                    ctx.contentResolver.openInputStream(target.uri)?.use { ins ->
+                        rollback.outputStream().use { ins.copyTo(it) }
+                        copied = true
+                    }
+                    copied
+                }.getOrDefault(false)
+                if (!hasRollback) {
+                    AppLogger.log(ctx, "Backup", "旧备份不可读，放弃本次覆盖写")
+                    rollback.delete()
+                    return
+                }
+            }
+
             val written = try {
                 val out = ctx.contentResolver.openOutputStream(target.uri)
                 if (out == null) {
@@ -127,28 +163,40 @@ object StorageBackup {
                 false
             }
             if (!written) {
-                AppLogger.log(ctx, "Backup", "导出校验未通过，保留旧备份")
-                runCatching { target.delete() }
+                AppLogger.log(ctx, "Backup", "导出校验未通过，恢复原备份")
+                if (hasRollback) {
+                    runCatching {
+                        ctx.contentResolver.openOutputStream(target.uri)?.use { out ->
+                            rollback.inputStream().use { it.copyTo(out) }
+                        }
+                    }
+                } else {
+                    // 只删除本次自己刚创建的半截文件，绝不动用户已有的文件
+                    runCatching { target.delete() }
+                }
+                rollback.delete()
                 return
             }
-            // 写入后再清一次：若本次 createFile 仍被改名（说明旧文件确实删不掉），
-            // 就保留刚写入的这份、把其它同名残留清掉，尽量只留一份备份。
-            purgeBackupFiles(root, keep = target.uri)
+            rollback.delete()
+            AppLogger.log(ctx, "Backup", "本地备份写入 ${target.name.orEmpty()}（覆盖写，不清理目录）")
         }
     }
 
     /** 修复前快照的文件名后缀（`daymate.db.bak`）。 */
     private const val SNAPSHOT_SUFFIX = ".bak"
 
-    /** 快照文件的命名模式（含 SAF 改名产生的 `(1)` 变体）。 */
-    private val SNAPSHOT_REGEX =
-        Regex("^" + Regex.escape(DB_NAME + SNAPSHOT_SUFFIX) + "(?:\\s*\\(\\d+\\))?$")
+    /** 快照文件的命名模式（同样覆盖两种编号位置，含无空格变体）。 */
+    private val SNAPSHOT_REGEX = Regex(
+        "^" + Regex.escape(DB_STEM) + COUNTER + "\\." + Regex.escape(DB_EXT) +
+            COUNTER + Regex.escape(SNAPSHOT_SUFFIX) + COUNTER + "$"
+    )
 
     /**
      * 在备份文件夹中留一份「修复前快照」`daymate.db.bak`（数据维护 → 修复前自动调用）。
      *
      * 与 [exportInternal] 刻意分开：快照不参与主备份的匹配（[BACKUP_NAME_REGEX] 不含 `.bak`），
-     * 因此既不会被下一次备份顺手清掉，也不会被误认成主备份参与恢复。
+     * 因此既不会被覆盖，也不会被误认成主备份参与恢复。
+     * 同样复用已有快照覆盖写，不清理目录、不会累积 `.bak (1)` 之类的副本。
      * @return 是否成功写入（未配置备份文件夹或写入失败时为 false，调用方据此提示用户）。
      */
     fun exportSnapshot(ctx: Context, internalDb: File, targetUri: Uri?): Boolean {
@@ -157,30 +205,23 @@ object StorageBackup {
         if (!src.exists()) return false
         synchronized(exportLock) {
             val root = DocumentFile.fromTreeUri(ctx, uri) ?: return false
-            // 先清掉旧快照，避免 createFile 被系统改名成 `daymate.db.bak (1)`
-            purgeSnapshots(root)
-            val target = root.createFile("application/octet-stream", DB_NAME + SNAPSHOT_SUFFIX)
-                ?: run {
-                    purgeSnapshots(root)
-                    return false
-                }
-            return runCatching {
-                var written = false
+            val existing = root.listFiles().firstOrNull { SNAPSHOT_REGEX.matches(it.name.orEmpty()) }
+            val target = existing
+                ?: root.createFile("application/octet-stream", DB_NAME + SNAPSHOT_SUFFIX)
+                ?: return false
+            val written = runCatching {
+                var ok = false
                 src.inputStream().use { input ->
                     ctx.contentResolver.openOutputStream(target.uri)?.use { output ->
                         input.copyTo(output)
-                        written = true
+                        ok = true
                     }
                 }
-                written
+                ok
             }.getOrDefault(false)
-        }
-    }
-
-    /** 删除目录中所有快照文件（`daymate.db.bak` 及其改名变体）。 */
-    private fun purgeSnapshots(root: DocumentFile) {
-        for (f in root.listFiles().filter { SNAPSHOT_REGEX.matches(it.name.orEmpty()) }) {
-            runCatching { f.delete() }
+            // 只删本次自己刚创建的半截文件
+            if (!written && existing == null) runCatching { target.delete() }
+            return written
         }
     }
 
@@ -347,14 +388,6 @@ object StorageBackup {
 
     private fun isSidecar(name: String): Boolean =
         name.contains("-wal") || name.contains("-shm")
-
-    /** 删除目录中所有备份相关文件，[keep] 指定的 Uri 除外。 */
-    private fun purgeBackupFiles(root: DocumentFile, keep: Uri? = null) {
-        for (f in matchingFiles(root)) {
-            if (keep != null && f.uri == keep) continue
-            runCatching { f.delete() }
-        }
-    }
 
     private fun deleteProbeTemps(tmp: File) {
         for (suffix in listOf("", "-wal", "-shm")) {

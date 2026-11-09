@@ -96,7 +96,15 @@ fun StorageSetupBody(
         .collectAsState(initial = SettingsRepository.BACKUP_TARGET_LOCAL)
 
     var status by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
+    // 「本地与云端」手动备份会同时起两条异步任务：用引用计数管理忙碌态，
+    // 避免先完成的一方把按钮提前解锁、另一方还在跑。
+    var busyCount by remember { mutableStateOf(0) }
+    val busy = busyCount > 0
+    fun beginBusy() { busyCount += 1 }
+    fun endBusy() { busyCount = (busyCount - 1).coerceAtLeast(0) }
+    // 同一次 both 备份里，本地/云端各自留存结果，界面汇总显示，互不覆盖。
+    var localResult by remember { mutableStateOf<String?>(null) }
+    var cloudResult by remember { mutableStateOf<String?>(null) }
     // 选择文件夹后若检测到已有备份，则弹出冲突确认；此处保存待裁决的目录 Uri
     var conflictUri by remember { mutableStateOf<Uri?>(null) }
     // 「从备份恢复」二次确认
@@ -190,18 +198,18 @@ fun StorageSetupBody(
 
     /** 保存文件夹，并把当前内部数据库导出为该文件夹的备份（覆盖其中的旧备份）。 */
     fun commitFolder(uri: Uri) {
-        busy = true
+        beginBusy()
         StorageConfig.setBackupFolder(ctx, uri)
         runCatching {
             withCheckpoint { StorageBackup.exportInternal(ctx, internalDb, uri) }
         }.onSuccess { status = Tr.s(R.string.storage_set_folder_done) }
             .onFailure { status = Tr.s(R.string.storage_export_failed, it.message) }
-        busy = false
+        endBusy()
     }
 
     /** 以所选文件夹的备份为准：导入到内部库并设为备份目录（不触碰/不删除原备份文件）。 */
     fun restoreFromSelected(uri: Uri) {
-        busy = true
+        beginBusy()
         val failure = replaceDbFile {
             if (!StorageBackup.importExternal(ctx, internalDb, uri)) {
                 error(Tr.s(R.string.storage_no_db_short))
@@ -209,24 +217,31 @@ fun StorageSetupBody(
         }
         if (failure != null) {
             status = Tr.s(R.string.storage_restore_failed, failure.message)
-            busy = false
+            endBusy()
             return
         }
         StorageConfig.setBackupFolder(ctx, uri)
         status = Tr.s(R.string.storage_restore_done)
-        busy = false
+        endBusy()
         finishAndRestartToHome()
     }
 
     /** 把当前内部主库导出（覆盖）到指定备份文件夹；alsoConfigure 为 true 时一并设为备份文件夹。 */
     fun doExport(targetUri: Uri, alsoConfigure: Boolean) {
-        busy = true
+        beginBusy()
         if (alsoConfigure) StorageConfig.setBackupFolder(ctx, targetUri)
         runCatching {
             withCheckpoint { StorageBackup.exportInternal(ctx, internalDb, targetUri) }
-        }.onSuccess { status = Tr.s(R.string.storage_backup_done) }
-            .onFailure { status = Tr.s(R.string.storage_backup_failed, it.message) }
-        busy = false
+        }.onSuccess {
+            val msg = Tr.s(R.string.storage_backup_done)
+            status = msg
+            localResult = msg
+        }.onFailure {
+            val msg = Tr.s(R.string.storage_backup_failed, it.message)
+            status = msg
+            localResult = msg
+        }
+        endBusy()
     }
 
     /**
@@ -296,7 +311,7 @@ fun StorageSetupBody(
             status = Tr.s(R.string.storage_no_valid_db)
             return
         }
-        busy = true
+        beginBusy()
         val failure = replaceDbFile {
             if (!StorageBackup.importExternal(ctx, internalDb)) {
                 error(Tr.s(R.string.storage_no_db_backup))
@@ -304,30 +319,37 @@ fun StorageSetupBody(
         }
         if (failure != null) {
             status = Tr.s(R.string.storage_restore_failed, failure.message)
-            busy = false
+            endBusy()
             return
         }
         status = Tr.s(R.string.storage_restored)
-        busy = false
+        endBusy()
         finishAndRestartToHome()
     }
 
     // ===== 云端备份 =====
 
     fun doCloudExport(cfg: WebDavConfig) {
-        busy = true
+        beginBusy()
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) { withCheckpoint { CloudBackup.upload(internalDb, cfg) } }
-            }.onSuccess { status = Tr.s(R.string.storage_cloud_backup_done) }
-                .onFailure { status = Tr.s(R.string.storage_cloud_backup_failed, it.message) }
-            busy = false
+            }.onSuccess {
+                val msg = Tr.s(R.string.storage_cloud_backup_done)
+                status = msg
+                cloudResult = msg
+            }.onFailure {
+                val msg = Tr.s(R.string.storage_cloud_backup_failed, it.message)
+                status = msg
+                cloudResult = msg
+            }
+            endBusy()
         }
     }
 
     /** 手动「立即备份」到云端：先过空数据护栏，再按需弹出覆盖确认。 */
     fun startCloudBackup(cfg: WebDavConfig) {
-        busy = true
+        beginBusy()
         scope.launch {
             val appRows = countAppDataRows()
             val remoteExists = runCatching {
@@ -340,18 +362,18 @@ fun StorageSetupBody(
                 }.getOrDefault(-1)
                 if (remoteRows != 0) {
                     cloudBlocked = true
-                    busy = false
+                    endBusy()
                     return@launch
                 }
             }
-            busy = false
+            endBusy()
             if (remoteExists) cloudOverwriteTarget = cfg else doCloudExport(cfg)
         }
     }
 
     /** 从云端恢复：先下载到临时文件并校验，**通过后才关库替换**（下载失败不影响现有数据）。 */
     fun doCloudRestore(cfg: WebDavConfig) {
-        busy = true
+        beginBusy()
         scope.launch {
             val tmp = File(ctx.cacheDir, "daymate_restore_cloud.db")
             val failure: Throwable? = try {
@@ -370,7 +392,7 @@ fun StorageSetupBody(
                 e
             }
             tmp.delete()
-            busy = false
+            endBusy()
             if (failure != null) {
                 status = Tr.s(R.string.storage_cloud_restore_failed, failure.message)
                 return@launch
@@ -381,6 +403,10 @@ fun StorageSetupBody(
     }
 
     fun backupNow() {
+        // 每次手动备份重置本次会话结果，避免把上一次的提示带进来
+        status = null
+        localResult = null
+        cloudResult = null
         val cloudCfg = WebDavStore.config(ctx)
         when (backupTarget) {
             SettingsRepository.BACKUP_TARGET_CLOUD -> {
@@ -570,10 +596,15 @@ fun StorageSetupBody(
                 enabled = !busy
             ) { Text(Tr.s(R.string.storage_restore_from)) }
 
-            if (status != null) {
+            val shownStatus =
+                if (backupTarget == SettingsRepository.BACKUP_TARGET_BOTH) {
+                    val parts = listOfNotNull(localResult, cloudResult)
+                    if (parts.isEmpty()) status else parts.joinToString("\n")
+                } else status
+            if (shownStatus != null) {
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    status!!,
+                    shownStatus,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -650,7 +681,10 @@ fun StorageSetupBody(
         }
 
         // ===== 用应用数据覆盖备份前的确认 =====
-        if (overwriteTarget != null) {
+        // both 模式下云端与本地可能同时要求确认：云端弹窗优先，本地的等它处理完再显示，
+        // 避免两个 AlertDialog 叠在一起抢焦点/返回键。
+        val cloudDialogShowing = cloudOverwriteTarget != null || cloudBlocked
+        if (overwriteTarget != null && !cloudDialogShowing) {
             AlertDialog(
                 onDismissRequest = { overwriteTarget = null },
                 title = { Text(Tr.s(R.string.storage_overwrite_title)) },
@@ -671,7 +705,7 @@ fun StorageSetupBody(
         }
 
         // ===== 备份有数据而当前应用为空：禁止用空数据覆盖，弹出警告 =====
-        if (overwriteBlocked) {
+        if (overwriteBlocked && !cloudDialogShowing) {
             AlertDialog(
                 onDismissRequest = { overwriteBlocked = false },
                 title = { Text(Tr.s(R.string.storage_blocked)) },

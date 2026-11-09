@@ -1363,7 +1363,7 @@ fun HomeScreen(
             state = cloudState,
             onDismiss = { showCloudSheet = false },
             // 复用自动备份的完整流程（含空数据护栏），只是跳过 1.5s 防抖立即执行
-            onBackupNow = { container.autoBackup.flush() }
+            onBackupNow = { container.autoBackup.flush(force = true) }
         )
     }
 
