@@ -2554,8 +2554,9 @@ private fun CycleCalendarMonth(
  * 描述某一天在周期里的定位，返回 (阶段标签, 副说明)。
  *
  * 口径必须与 [CycleCalculator.phaseOfAnyDay] 完全一致，否则会出现「日历底色是黄体期、
- * 详情区却写排卵期」这种自相矛盾的展示。锚点推进逻辑与之一一对应：先把锚点推到不晚于该日，
- * 再以「锚点 + 周期天数」为下次经期，避免逾期未登记时算出负的「距下次经期天数」。
+ * 详情区却写排卵期」这种自相矛盾的展示。锚点与下次经期的取法与之一一对应：
+ * 后面已有真实登记就用那条真实首日，否则按固定周期天数外推，避免逾期未登记时
+ * 算出负的「距下次经期天数」。
  *
  * 早于最早一次登记的日子属于无数据区（[CycleCalculator.Phase.NONE]），照「尚无记录」返回，
  * 不编造阶段——与日历格子画中性灰同一口径。
@@ -2587,16 +2588,28 @@ internal fun describeDay(
     }
 
     // 锚点推进：与 phaseOfAnyDay 同款，保证 nextStart 恒晚于 day。
-    // logs 降序（DAO ORDER BY startDateEpochDay DESC），取「最晚一条不晚于 day」要用 firstOrNull；
+    // logs 降序（DAO ORDER BY startDateEpochDay DESC），取「最晚一条不晚于 day」要用 indexOfFirst；
     // 早先写成 lastOrNull 取到的是最早一条，两处口径必须一起改，否则详情与网格会打架。
-    val anchorLog = logs.firstOrNull { it.startDateEpochDay <= day } ?: logs.last()
-    var anchorStart = anchorLog.startDateEpochDay
+    // 周期锚点只认真实经期：periodDays == 1 的旧单日标记不能把一次周期拦腰切断
+    // （与 phaseOfAnyDay 的 anchorLogs 口径逐字一致）。
+    val anchorLogs = logs.filter { it.periodDays > 1 }.ifEmpty { logs }
+    val anchorIndex = anchorLogs.indexOfFirst { it.startDateEpochDay <= day }
+    val anchorLog = if (anchorIndex >= 0) anchorLogs[anchorIndex] else anchorLogs.last()
+    val anchorStart = anchorLog.startDateEpochDay
     val anchorPd = anchorLog.periodDays
-    while (anchorStart + cycleDays <= day) anchorStart += cycleDays
-    val nextStart = anchorStart + cycleDays
-    val ovu = CycleCalculator.effectiveOvulationDay(anchorStart, anchorPd, nextStart)
+    // 后面已有真实登记 → 这段是真实周期，nextStart 直接用真实首日；否则「距下次经期 N 天」
+    // 会拿固定 29 天硬推（10/29 显示 1 天，实际还有 4 天）。条件必须与 phaseOfAnyDay 一致。
+    val nextReal = if (anchorIndex > 0) anchorLogs[anchorIndex - 1].startDateEpochDay else null
+    val realLength = nextReal?.let { (it - anchorStart).toInt() }
+    val useReal = nextReal != null && realLength != null &&
+        realLength in CycleCalculator.MIN_CYCLE_DAYS..CycleCalculator.MAX_CYCLE_DAYS
+    var virtualStart = anchorStart
+    while (virtualStart + cycleDays <= day) virtualStart += cycleDays
+    val cycleStart = if (useReal) anchorStart else virtualStart
+    val nextStart = if (useReal && nextReal != null) nextReal else cycleStart + cycleDays
+    val ovu = CycleCalculator.effectiveOvulationDay(cycleStart, anchorPd, nextStart)
     // 同上：只用于「窗口 Y ~ Z」文案。着色口径更窄（ovulationPhaseRange），别混用
-    val window = CycleCalculator.fertileWindow(anchorStart, anchorPd, nextStart)
+    val window = CycleCalculator.fertileWindow(cycleStart, anchorPd, nextStart)
 
     return when {
         // 走到这里说明不在任何已登记经期区间内（前面已 return），所以经期只可能是**预测**的

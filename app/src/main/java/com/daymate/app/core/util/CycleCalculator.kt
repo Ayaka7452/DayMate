@@ -190,8 +190,12 @@ object CycleCalculator {
      * 推算任意日期所处阶段（日历视图着色用）。logsDesc：(经期首日, 该次持续天数) 列表，按首日降序。
      *  - **早于最早一次登记经期** → [Phase.NONE]（无数据区，画中性灰）
      *  - 落在任一**已登记**经期区间内（按该记录自身的持续天数）→ [Phase.PERIOD]
-     *  - 否则以「最后一个不晚于该日的记录」为锚点按周期向后推算：
-     *    经期区间 → [Phase.PREDICTED_PERIOD]（该来没登记），其余为排卵/黄体/卵泡
+     *  - 否则以「最后一个不晚于该日的记录」为锚点：
+     *    · 锚点之后**已有下一次真实登记**（相邻首日间隔 15~60 天）→ 这段是已发生的真实周期，
+     *      用真实间隔重排排卵/黄体/卵泡，**绝不产生预测经期**（2026-11-10 修：预测日到了没来、
+     *      后来才登记实际经期时，被跳过的那几天按医学口径仍属黄体期，不是一段幽灵经期）；
+     *    · 没有下一次真实登记（最后一条记录之后，或间隔异常疑似漏记）→ 按 cycleDays 外推，
+     *      落在经期区间 → [Phase.PREDICTED_PERIOD]（该来没登记），其余为排卵/黄体/卵泡
      *
      * ⚠️ **不再向前虚拟外推**（2026-10-07 修）：早于最早记录的日子若照常推算，会凭空造出一段
      * 「上一个周期」——用户明明一次都没登记，日历上最早记录之前却整块显示成经期深色，读起来
@@ -211,22 +215,45 @@ object CycleCalculator {
         for ((s, pd) in logsDesc) {
             if (epochDay in periodRange(s, pd)) return Phase.PERIOD
         }
-        // 锚点 = **最晚**一条不晚于目标日的记录。logsDesc 按首日**降序**（DAO `ORDER BY startDateEpochDay DESC`），
-        // 所以必须用 `firstOrNull`——取降序里第一个命中的才是「最近的那条」。
+        // 周期锚点只认真实经期：periodDays == 1 的旧单日标记（v1.25.6 前的特殊情况记录）
+        // 只参与上面的 PERIOD 判定，不能把一次已发生的周期拦腰切成两段（2026-11-10 补）。
+        val anchorLogs = logsDesc.filter { it.second > 1 }.ifEmpty { logsDesc }
+        // 锚点 = **最晚**一条不晚于目标日的记录。列表按首日**降序**（DAO `ORDER BY startDateEpochDay DESC`），
+        // 用 `indexOfFirst` 拿下标，后面还要据此找「紧随其后的下一条真实登记」。
         // 早先误写成 `lastOrNull`，取到的是**最早**一条：锚点整体前移，后续 `while` 推进出的预测周期
         // 跟着偏，周期不规律时越往后偏得越多（等距周期时两者恰好相同，所以长期没被发现）。
-        val anchor = logsDesc.firstOrNull { it.first <= epochDay } ?: logsDesc.last()
-        var anchorStart = anchor.first
+        val anchorIndex = anchorLogs.indexOfFirst { it.first <= epochDay }
+        val anchor = if (anchorIndex >= 0) anchorLogs[anchorIndex] else anchorLogs.last()
+        val anchorStart = anchor.first
         val anchorPd = anchor.second
-        while (anchorStart + cycleDays <= epochDay) anchorStart += cycleDays
+
+        // 锚点之后若已登记下一次真实经期，说明这段周期**已经真实发生过**：用它的真实长度
+        // 重排四阶段，而不是拿固定 cycleDays 继续外推。降序列表里 index < anchorIndex 的元素
+        // 都比锚点晚，anchorLogs 已滤掉单日标记，紧邻的前一条就是下一次真实经期首日。
+        // 间隔超出有效区间多半是漏记/异常，此时维持原有外推，避免把 70 天硬算成一个周期。
+        val nextReal = if (anchorIndex > 0) anchorLogs[anchorIndex - 1].first else null
+        val realLength = nextReal?.let { (it - anchorStart).toInt() }
+        if (nextReal != null && realLength != null &&
+            realLength in MIN_CYCLE_DAYS..MAX_CYCLE_DAYS
+        ) {
+            return when {
+                epochDay in ovulationPhaseRange(anchorStart, anchorPd, nextReal) -> Phase.OVULATION
+                epochDay in lutealRange(anchorStart, anchorPd, nextReal) -> Phase.LUTEAL
+                else -> Phase.FOLLICULAR
+            }
+        }
+
+        // 最后一条记录之后（或异常间隔）：按固定周期天数继续外推，保留未来预测与逾期提示。
+        var virtualStart = anchorStart
+        while (virtualStart + cycleDays <= epochDay) virtualStart += cycleDays
         // 锚点推进后的预测周期：目标日落在锚点经期区间内 → 预测经期
         // （此前漏判，预测经期首日会被渲染成卵泡期/黄体期，日历上从未点亮）
         // 注意这里返回 PREDICTED_PERIOD 而非 PERIOD：UI 要能区分「实登记」与「预测」用不同颜色。
-        if (epochDay in periodRange(anchorStart, anchorPd)) return Phase.PREDICTED_PERIOD
-        val nextStart = anchorStart + cycleDays
+        if (epochDay in periodRange(virtualStart, anchorPd)) return Phase.PREDICTED_PERIOD
+        val nextStart = virtualStart + cycleDays
         return when {
-            epochDay in ovulationPhaseRange(anchorStart, anchorPd, nextStart) -> Phase.OVULATION
-            epochDay in lutealRange(anchorStart, anchorPd, nextStart) -> Phase.LUTEAL
+            epochDay in ovulationPhaseRange(virtualStart, anchorPd, nextStart) -> Phase.OVULATION
+            epochDay in lutealRange(virtualStart, anchorPd, nextStart) -> Phase.LUTEAL
             else -> Phase.FOLLICULAR
         }
     }
