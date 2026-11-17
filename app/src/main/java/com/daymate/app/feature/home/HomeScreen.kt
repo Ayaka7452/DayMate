@@ -16,7 +16,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
@@ -138,6 +137,7 @@ import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import com.ayaka7452.daymate.data.db.FolderKinds
 import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -620,9 +620,8 @@ fun HomeScreen(
         if (dragEv.id != targetEv.id) pendingMerge = dragEv to targetEv
     }
 
-    val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-        val fk = from.key.toString()
-        val tk = to.key.toString()
+    /** 列表与网格共用的换位逻辑：f* 普通文件夹、m* 小文件夹、e* 事件（根层 / 成员行）。 */
+    fun applyMove(fk: String, tk: String) {
         when {
             fk.startsWith("f") && tk.startsWith("f") -> {
                 val fi = folderList.indexOfFirst { "f${it.id}" == fk }
@@ -659,6 +658,14 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+        applyMove(from.key.toString(), to.key.toString())
+    }
+    // 网格与列表共用换位与持久化；两个 state 各自 remember，互不干扰（Crossfade 只显示其一）。
+    val gridReorderableState = rememberReorderableLazyGridState(gridState) { from, to ->
+        applyMove(from.key.toString(), to.key.toString())
     }
 
     fun persistFolderOrder() {
@@ -1490,7 +1497,44 @@ fun HomeScreen(
                 LazyVerticalGrid(
                     columns = columns,
                     state = gridState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // 合并手势：与列表同款 Initial pass 观察指针（不消费，不影响库的拖拽）。
+                        // 网格按二维坐标判定：指针落在某根层事件格子的中间 1/3 区域时高亮该格，
+                        // 松手先于库的 onDragStopped 到达 → 捕获合并意图。
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (dragKey == null) continue
+                                    if (ev.changes.none { it.pressed }) {
+                                        captureMergeIfAny()
+                                        mergeTargetKey = null
+                                        continue
+                                    }
+                                    val pos = ev.changes.first().position
+                                    val layout = gridState.layoutInfo
+                                    var found: String? = null
+                                    for (item in layout.visibleItemsInfo) {
+                                        val k = item.key as? String ?: continue
+                                        if (!k.startsWith("e") || k == dragKey) continue
+                                        // LazyGridItemInfo.offset 已是相对视口左上角的像素坐标（含滚动），
+                                        // 与指针 position 同坐标系，直接比较即可。
+                                        val left = item.offset.x
+                                        val top = item.offset.y
+                                        if (pos.x < left || pos.x >= left + item.size.width) continue
+                                        if (pos.y < top || pos.y >= top + item.size.height) continue
+                                        val relX = (pos.x - left) / item.size.width.toFloat()
+                                        val relY = (pos.y - top) / item.size.height.toFloat()
+                                        if (relX in 1f / 3f..2f / 3f && relY in 1f / 3f..2f / 3f) found = k
+                                        break
+                                    }
+                                    mergeTargetKey = if (isMergeEligibleKey(dragKey)) {
+                                        found?.takeIf { isMergeEligibleKey(it) }
+                                    } else null
+                                }
+                            }
+                        },
                     contentPadding = PaddingValues(
                         start = 12.dp,
                         end = 12.dp,
@@ -1504,55 +1548,127 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(gridSpacingDp)
                 ) {
                     items(folderList, key = { "f${it.id}" }) { folder ->
-                        val count = allEvents.count { it.folderId == folder.id }
-                        FolderGridItem(
-                            folder = folder,
-                            itemCount = count,
-                            isLarge = isLarge,
-                            selectionMode = selectionMode,
-                            selected = folder.id in selectedFolderIds,
-                            onClick = {
-                                if (selectionMode) toggleFolder(folder.id)
-                                else onNavigate("folder/${folder.id}")
-                            },
-                            onLongClick = {
-                                if (!selectionMode) {
-                                    folderDialogTarget = folder
-                                    showFolderDialog = true
-                                }
-                            },
-                            onMoveToRecycleBin = {
-                                folderToDelete = folder
-                                showFolderDeleteConfirm = true
-                            }
-                        )
+                        ReorderableItem(gridReorderableState, key = "f${folder.id}") {
+                            val dragModifier = if (manualSort && !selectionMode) {
+                                Modifier.longPressDraggableHandle(
+                                    onDragStarted = { dragKey = "f${folder.id}" },
+                                    onDragStopped = {
+                                        if (dragKey == "f${folder.id}") dragKey = null
+                                        persistFolderOrder()
+                                    }
+                                )
+                            } else null
+                            val count = allEvents.count { it.folderId == folder.id }
+                            FolderGridItem(
+                                folder = folder,
+                                itemCount = count,
+                                isLarge = isLarge,
+                                selectionMode = selectionMode,
+                                selected = folder.id in selectedFolderIds,
+                                onClick = {
+                                    if (selectionMode) toggleFolder(folder.id)
+                                    else onNavigate("folder/${folder.id}")
+                                },
+                                onLongClick = {
+                                    if (!selectionMode) {
+                                        folderDialogTarget = folder
+                                        showFolderDialog = true
+                                    }
+                                },
+                                onMoveToRecycleBin = {
+                                    folderToDelete = folder
+                                    showFolderDeleteConfirm = true
+                                },
+                                dragModifier = dragModifier,
+                                onBlockedLongPress = if (!manualSort && !selectionMode) {
+                                    { requireManualToast() }
+                                } else null
+                            )
+                        }
                     }
-                    items(displayEvents, key = { "e${it.id}" }) { event ->
-                        EventGridItem(
-                            event = event,
-                            festivalRepo = festivalRepo,
-                            isLarge = isLarge,
-                            selectionMode = selectionMode,
-                            selected = event.id in selectedEventIds,
-                            onClick = {
-                                if (selectionMode) toggleEvent(event.id)
-                                else if (event.specialType == "cycle") onNavigate("cycle")
-                                else onNavigate("event_detail?eventId=${event.id}")
-                            },
-                            onMoveToVault = {
-                                if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
-                            },
-                            onMoveToFolder = { singleMoveEventId = event.id },
-                            onMoveToRecycleBin = {
-                                scope.launch {
-                                    container.eventRepository.softDeleteByIds(
-                                        listOf(event.id),
-                                        System.currentTimeMillis()
+                    // 网格与列表共用 displayRows：小文件夹（m*）混排在事件里，展开的成员缩进行在网格里
+                    // 仍画成事件格子（indent 仅作数据标记），这样三种视图的合并/展开口径完全一致。
+                    items(displayRows, key = { rowKeyOf(it) }) { row ->
+                        val mini = row.mini
+                        val event = row.event
+                        if (mini != null) {
+                            ReorderableItem(gridReorderableState, key = "m${mini.id}") {
+                                val dragModifier = if (manualSort && !selectionMode) {
+                                    Modifier.longPressDraggableHandle(
+                                        onDragStarted = { dragKey = "m${mini.id}" },
+                                        onDragStopped = {
+                                            if (dragKey == "m${mini.id}") dragKey = null
+                                            if (pendingMerge == null) { persistRootOrder(); persistMemberOrders() }
+                                        }
                                     )
-                                }
-                            },
-                            folderBadge = event.folderId?.let { folderNameById[it] }
-                        )
+                                } else null
+                                MiniFolderGridItem(
+                                    folder = mini,
+                                    expanded = mini.id in expandedMiniIds,
+                                    isLarge = isLarge,
+                                    dragModifier = dragModifier,
+                                    mergeHighlight = "m${mini.id}" == mergeTargetKey,
+                                    onClick = {
+                                        if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
+                                        else expandedMiniIds.add(mini.id)
+                                    },
+                                    onRename = {
+                                        miniRenameTarget = mini
+                                        showMiniRenameDialog = true
+                                    },
+                                    onDissolve = {
+                                        folderToDelete = mini
+                                        showFolderDeleteConfirm = true
+                                    },
+                                    onMoveToRecycleBin = {
+                                        folderToDelete = mini
+                                        showFolderDeleteConfirm = true
+                                    }
+                                )
+                            }
+                        } else if (event != null) {
+                            ReorderableItem(gridReorderableState, key = "e${event.id}") {
+                                val dragModifier = if (manualSort && !selectionMode) {
+                                    Modifier.longPressDraggableHandle(
+                                        onDragStarted = { dragKey = "e${event.id}" },
+                                        onDragStopped = {
+                                            if (dragKey == "e${event.id}") dragKey = null
+                                            if (pendingMerge == null) { persistRootOrder(); persistMemberOrders() }
+                                        }
+                                    )
+                                } else null
+                                EventGridItem(
+                                    event = event,
+                                    festivalRepo = festivalRepo,
+                                    isLarge = isLarge,
+                                    selectionMode = selectionMode,
+                                    selected = event.id in selectedEventIds,
+                                    onClick = {
+                                        if (selectionMode) toggleEvent(event.id)
+                                        else if (event.specialType == "cycle") onNavigate("cycle")
+                                        else onNavigate("event_detail?eventId=${event.id}")
+                                    },
+                                    onMoveToVault = {
+                                        if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
+                                    },
+                                    onMoveToFolder = { singleMoveEventId = event.id },
+                                    onMoveToRecycleBin = {
+                                        scope.launch {
+                                            container.eventRepository.softDeleteByIds(
+                                                listOf(event.id),
+                                                System.currentTimeMillis()
+                                            )
+                                        }
+                                    },
+                                    folderBadge = event.folderId?.let { folderNameById[it] },
+                                    dragModifier = dragModifier,
+                                    mergeHighlight = "e${event.id}" == mergeTargetKey,
+                                    onBlockedLongPress = if (!manualSort && !selectionMode) {
+                                        { requireManualToast() }
+                                    } else null
+                                )
+                            }
+                        }
                     }
                 }
                 }
@@ -1905,20 +2021,20 @@ fun EventRow(
     )
 
     var menuExpanded by remember { mutableStateOf(false) }
+    // 点击与长按合并进同一个手势检测器：非手动排序时长按可靠弹「切手动」提示。
+    // 此前用独立的 detectTapGestures 叠在 clickable 上，两者争抢 down 事件，长按经常无反应。
+    val clickModifier = if (onBlockedLongPress != null) {
+        Modifier.combinedClickable(onClick = onClick, onLongClick = { onBlockedLongPress() })
+    } else {
+        Modifier.clickable(onClick = onClick)
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(dragModifier ?: Modifier)
-            .then(
-                if (onBlockedLongPress != null) {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(onLongPress = { onBlockedLongPress() })
-                    }
-                } else Modifier
-            )
             .background(if (mergeHighlight) MINI_MERGE_HIGHLIGHT else Color.Transparent)
-            .clickable(onClick = onClick)
+            .then(clickModifier)
             .padding(
                 start = if (indent) 42.dp else 16.dp,
                 end = 16.dp,
@@ -2037,18 +2153,17 @@ fun FolderRow(
     onBlockedLongPress: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    // 与 EventRow 同口径：点击 + 长按合并到 combinedClickable，避免长按提示被 clickable 吞掉。
+    val clickModifier = if (onBlockedLongPress != null) {
+        Modifier.combinedClickable(onClick = onClick, onLongClick = { onBlockedLongPress() })
+    } else {
+        Modifier.clickable(onClick = onClick)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(dragModifier ?: Modifier)
-            .then(
-                if (onBlockedLongPress != null) {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(onLongPress = { onBlockedLongPress() })
-                    }
-                } else Modifier
-            )
-            .clickable(onClick = onClick)
+            .then(clickModifier)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -2495,6 +2610,165 @@ private fun CloudBackupSheet(
 // ===== 网格卡片 =====
 
 /**
+ * 小文件夹网格项：与普通事件格子同形，深绿圆点 + 深绿描边区分，行内展开箭头（大图标在右上角）。
+ * 与 [MiniFolderRow] 同口径：点击切换展开，⋮ 菜单重命名 / 解散 / 回收站。
+ */
+@Composable
+private fun MiniFolderGridItem(
+    folder: FolderEntity,
+    expanded: Boolean,
+    isLarge: Boolean,
+    dragModifier: Modifier? = null,
+    mergeHighlight: Boolean = false,
+    onClick: () -> Unit = {},
+    onRename: () -> Unit = {},
+    onDissolve: () -> Unit = {},
+    onMoveToRecycleBin: () -> Unit = {}
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val radius = RoundedCornerShape(if (isLarge) 14.dp else 12.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(dragModifier ?: Modifier)
+            .clip(radius)
+            .background(
+                if (mergeHighlight) MINI_MERGE_HIGHLIGHT
+                else MINI_FOLDER_DOT.copy(alpha = 0.10f)
+            )
+            .border(
+                if (mergeHighlight) 1.5.dp else 0.8.dp,
+                MINI_FOLDER_DOT,
+                radius
+            )
+            .combinedClickable(onClick = onClick)
+            .padding(if (isLarge) 12.dp else 10.dp)
+    ) {
+        if (isLarge) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(MINI_FOLDER_DOT)
+                    )
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.common_more),
+                                modifier = Modifier.size(16.dp),
+                                tint = MINI_FOLDER_DOT
+                            )
+                        }
+                        MiniFolderGridMenu(
+                            expanded = menuExpanded,
+                            onDismiss = { menuExpanded = false },
+                            onRename = onRename,
+                            onDissolve = onDissolve,
+                            onTrash = onMoveToRecycleBin
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MINI_FOLDER_DOT,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(if (expanded) R.string.common_collapse else R.string.common_expand),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MINI_FOLDER_DOT.copy(alpha = 0.7f)
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(MINI_FOLDER_DOT)
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MINI_FOLDER_DOT,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(if (expanded) R.string.common_collapse else R.string.common_expand),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MINI_FOLDER_DOT.copy(alpha = 0.7f),
+                    maxLines = 1
+                )
+            }
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.common_more),
+                        modifier = Modifier.size(14.dp),
+                        tint = MINI_FOLDER_DOT
+                    )
+                }
+                MiniFolderGridMenu(
+                    expanded = menuExpanded,
+                    onDismiss = { menuExpanded = false },
+                    onRename = onRename,
+                    onDissolve = onDissolve,
+                    onTrash = onMoveToRecycleBin
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniFolderGridMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onRename: () -> Unit,
+    onDissolve: () -> Unit,
+    onTrash: () -> Unit
+) {
+    DropdownMenu(
+        modifier = Modifier.widthIn(min = 200.dp),
+        expanded = expanded,
+        onDismissRequest = onDismiss
+    ) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.common_rename)) },
+            onClick = { onDismiss(); onRename() }
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.mini_folder_dissolve)) },
+            onClick = { onDismiss(); onDissolve() }
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_move_to_trash)) },
+            onClick = { onDismiss(); onTrash() }
+        )
+    }
+}
+
+/**
  * 文件夹网格项：自适应支持中图标（3 列居中）与大图标（2 列卡片）。
  * 沿用文件夹自带 emoji，不额外找外置图标。
  */
@@ -2507,32 +2781,50 @@ fun FolderGridItem(
     selected: Boolean = false,
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
-    onMoveToRecycleBin: (() -> Unit)? = null
+    onMoveToRecycleBin: (() -> Unit)? = null,
+    dragModifier: Modifier? = null,
+    mergeHighlight: Boolean = false,
+    onBlockedLongPress: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    // 与列表行同口径：可拖拽时长按完全交给库的 handle，combinedClickable 不再占用长按；
+    // 不可拖拽时长按走 onBlockedLongPress（切手动提示）或 onLongClick（编辑菜单）。菜单改由常驻 ⋮ 进入。
+    val clickModifier = if (dragModifier != null) {
+        Modifier.clickable(onClick = onClick)
+    } else {
+        Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = {
+                if (selectionMode) {
+                    onClick()
+                } else if (onBlockedLongPress != null) {
+                    onBlockedLongPress()
+                } else if (onMoveToRecycleBin != null) {
+                    menuExpanded = true
+                } else {
+                    onLongClick()
+                }
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .then(dragModifier ?: Modifier)
             .clip(RoundedCornerShape(if (isLarge) 14.dp else 12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .background(
+                if (mergeHighlight) MINI_MERGE_HIGHLIGHT
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            )
             .border(
-                0.5.dp,
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                if (mergeHighlight) 1.5.dp else 0.5.dp,
+                if (mergeHighlight) MINI_FOLDER_DOT
+                else if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                 RoundedCornerShape(if (isLarge) 14.dp else 12.dp)
             )
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    if (selectionMode) {
-                        onClick()
-                    } else if (onMoveToRecycleBin != null) {
-                        menuExpanded = true
-                    } else {
-                        onLongClick()
-                    }
-                }
-            )
+            .then(clickModifier)
             .padding(if (isLarge) 12.dp else 10.dp)
     ) {
         if (isLarge) {
@@ -2550,18 +2842,30 @@ fun FolderGridItem(
                         fontSize = 32.sp,
                         lineHeight = 32.sp
                     )
-                    if (selectionMode) {
-                        SelectionDot(selected = selected)
-                    } else if (itemCount > 0) {
-                        Text(
-                            text = Tr.s(R.string.settings_unit_items, itemCount),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (selectionMode) {
+                            SelectionDot(selected = selected)
+                        } else if (itemCount > 0) {
+                            Text(
+                                text = Tr.s(R.string.settings_unit_items, itemCount),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        // 长按让位给拖拽后，操作入口改走常驻 ⋮（与列表 FolderRow 同口径）
+                        if (!selectionMode && onMoveToRecycleBin != null) {
+                            IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(24.dp)) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = stringResource(R.string.common_more),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -2578,9 +2882,17 @@ fun FolderGridItem(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                if (selectionMode) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                    if (selectionMode) {
                         SelectionDot(selected = selected)
+                    } else if (onMoveToRecycleBin != null) {
+                        IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(24.dp)) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.common_more),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
                 Text(
@@ -2645,7 +2957,10 @@ fun EventGridItem(
     onMoveToVault: (() -> Unit)? = null,
     onMoveToFolder: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
-    folderBadge: String? = null
+    folderBadge: String? = null,
+    dragModifier: Modifier? = null,
+    mergeHighlight: Boolean = false,
+    onBlockedLongPress: (() -> Unit)? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
     val isFuture = days >= 0
@@ -2667,24 +2982,39 @@ fun EventGridItem(
     val statusColor = if (isFuture) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
 
     var menuExpanded by remember { mutableStateOf(false) }
+    // 与 FolderGridItem 同口径：点击 + 长按合并到一个检测器。
+    // 可拖拽时（dragModifier!=null）长按完全交给库的 handle，combinedClickable 不再占用长按，
+    // 彻底避免两个手势检测器竞争；菜单改由常驻 ⋮ 进入。
+    val clickModifier = if (dragModifier != null) {
+        Modifier.clickable(onClick = onClick)
+    } else {
+        Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = {
+                if (selectionMode) onClick()
+                else if (onBlockedLongPress != null) onBlockedLongPress()
+                else if (onMoveToVault != null) menuExpanded = true
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .then(dragModifier ?: Modifier)
             .clip(RoundedCornerShape(if (isLarge) 14.dp else 12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .background(
+                if (mergeHighlight) MINI_MERGE_HIGHLIGHT
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            )
             .border(
-                0.5.dp,
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                if (mergeHighlight) 1.5.dp else 0.5.dp,
+                if (mergeHighlight) MINI_FOLDER_DOT
+                else if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                 RoundedCornerShape(if (isLarge) 14.dp else 12.dp)
             )
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    if (selectionMode) onClick()
-                    else if (onMoveToVault != null) menuExpanded = true
-                }
-            )
+            .then(clickModifier)
             .padding(if (isLarge) 12.dp else 10.dp)
     ) {
         if (isLarge) {
@@ -2703,19 +3033,33 @@ fun EventGridItem(
                             .clip(CircleShape)
                             .background(eventColor)
                     )
-                    if (selectionMode) {
-                        SelectionDot(selected = selected)
-                    } else if (folderBadge != null) {
-                        Text(
-                            text = folderBadge,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (selectionMode) {
+                            SelectionDot(selected = selected)
+                        } else {
+                            if (folderBadge != null) {
+                                Text(
+                                    text = folderBadge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                            // 长按让位给拖拽后，操作入口改走常驻 ⋮（与列表 EventRow 同口径）
+                            if (onMoveToVault != null) {
+                                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(24.dp)) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = stringResource(R.string.common_more),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -2740,9 +3084,17 @@ fun EventGridItem(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                if (selectionMode) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                    if (selectionMode) {
                         SelectionDot(selected = selected)
+                    } else if (onMoveToVault != null) {
+                        IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(24.dp)) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.common_more),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
                 val absDays = kotlin.math.abs(days)
