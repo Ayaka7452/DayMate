@@ -116,6 +116,7 @@ import androidx.compose.ui.zIndex
 import com.ayaka7452.daymate.Routes
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.core.CloudBackupState
+import com.ayaka7452.daymate.core.log.AppLogger
 import com.ayaka7452.daymate.core.security.VaultSession
 import com.ayaka7452.daymate.core.util.CountdownCalculator
 import com.ayaka7452.daymate.data.db.EventEntity
@@ -435,6 +436,21 @@ fun HomeScreen(
     var miniRenameTarget by remember { mutableStateOf<FolderEntity?>(null) }
     var showMiniRenameDialog by remember { mutableStateOf(false) }
 
+    /** 所有行共用的拖拽起止入口：统一清合并态并写诊断日志，避免各视图状态漂移。 */
+    fun beginDrag(key: String) {
+        dragKey = key
+        mergeTargetKey = null
+        isDragging = true
+        AppLogger.log(context, "Drag", "start key=$key manualSort=$manualSort")
+    }
+
+    fun endDrag(key: String) {
+        if (dragKey == key) dragKey = null
+        mergeTargetKey = null
+        isDragging = false
+        AppLogger.log(context, "Drag", "stop key=$key pendingMerge=${pendingMerge != null}")
+    }
+
     LaunchedEffect(folders, events) {
         if (isDragging) return@LaunchedEffect
         folderList.clear()
@@ -610,18 +626,31 @@ fun HomeScreen(
 
     /** 拖拽松手时若悬停在某根层事件行中段，捕获合并意图（弹命名框）；否则不动。 */
     fun captureMergeIfAny() {
-        if (!isMergeEligibleKey(dragKey) || !isMergeEligibleKey(mergeTargetKey)) return
-        val dragEv = mergedList.firstOrNull {
+        val dragOk = isMergeEligibleKey(dragKey)
+        val targetOk = isMergeEligibleKey(mergeTargetKey)
+        AppLogger.log(
+            context, "Merge",
+            "capture drag=$dragKey target=$mergeTargetKey dragOk=$dragOk targetOk=$targetOk"
+        )
+        if (!dragOk || !targetOk) return
+        val snapshot = mergedList.toList()
+        val dragEv = snapshot.firstOrNull {
             it.event?.id == dragKey?.removePrefix("e")?.toLongOrNull()
         }?.event ?: return
-        val targetEv = mergedList.firstOrNull {
+        val targetEv = snapshot.firstOrNull {
             it.event?.id == mergeTargetKey?.removePrefix("e")?.toLongOrNull()
         }?.event ?: return
-        if (dragEv.id != targetEv.id) pendingMerge = dragEv to targetEv
+        if (dragEv.id == targetEv.id) return
+        pendingMerge = dragEv to targetEv
+        AppLogger.log(context, "Merge", "captured ${dragEv.id} -> ${targetEv.id}")
     }
 
     /** 列表与网格共用的换位逻辑：f* 普通文件夹、m* 小文件夹、e* 事件（根层 / 成员行）。 */
     fun applyMove(fk: String, tk: String) {
+        // 合并区优先于排序：指针停在目标事件中段时，库若先把两行换位，
+        // 目标行就会被拖起行顶替，Initial pass 再也判不到合并目标。
+        // 父层 pointerInput 已经先算出 mergeTargetKey，这里直接拦住库的换位。
+        if (mergeTargetKey != null && fk.startsWith("e") && tk.startsWith("e")) return
         when {
             fk.startsWith("f") && tk.startsWith("f") -> {
                 val fi = folderList.indexOfFirst { "f${it.id}" == fk }
@@ -669,8 +698,11 @@ fun HomeScreen(
     }
 
     fun persistFolderOrder() {
+        // 必须先快照：快速连续拖动时，库可能在 launch 的协程遍历途中继续改 SnapshotStateList，
+        // 直接 forEachIndexed 会抛 ConcurrentModificationException（v1.26.1 真机崩溃根因）。
+        val snapshot = folderList.toList()
         scope.launch {
-            folderList.forEachIndexed { index, f ->
+            snapshot.forEachIndexed { index, f ->
                 container.folderRepository.update(f.copy(sortIndex = index))
             }
         }
@@ -678,8 +710,9 @@ fun HomeScreen(
 
     /** 根层混排顺序落库：事件与小文件夹共用一套 sortIndex 空间。 */
     fun persistRootOrder() {
+        val snapshot = mergedList.toList()
         scope.launch {
-            mergedList.forEachIndexed { index, entry ->
+            snapshot.forEachIndexed { index, entry ->
                 entry.event?.let { container.eventRepository.update(it.copy(sortIndex = index)) }
                 entry.mini?.let { container.folderRepository.update(it.copy(sortIndex = index)) }
             }
@@ -687,8 +720,9 @@ fun HomeScreen(
     }
 
     fun persistMemberOrders() {
+        val snapshot = memberLists.mapValues { (_, list) -> list.toList() }
         scope.launch {
-            memberLists.forEach { (_, list) ->
+            snapshot.forEach { (_, list) ->
                 list.forEachIndexed { index, e ->
                     container.eventRepository.update(e.copy(sortIndex = index))
                 }
@@ -1344,16 +1378,26 @@ fun HomeScreen(
                                     for (item in layout.visibleItemsInfo) {
                                         val k = item.key as? String ?: continue
                                         if (!k.startsWith("e") || k == dragKey) continue
-                                        val top = item.offset - layout.viewportStartOffset
+                                        // pointer 的 y 是相对 LazyColumn 整个组件原点，
+                                        // item.offset 也是从组件起点算，不能再减 viewportStartOffset，
+                                        // 否则有顶部 contentPadding 时整段判定会整体上移。
+                                        val top = item.offset.toFloat()
                                         if (y < top || y >= top + item.size) continue
                                         val rel = y - top
                                         if (rel >= item.size / 3f && rel < item.size * 2f / 3f) found = k
                                         break
                                     }
                                     // 只有拖起的也是根层事件时才亮合并目标（成员行拖拽只排序不合并）
-                                    mergeTargetKey = if (isMergeEligibleKey(dragKey)) {
+                                    val newTarget = if (isMergeEligibleKey(dragKey)) {
                                         found?.takeIf { isMergeEligibleKey(it) }
                                     } else null
+                                    if (newTarget != mergeTargetKey) {
+                                        AppLogger.log(
+                                            context, "Merge",
+                                            "target=${newTarget ?: "-"} drag=$dragKey y=${y.toInt()}"
+                                        )
+                                        mergeTargetKey = newTarget
+                                    }
                                 }
                             }
                         },
@@ -1367,10 +1411,9 @@ fun HomeScreen(
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
                         val dragModifier = if (manualSort && !selectionMode) {
                             Modifier.longPressDraggableHandle(
-                                onDragStarted = { dragKey = "f${folder.id}"; isDragging = true },
+                                onDragStarted = { beginDrag("f${folder.id}") },
                                 onDragStopped = {
-                                    if (dragKey == "f${folder.id}") dragKey = null
-                                    isDragging = false
+                                    endDrag("f${folder.id}")
                                     persistFolderOrder()
                                 }
                             )
@@ -1407,10 +1450,9 @@ fun HomeScreen(
                         ReorderableItem(reorderableState, key = "m${mini.id}") {
                             val dragModifier = if (manualSort && !selectionMode) {
                                 Modifier.longPressDraggableHandle(
-                                    onDragStarted = { dragKey = "m${mini.id}"; isDragging = true },
+                                    onDragStarted = { beginDrag("m${mini.id}") },
                                     onDragStopped = {
-                                        if (dragKey == "m${mini.id}") dragKey = null
-                                        isDragging = false
+                                        endDrag("m${mini.id}")
                                         if (pendingMerge == null) {
                                             persistRootOrder(); persistMemberOrders()
                                         }
@@ -1444,10 +1486,9 @@ fun HomeScreen(
                         ReorderableItem(reorderableState, key = "e${event.id}") {
                             val dragModifier = if (manualSort && !selectionMode) {
                                 Modifier.longPressDraggableHandle(
-                                    onDragStarted = { dragKey = "e${event.id}"; isDragging = true },
+                                    onDragStarted = { beginDrag("e${event.id}") },
                                     onDragStopped = {
-                                        if (dragKey == "e${event.id}") dragKey = null
-                                        isDragging = false
+                                        endDrag("e${event.id}")
                                         // 合并意图被捕获时不落排序：两行即将进小文件夹，顺序落库无意义
                                         if (pendingMerge == null) {
                                             persistRootOrder(); persistMemberOrders()
@@ -1529,9 +1570,16 @@ fun HomeScreen(
                                         if (relX in 1f / 3f..2f / 3f && relY in 1f / 3f..2f / 3f) found = k
                                         break
                                     }
-                                    mergeTargetKey = if (isMergeEligibleKey(dragKey)) {
+                                    val newTarget = if (isMergeEligibleKey(dragKey)) {
                                         found?.takeIf { isMergeEligibleKey(it) }
                                     } else null
+                                    if (newTarget != mergeTargetKey) {
+                                        AppLogger.log(
+                                            context, "Merge",
+                                            "target=${newTarget ?: "-"} drag=$dragKey pos=(${pos.x.toInt()},${pos.y.toInt()})"
+                                        )
+                                        mergeTargetKey = newTarget
+                                    }
                                 }
                             }
                         },
@@ -1551,9 +1599,9 @@ fun HomeScreen(
                         ReorderableItem(gridReorderableState, key = "f${folder.id}") {
                             val dragModifier = if (manualSort && !selectionMode) {
                                 Modifier.longPressDraggableHandle(
-                                    onDragStarted = { dragKey = "f${folder.id}" },
+                                    onDragStarted = { beginDrag("f${folder.id}") },
                                     onDragStopped = {
-                                        if (dragKey == "f${folder.id}") dragKey = null
+                                        endDrag("f${folder.id}")
                                         persistFolderOrder()
                                     }
                                 )
@@ -1595,9 +1643,9 @@ fun HomeScreen(
                             ReorderableItem(gridReorderableState, key = "m${mini.id}") {
                                 val dragModifier = if (manualSort && !selectionMode) {
                                     Modifier.longPressDraggableHandle(
-                                        onDragStarted = { dragKey = "m${mini.id}" },
+                                        onDragStarted = { beginDrag("m${mini.id}") },
                                         onDragStopped = {
-                                            if (dragKey == "m${mini.id}") dragKey = null
+                                            endDrag("m${mini.id}")
                                             if (pendingMerge == null) { persistRootOrder(); persistMemberOrders() }
                                         }
                                     )
@@ -1630,9 +1678,9 @@ fun HomeScreen(
                             ReorderableItem(gridReorderableState, key = "e${event.id}") {
                                 val dragModifier = if (manualSort && !selectionMode) {
                                     Modifier.longPressDraggableHandle(
-                                        onDragStarted = { dragKey = "e${event.id}" },
+                                        onDragStarted = { beginDrag("e${event.id}") },
                                         onDragStopped = {
-                                            if (dragKey == "e${event.id}") dragKey = null
+                                            endDrag("e${event.id}")
                                             if (pendingMerge == null) { persistRootOrder(); persistMemberOrders() }
                                         }
                                     )
@@ -1910,9 +1958,9 @@ fun HomeScreen(
             onConfirm = { name ->
                 val finalName = name.trim()
                     .ifBlank { Tr.s(R.string.mini_folder_default_name) }
+                val sortIndex = mergedList.toList().firstOrNull { it.event?.id == target.id }
+                    ?.event?.sortIndex ?: 0
                 scope.launch {
-                    val sortIndex = mergedList.firstOrNull { it.event?.id == target.id }
-                        ?.event?.sortIndex ?: 0
                     val newId = container.folderRepository.add(
                         FolderEntity(
                             name = finalName,
@@ -1922,6 +1970,7 @@ fun HomeScreen(
                     )
                     container.eventRepository.moveToFolder(listOf(dragged.id, target.id), newId)
                 }
+                AppLogger.log(context, "Merge", "confirm ${dragged.id} + ${target.id} name=$finalName")
                 pendingMerge = null
             }
         )
