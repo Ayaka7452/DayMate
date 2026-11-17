@@ -1035,7 +1035,7 @@ fun HomeScreen(
                             FolderRow(
                                 folder = folder,
                                 onClick = { onNavigate("folder/${folder.id}") },
-                                onLongClick = {
+                                onRename = {
                                     folderDialogTarget = folder
                                     showFolderDialog = true
                                 },
