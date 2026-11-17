@@ -5,6 +5,19 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/** folders.kind 的取值。 */
+object FolderKinds {
+    /** 普通文件夹：在大文件夹区（列表区块 / 网格）显示。 */
+    const val NORMAL = "normal"
+
+    /**
+     * 小文件夹：由两个事件拖拽合并产生，混排在事件列表中（蓝点变深绿点 + 展开箭头），
+     * 不进大文件夹区、不支持置顶、不进 widget。成员事件的 folderId 指向它，
+     * 解散/重命名/回收站全部复用普通文件夹的既有链路。
+     */
+    const val MINI = "mini"
+}
+
 @Entity(tableName = "folders")
 data class FolderEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -13,6 +26,8 @@ data class FolderEntity(
     val color: Int? = null,
     val sortIndex: Int = 0,
     val isPinned: Boolean = false,
+    /** 文件夹类型，见 [FolderKinds]。历史数据经迁移统一置为 normal。 */
+    val kind: String = FolderKinds.NORMAL,
     val isDeleted: Boolean = false,
     val deletedAt: Long = 0,
     val createdAt: Long = System.currentTimeMillis()

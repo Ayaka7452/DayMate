@@ -9,7 +9,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Box
@@ -75,6 +75,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -94,7 +95,6 @@ import com.ayaka7452.daymate.data.db.VaultEventEntity
 import com.ayaka7452.daymate.data.db.VaultFolderEntity
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
-import com.ayaka7452.daymate.feature.common.ReorderMenuItems
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.highlightedText
@@ -102,7 +102,6 @@ import com.ayaka7452.daymate.feature.common.matchesQuery
 import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.noteHitOnly
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
-import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import android.widget.Toast
 import com.ayaka7452.daymate.feature.home.AddSheet
 import com.ayaka7452.daymate.feature.home.SelectionDot
@@ -475,35 +474,12 @@ private fun VaultListScreen(
             }
         }
     }
-    fun moveVaultEvent(event: VaultEventEntity, action: String) {
-        if (!manualSort) {
-            Toast.makeText(
-                context,
-                context.getString(R.string.vault_switch_manual_sort),
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-        val index = eventList.indexOfFirst { it.id == event.id }
-        if (index >= 0) {
-            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
-            persistEventOrder()
-        }
-    }
-    fun moveVaultFolder(folder: VaultFolderEntity, action: String) {
-        if (!manualSort) {
-            Toast.makeText(
-                context,
-                context.getString(R.string.vault_switch_manual_sort),
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-        val index = folderList.indexOfFirst { it.id == folder.id }
-        if (index >= 0) {
-            folderList.moveItem(index, targetIndexForAction(index, folderList.size, action))
-            persistFolderOrder()
-        }
+    fun requireManualToast() {
+        Toast.makeText(
+            context,
+            context.getString(R.string.vault_switch_manual_sort),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     var showAddSheet by remember { mutableStateOf(false) }
@@ -664,10 +640,8 @@ private fun VaultListScreen(
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
-                        // 与下方事件行、HomeScreen、FolderScreen 同一口径：多选态下才给拖拽手柄。
-                        // 此前写成 !selectionMode，导致文件夹与事件的拖拽手柄互斥。
-                        val handleModifier = if (selectionMode && manualSort) {
-                            Modifier.draggableHandle(
+                        val dragModifier = if (manualSort && !selectionMode) {
+                            Modifier.longPressDraggableHandle(
                                 onDragStarted = { isDragging = true },
                                 onDragStopped = {
                                     isDragging = false
@@ -683,23 +657,23 @@ private fun VaultListScreen(
                                 if (selectionMode) toggleFolder(folder.id)
                                 else onNavigate("vault_folder/${folder.id}")
                             },
-                            onLongClick = {
-                                if (!selectionMode) {
-                                    folderTarget = folder
-                                    showFolderDialog = true
-                                }
+                            // 长按手势已让位给整行拖拽，重命名改从 ⋮ 菜单进
+                            onRename = {
+                                folderTarget = folder
+                                showFolderDialog = true
                             },
-                            dragHandle = handleModifier,
-                            // 非手动排序时重排项无意义（moveVaultFolder 内部也会直接返回），不展示菜单入口
-                            onReorder = if (manualSort) ({ action -> moveVaultFolder(folder, action) }) else null
+                            dragModifier = dragModifier,
+                            onBlockedLongPress = if (!manualSort && !selectionMode) {
+                                { requireManualToast() }
+                            } else null
                         )
                     }
                     ListItemDivider()
                 }
                 items(displayEvents, key = { "e${it.id}" }) { event ->
                     ReorderableItem(reorderableState, key = "e${event.id}") {
-                        val handleModifier = if (selectionMode && manualSort) {
-                            Modifier.draggableHandle(
+                        val dragModifier = if (manualSort && !selectionMode) {
+                            Modifier.longPressDraggableHandle(
                                 onDragStarted = { isDragging = true },
                                 onDragStopped = {
                                     isDragging = false
@@ -718,8 +692,10 @@ private fun VaultListScreen(
                             onMoveToMain = {
                                 scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                             },
-                            onReorder = if (manualSort) ({ action -> moveVaultEvent(event, action) }) else null,
-                            dragHandle = handleModifier
+                            dragModifier = dragModifier,
+                            onBlockedLongPress = if (!manualSort && !selectionMode) {
+                                { requireManualToast() }
+                            } else null
                         )
                     }
                     ListItemDivider()
@@ -978,20 +954,12 @@ fun VaultFolderScreen(
         }
     }
 
-    fun moveVaultFolderEvent(event: VaultEventEntity, action: String) {
-        if (!manualSort) {
-            Toast.makeText(
-                folderContext,
-                folderContext.getString(R.string.vault_switch_manual_sort),
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-        val index = eventList.indexOfFirst { it.id == event.id }
-        if (index >= 0) {
-            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
-            persistVaultFolderEventOrder()
-        }
+    fun requireManualToastFolder() {
+        Toast.makeText(
+            folderContext,
+            folderContext.getString(R.string.vault_switch_manual_sort),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     var showEventDialog by remember { mutableStateOf(false) }
@@ -1074,8 +1042,8 @@ fun VaultFolderScreen(
             LazyColumn(state = folderListState, modifier = Modifier.fillMaxSize()) {
                 items(displayEvents, key = { "e${it.id}" }) { event ->
                     ReorderableItem(folderReorderableState, key = "e${event.id}") {
-                        val handleModifier = if (selectionMode && manualSort) {
-                            Modifier.draggableHandle(
+                        val dragModifier = if (manualSort && !selectionMode) {
+                            Modifier.longPressDraggableHandle(
                                 onDragStarted = { isDraggingEvents = true },
                                 onDragStopped = {
                                     isDraggingEvents = false
@@ -1094,8 +1062,10 @@ fun VaultFolderScreen(
                             onMoveToMain = {
                                 scope.launch { container.vaultBridge.moveVaultEventToMain(event.id) }
                             },
-                            onReorder = if (manualSort) ({ action -> moveVaultFolderEvent(event, action) }) else null,
-                            dragHandle = handleModifier
+                            dragModifier = dragModifier,
+                            onBlockedLongPress = if (!manualSort && !selectionMode) {
+                                { requireManualToastFolder() }
+                            } else null
                         )
                     }
                     ListItemDivider()
@@ -1472,8 +1442,10 @@ private fun VaultEventRow(
     selected: Boolean = false,
     onClick: () -> Unit = {},
     onMoveToMain: (() -> Unit)? = null,
-    onReorder: ((String) -> Unit)? = null,
-    dragHandle: Modifier? = null,
+    /** 整行长按拖拽修饰符（由 ReorderableItem scope 构造传入，null = 拖拽禁用）。 */
+    dragModifier: Modifier? = null,
+    /** 拖拽被禁用（非手动排序）时长按触发的引导回调；null = 不挂长按监听。 */
+    onBlockedLongPress: (() -> Unit)? = null,
     searchQuery: String = "",
     folderBadge: String? = null,
     noteHit: Boolean = false,
@@ -1499,6 +1471,14 @@ private fun VaultEventRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(dragModifier ?: Modifier)
+            .then(
+                if (onBlockedLongPress != null) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(onLongPress = { onBlockedLongPress() })
+                    }
+                } else Modifier
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1550,15 +1530,6 @@ private fun VaultEventRow(
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
-        if (dragHandle != null) {
-            IconButton(modifier = dragHandle, onClick = {}) {
-                Text(
-                    "⠿",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-        }
         if (!selectionMode && onMoveToMain != null) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -1569,9 +1540,6 @@ private fun VaultEventRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
-                    if (onReorder != null) {
-                        ReorderMenuItems(onReorder) { menuExpanded = false }
-                    }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.vault_move_out_main)) },
                         onClick = {
@@ -1591,17 +1559,25 @@ private fun VaultFolderRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {},
-    dragHandle: Modifier? = null,
-    onReorder: ((String) -> Unit)? = null
+    /** 重命名入口（原长按手势已让位给整行拖拽，改从 ⋮ 菜单进）。 */
+    onRename: (() -> Unit)? = null,
+    /** 整行长按拖拽修饰符（由 ReorderableItem scope 构造传入，null = 拖拽禁用）。 */
+    dragModifier: Modifier? = null,
+    /** 拖拽被禁用（非手动排序）时长按触发的引导回调；null = 不挂长按监听。 */
+    onBlockedLongPress: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = if (selectionMode) null else onLongClick
+            .then(dragModifier ?: Modifier)
+            .then(
+                if (onBlockedLongPress != null) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(onLongPress = { onBlockedLongPress() })
+                    }
+                } else Modifier
             )
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1616,7 +1592,7 @@ private fun VaultFolderRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )
-        if (!selectionMode && onReorder != null) {
+        if (!selectionMode && onRename != null) {
             var menuExpanded by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -1627,19 +1603,15 @@ private fun VaultFolderRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
-                    ReorderMenuItems(onReorder) { menuExpanded = false }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.common_rename)) },
+                        onClick = {
+                            menuExpanded = false
+                            onRename.invoke()
+                        }
+                    )
                 }
             }
-        }
-        if (dragHandle != null) {
-            IconButton(modifier = dragHandle, onClick = {}) {
-                Text(
-                    "⠿",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-            Spacer(Modifier.width(4.dp))
         }
         if (!selectionMode) {
             Text(

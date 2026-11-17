@@ -163,7 +163,7 @@ class DbRepair(
             "sortIndex", "isPinned", "isDeleted", "deletedAt", "createdAt", "updatedAt"
         ),
         "folders" to setOf(
-            "id", "name", "icon", "color", "sortIndex", "isPinned",
+            "id", "name", "icon", "color", "sortIndex", "isPinned", "kind",
             "isDeleted", "deletedAt", "createdAt"
         ),
         "vault_events" to setOf(

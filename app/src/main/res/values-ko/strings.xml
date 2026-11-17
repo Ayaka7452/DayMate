@@ -38,6 +38,10 @@
     <string name="common_move_to">이동 위치</string>
     <string name="common_collapse">접기</string>
     <string name="common_expand">펼치기</string>
+    <string name="mini_folder_merge_title">미니 폴더로 합치기</string>
+    <string name="mini_folder_merge_placeholder">이 미니 폴더 이름 정하기</string>
+    <string name="mini_folder_default_name">미니 폴더</string>
+    <string name="mini_folder_dissolve">미니 폴더 해산</string>
     <string name="home_manual_sort_toast">설정에서 먼저 수동 정렬로 전환하세요.</string>
     <string name="home_selected_n">%1$d개 선택됨</string>
     <string name="home_move_into_folder">폴더로 이동</string>
@@ -95,10 +99,6 @@
     <string name="home_cloud_success">백업 완료 · %1$s</string>
     <string name="home_cloud_failure">백업 실패 · %1$s</string>
     <string name="home_backup_now">지금 백업</string>
-    <string name="reorder_up">위로 이동</string>
-    <string name="reorder_down">아래로 이동</string>
-    <string name="reorder_top">맨 위로 이동</string>
-    <string name="reorder_bottom">맨 아래로 이동</string>
     <string name="dlg_name">이름</string>
     <string name="dlg_icon">아이콘</string>
     <string name="dlg_root_folder">📂  루트</string>

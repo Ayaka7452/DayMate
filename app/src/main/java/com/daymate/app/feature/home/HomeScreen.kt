@@ -16,6 +16,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
@@ -50,7 +51,9 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.outlined.PushPin
@@ -96,6 +99,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -120,7 +124,6 @@ import com.ayaka7452.daymate.data.festival.FestivalRepository
 import com.ayaka7452.daymate.data.repo.SettingsRepository
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
-import com.ayaka7452.daymate.feature.common.ReorderMenuItems
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.UpdateHost
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
@@ -129,10 +132,10 @@ import com.ayaka7452.daymate.feature.common.matchesQuery
 import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.noteHitOnly
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
-import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import com.ayaka7452.daymate.feature.home.SelectionDot
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
+import com.ayaka7452.daymate.data.db.FolderKinds
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.launch
@@ -394,29 +397,110 @@ fun HomeScreen(
     // 拖拽排序用的可变镜像列表：Flow 更新时同步（拖拽中不同步，避免跳动）。
     // 用预载值播种：首帧渲染时 LaunchedEffect 还没跑，不播种的话列表会先空一帧。
     var isDragging by remember { mutableStateOf(false) }
+    // 普通文件夹（kind=normal）：在大文件夹区显示；小文件夹（mini）走下方 mergedList 混排
     val folderList = remember {
-        mutableStateListOf<FolderEntity>().apply { addAll(folders) }
+        mutableStateListOf<FolderEntity>()
+            .apply { addAll(folders.filter { it.kind == FolderKinds.NORMAL }) }
     }
     val eventList = remember {
         mutableStateListOf<EventEntity>().apply { addAll(events) }
     }
-    LaunchedEffect(folders) {
-        if (!isDragging) {
-            folderList.clear()
-            folderList.addAll(folders)
+    // 根层混排列表：事件行与小文件夹行按 sortIndex 交错（手动排序的显示与拖拽都以它为准）。
+    // 首帧同步播种，避免事件区先空一帧。
+    val mergedList = remember {
+        mutableStateListOf<HomeRootEntry>().apply {
+            val minis = folders.filter { it.kind == FolderKinds.MINI }.sortedBy { it.sortIndex }
+            var mi = 0
+            for (e in events) {
+                while (mi < minis.size && minis[mi].sortIndex <= e.sortIndex) {
+                    add(HomeRootEntry(mini = minis[mi])); mi++
+                }
+                add(HomeRootEntry(event = e))
+            }
+            while (mi < minis.size) { add(HomeRootEntry(mini = minis[mi])); mi++ }
         }
     }
-    LaunchedEffect(events) {
-        if (!isDragging) {
-            eventList.clear()
-            eventList.addAll(events)
+    // 小文件夹的成员事件（folderId 指向小文件夹），key = 小文件夹 id
+    // （成员同步的 LaunchedEffect 依赖 allEvents，见其声明之后）
+    val memberLists = remember { mutableStateMapOf<Long, List<EventEntity>>() }
+    // 原地展开的小文件夹 id
+    val expandedMiniIds = remember { mutableStateListOf<Long>() }
+    // 拖拽/合并手势状态：dragKey=正在拖的行 key；mergeTargetKey=悬停中段的目标行 key；
+    // pendingMerge=松手后待确认的合并（拖起的事件, 目标事件）
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var mergeTargetKey by remember { mutableStateOf<String?>(null) }
+    var pendingMerge by remember { mutableStateOf<Pair<EventEntity, EventEntity>?>(null) }
+    // 小文件夹重命名弹窗
+    var miniRenameTarget by remember { mutableStateOf<FolderEntity?>(null) }
+    var showMiniRenameDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(folders, events) {
+        if (isDragging) return@LaunchedEffect
+        folderList.clear()
+        folderList.addAll(folders.filter { it.kind == FolderKinds.NORMAL })
+        eventList.clear()
+        eventList.addAll(events)
+        // 根层混排：事件与小文件夹按 sortIndex 归并（同值时小文件夹在前——
+        // 合并创建时小文件夹的 sortIndex 取目标事件值，正好落在目标事件上方）
+        val minis = folders.filter { it.kind == FolderKinds.MINI }.sortedBy { it.sortIndex }
+        mergedList.clear()
+        var mi = 0
+        for (e in eventList) {
+            while (mi < minis.size && minis[mi].sortIndex <= e.sortIndex) {
+                mergedList.add(HomeRootEntry(mini = minis[mi])); mi++
+            }
+            mergedList.add(HomeRootEntry(event = e))
         }
+        while (mi < minis.size) { mergedList.add(HomeRootEntry(mini = minis[mi])); mi++ }
     }
 
-    // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
+    // 事件显示列表：网格视图与顶部卡片用（根层事件；小文件夹不进网格），manual 保持手动顺序
     val eventSnapshot = eventList.toList()
     val displayEvents = remember(eventSnapshot, defaultSort) {
         sortEventsForDisplay(eventSnapshot, defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
+    }
+
+    // 列表视图的行序列：手动排序走 mergedList 混排（展开的小文件夹随后内联缩进的成员行）；
+    // 自动排序事件按剩余天数排，小文件夹追加在事件之后（自动模式无拖拽，顺序仅影响展开入口位置）
+    val mergedSnapshot = mergedList.toList()
+    val minisSnapshot = remember {
+        mutableStateListOf<FolderEntity>()
+            .apply { addAll(folders.filter { it.kind == FolderKinds.MINI }) }
+    }
+    LaunchedEffect(folders) {
+        if (!isDragging) {
+            minisSnapshot.clear()
+            minisSnapshot.addAll(folders.filter { it.kind == FolderKinds.MINI })
+        }
+    }
+    val memberSnapshot = memberLists.toMap()
+    val expandedSnapshot = expandedMiniIds.toList()
+    val displayRows = remember(mergedSnapshot, minisSnapshot, memberSnapshot, expandedSnapshot, defaultSort) {
+        val expandedSet = expandedSnapshot.toSet()
+        val rows = mutableListOf<HomeRow>()
+        if (manualSort) {
+            for (entry in mergedSnapshot) {
+                val mini = entry.mini
+                if (mini != null) {
+                    rows.add(HomeRow(mini = mini))
+                    if (mini.id in expandedSet) {
+                        memberSnapshot[mini.id]?.forEach { rows.add(HomeRow(event = it, indent = true)) }
+                    }
+                } else entry.event?.let { rows.add(HomeRow(event = it)) }
+            }
+        } else {
+            val events = sortEventsForDisplay(
+                mergedSnapshot.mapNotNull { it.event }, defaultSort
+            ) { eventDaysUntil(it.targetDateEpochDay) }
+            events.forEach { rows.add(HomeRow(event = it)) }
+            minisSnapshot.sortedBy { it.sortIndex }.forEach { mini ->
+                rows.add(HomeRow(mini = mini))
+                if (mini.id in expandedSet) {
+                    memberSnapshot[mini.id]?.forEach { rows.add(HomeRow(event = it, indent = true)) }
+                }
+            }
+        }
+        rows.toList()
     }
 
     // 搜索数据源：全部未删除事件（含文件夹内的）；结果按剩余天数升序
@@ -430,6 +514,20 @@ fun HomeScreen(
         }.getOrDefault(emptyList<EventEntity>())
     }
     val allEvents by allEventsFlow.collectAsState(initial = allEventsSeed)
+
+    // 小文件夹成员事件同步：folderId 指向小文件夹的存活事件按 sortIndex 分组
+    LaunchedEffect(allEvents, folders) {
+        if (isDragging) return@LaunchedEffect
+        val miniIds = folders.filter { it.kind == FolderKinds.MINI }.map { it.id }.toSet()
+        val byFolder = allEvents
+            .filter { it.folderId != null && it.folderId in miniIds }
+            .groupBy { it.folderId!! }
+        miniIds.forEach { fid ->
+            memberLists[fid] = (byFolder[fid] ?: emptyList()).sortedBy { it.sortIndex }
+        }
+        memberLists.keys.filter { it !in miniIds }.forEach { memberLists.remove(it) }
+    }
+
     val folderNameById = remember(folders) { folders.associate { it.id to it.name } }
     val searchResults = remember(allEvents, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
@@ -492,6 +590,35 @@ fun HomeScreen(
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    /** 根层条目的行 key：事件 e<id> / 小文件夹 m<id>（普通文件夹是独立区块 f<id>）。 */
+    fun rootKeyOf(entry: HomeRootEntry): String =
+        entry.mini?.let { "m${it.id}" } ?: "e${entry.event!!.id}"
+
+    /** 成员行 key → 所属小文件夹 id；根层事件与文件夹不在成员列表里，返回 null。 */
+    fun memberOwnerOf(key: String): Long? {
+        val id = key.removePrefix("e").toLongOrNull() ?: return null
+        return memberLists.entries.firstOrNull { list -> list.value.any { it.id == id } }?.key
+    }
+
+    /** 根层事件行才可作合并对象/发起者：成员行、特殊事件（周期管家入口）排除。 */
+    fun isMergeEligibleKey(key: String?): Boolean {
+        val id = key?.removePrefix("e")?.toLongOrNull() ?: return false
+        val ev = mergedList.firstOrNull { it.event?.id == id }?.event ?: return false
+        return ev.specialType == null
+    }
+
+    /** 拖拽松手时若悬停在某根层事件行中段，捕获合并意图（弹命名框）；否则不动。 */
+    fun captureMergeIfAny() {
+        if (!isMergeEligibleKey(dragKey) || !isMergeEligibleKey(mergeTargetKey)) return
+        val dragEv = mergedList.firstOrNull {
+            it.event?.id == dragKey?.removePrefix("e")?.toLongOrNull()
+        }?.event ?: return
+        val targetEv = mergedList.firstOrNull {
+            it.event?.id == mergeTargetKey?.removePrefix("e")?.toLongOrNull()
+        }?.event ?: return
+        if (dragEv.id != targetEv.id) pendingMerge = dragEv to targetEv
+    }
+
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
         val fk = from.key.toString()
         val tk = to.key.toString()
@@ -501,10 +628,34 @@ fun HomeScreen(
                 val ti = folderList.indexOfFirst { "f${it.id}" == tk }
                 if (fi >= 0 && ti >= 0) folderList.moveItem(fi, ti)
             }
+            // 根层混排（事件 e* / 小文件夹 m*）之间的换位
+            fk.startsWith("m") || tk.startsWith("m") -> {
+                val fi = mergedList.indexOfFirst { rootKeyOf(it) == fk }
+                val ti = mergedList.indexOfFirst { rootKeyOf(it) == tk }
+                if (fi >= 0 && ti >= 0) mergedList.moveItem(fi, ti)
+            }
             fk.startsWith("e") && tk.startsWith("e") -> {
-                val fi = eventList.indexOfFirst { "e${it.id}" == fk }
-                val ti = eventList.indexOfFirst { "e${it.id}" == tk }
-                if (fi >= 0 && ti >= 0) eventList.moveItem(fi, ti)
+                val fo = memberOwnerOf(fk)
+                val toOwner = memberOwnerOf(tk)
+                when {
+                    // 同一小文件夹的成员行之间换位
+                    fo != null && fo == toOwner -> {
+                        val list = memberLists[fo]
+                        if (list != null) {
+                            val fi = list.indexOfFirst { "e${it.id}" == fk }
+                            val ti = list.indexOfFirst { "e${it.id}" == tk }
+                            if (fi >= 0 && ti >= 0) {
+                                memberLists[fo] = list.toMutableList().apply { moveItem(fi, ti) }
+                            }
+                        }
+                    }
+                    // 根层事件行之间换位；跨根层/成员层不允许（fi/ti 查不到自然不动）
+                    fo == null && toOwner == null -> {
+                        val fi = mergedList.indexOfFirst { rootKeyOf(it) == fk }
+                        val ti = mergedList.indexOfFirst { rootKeyOf(it) == tk }
+                        if (fi >= 0 && ti >= 0) mergedList.moveItem(fi, ti)
+                    }
+                }
             }
         }
     }
@@ -517,36 +668,32 @@ fun HomeScreen(
         }
     }
 
-    fun persistEventOrder() {
+    /** 根层混排顺序落库：事件与小文件夹共用一套 sortIndex 空间。 */
+    fun persistRootOrder() {
         scope.launch {
-            eventList.forEachIndexed { index, e ->
-                container.eventRepository.update(e.copy(sortIndex = index))
+            mergedList.forEachIndexed { index, entry ->
+                entry.event?.let { container.eventRepository.update(it.copy(sortIndex = index)) }
+                entry.mini?.let { container.folderRepository.update(it.copy(sortIndex = index)) }
             }
         }
     }
 
-    fun requireManualThen(action: () -> Unit) {
-        if (manualSort) action() else Toast.makeText(
+    fun persistMemberOrders() {
+        scope.launch {
+            memberLists.forEach { (_, list) ->
+                list.forEachIndexed { index, e ->
+                    container.eventRepository.update(e.copy(sortIndex = index))
+                }
+            }
+        }
+    }
+
+    fun requireManualToast() {
+        Toast.makeText(
             context,
             context.getString(R.string.home_manual_sort_toast),
             Toast.LENGTH_SHORT
         ).show()
-    }
-
-    fun moveEvent(event: EventEntity, action: String) = requireManualThen {
-        val index = eventList.indexOfFirst { it.id == event.id }
-        if (index >= 0) {
-            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
-            persistEventOrder()
-        }
-    }
-
-    fun moveFolder(folder: FolderEntity, action: String) = requireManualThen {
-        val index = folderList.indexOfFirst { it.id == folder.id }
-        if (index >= 0) {
-            folderList.moveItem(index, targetIndexForAction(index, folderList.size, action))
-            persistFolderOrder()
-        }
     }
 
     val totalSelected = selectedEventIds.size + selectedFolderIds.size
@@ -1166,7 +1313,42 @@ fun HomeScreen(
                     SettingsRepository.VIEW_MODE_LIST -> {
                     LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // 合并手势：拖拽期间在容器层以 Initial pass 观察指针（不消费，
+                        // 不影响库自身的排序手势），对根层事件行做上/中/下三分区判定：
+                        // 指针停在某一行的中段时高亮该行，松手即弹合并命名框；
+                        // 上/下三分段走普通排序。松手事件在 Initial pass 先于库的
+                        // onDragStopped（父先于子）到达，此处先捕获合并意图。
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (dragKey == null) continue
+                                    if (ev.changes.none { it.pressed }) {
+                                        captureMergeIfAny()
+                                        mergeTargetKey = null
+                                        continue
+                                    }
+                                    val y = ev.changes.first().position.y
+                                    val layout = listState.layoutInfo
+                                    var found: String? = null
+                                    for (item in layout.visibleItemsInfo) {
+                                        val k = item.key as? String ?: continue
+                                        if (!k.startsWith("e") || k == dragKey) continue
+                                        val top = item.offset - layout.viewportStartOffset
+                                        if (y < top || y >= top + item.size) continue
+                                        val rel = y - top
+                                        if (rel >= item.size / 3f && rel < item.size * 2f / 3f) found = k
+                                        break
+                                    }
+                                    // 只有拖起的也是根层事件时才亮合并目标（成员行拖拽只排序不合并）
+                                    mergeTargetKey = if (isMergeEligibleKey(dragKey)) {
+                                        found?.takeIf { isMergeEligibleKey(it) }
+                                    } else null
+                                }
+                            }
+                        },
                     contentPadding = PaddingValues(
                         top = if (hasHeader || pinnedEvents.isNotEmpty()) 0.dp else padding.calculateTopPadding(),
                         bottom = padding.calculateBottomPadding()
@@ -1175,10 +1357,11 @@ fun HomeScreen(
                 ) {
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
-                        val handle = if (selectionMode && manualSort) {
-                            Modifier.draggableHandle(
-                                onDragStarted = { isDragging = true },
+                        val dragModifier = if (manualSort && !selectionMode) {
+                            Modifier.longPressDraggableHandle(
+                                onDragStarted = { dragKey = "f${folder.id}"; isDragging = true },
                                 onDragStopped = {
+                                    if (dragKey == "f${folder.id}") dragKey = null
                                     isDragging = false
                                     persistFolderOrder()
                                 }
@@ -1192,60 +1375,110 @@ fun HomeScreen(
                                 if (selectionMode) toggleFolder(folder.id)
                                 else onNavigate("folder/${folder.id}")
                             },
-                            onLongClick = {
-                                if (!selectionMode) {
-                                    folderDialogTarget = folder
-                                    showFolderDialog = true
-                                }
-                            },
                             onMoveToRecycleBin = {
                                 folderToDelete = folder
                                 showFolderDeleteConfirm = true
                             },
-                            onReorder = { action -> moveFolder(folder, action) },
-                            dragHandle = handle
+                            onRename = {
+                                folderDialogTarget = folder
+                                showFolderDialog = true
+                            },
+                            dragModifier = dragModifier,
+                            // 非手动排序时长按给 Toast 引导（拖拽被禁用，无手势冲突）
+                            onBlockedLongPress = if (!manualSort && !selectionMode) {
+                                { requireManualToast() }
+                            } else null
                         )
                     }
                     ListItemDivider()
                 }
-                items(displayEvents, key = { "e${it.id}" }) { event ->
-                    ReorderableItem(reorderableState, key = "e${event.id}") {
-                        val handle = if (selectionMode && manualSort) {
-                            Modifier.draggableHandle(
-                                onDragStarted = { isDragging = true },
-                                onDragStopped = {
-                                    isDragging = false
-                                    persistEventOrder()
+                items(displayRows, key = { rowKeyOf(it) }) { row ->
+                    val mini = row.mini
+                    val event = row.event
+                    if (mini != null) {
+                        ReorderableItem(reorderableState, key = "m${mini.id}") {
+                            val dragModifier = if (manualSort && !selectionMode) {
+                                Modifier.longPressDraggableHandle(
+                                    onDragStarted = { dragKey = "m${mini.id}"; isDragging = true },
+                                    onDragStopped = {
+                                        if (dragKey == "m${mini.id}") dragKey = null
+                                        isDragging = false
+                                        if (pendingMerge == null) {
+                                            persistRootOrder(); persistMemberOrders()
+                                        }
+                                    }
+                                )
+                            } else null
+                            MiniFolderRow(
+                                folder = mini,
+                                expanded = mini.id in expandedMiniIds,
+                                dragModifier = dragModifier,
+                                onClick = {
+                                    if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
+                                    else expandedMiniIds.add(mini.id)
+                                },
+                                onRename = {
+                                    miniRenameTarget = mini
+                                    showMiniRenameDialog = true
+                                },
+                                onDissolve = {
+                                    folderToDelete = mini
+                                    showFolderDeleteConfirm = true
+                                },
+                                onMoveToRecycleBin = {
+                                    folderToDelete = mini
+                                    showFolderDeleteConfirm = true
                                 }
                             )
-                        } else null
-                        EventRow(
-                            event = event,
-                            festivalRepo = festivalRepo,
-                            selectionMode = selectionMode,
-                            selected = event.id in selectedEventIds,
-                            onClick = {
-                                if (selectionMode) toggleEvent(event.id)
-                                else if (event.specialType == "cycle") onNavigate("cycle")
-                                else onNavigate("event_detail?eventId=${event.id}")
-                            },
-                            onMoveToVault = {
-                                if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
-                            },
-                            onMoveToFolder = { singleMoveEventId = event.id },
-                            onMoveToRecycleBin = {
-                                scope.launch {
-                                    container.eventRepository.softDeleteByIds(
-                                        listOf(event.id),
-                                        System.currentTimeMillis()
-                                    )
-                                }
-                            },
-                            onReorder = { action -> moveEvent(event, action) },
-                            dragHandle = handle
-                        )
+                        }
+                        ListItemDivider()
+                    } else if (event != null) {
+                        ReorderableItem(reorderableState, key = "e${event.id}") {
+                            val dragModifier = if (manualSort && !selectionMode) {
+                                Modifier.longPressDraggableHandle(
+                                    onDragStarted = { dragKey = "e${event.id}"; isDragging = true },
+                                    onDragStopped = {
+                                        if (dragKey == "e${event.id}") dragKey = null
+                                        isDragging = false
+                                        // 合并意图被捕获时不落排序：两行即将进小文件夹，顺序落库无意义
+                                        if (pendingMerge == null) {
+                                            persistRootOrder(); persistMemberOrders()
+                                        }
+                                    }
+                                )
+                            } else null
+                            EventRow(
+                                event = event,
+                                festivalRepo = festivalRepo,
+                                selectionMode = selectionMode,
+                                selected = event.id in selectedEventIds,
+                                indent = row.indent,
+                                mergeHighlight = "e${event.id}" == mergeTargetKey,
+                                onClick = {
+                                    if (selectionMode) toggleEvent(event.id)
+                                    else if (event.specialType == "cycle") onNavigate("cycle")
+                                    else onNavigate("event_detail?eventId=${event.id}")
+                                },
+                                onMoveToVault = {
+                                    if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
+                                },
+                                onMoveToFolder = { singleMoveEventId = event.id },
+                                onMoveToRecycleBin = {
+                                    scope.launch {
+                                        container.eventRepository.softDeleteByIds(
+                                            listOf(event.id),
+                                            System.currentTimeMillis()
+                                        )
+                                    }
+                                },
+                                dragModifier = dragModifier,
+                                onBlockedLongPress = if (!manualSort && !selectionMode) {
+                                    { requireManualToast() }
+                                } else null
+                            )
+                        }
+                        ListItemDivider()
                     }
-                    ListItemDivider()
                 }
                 }
             }
@@ -1435,8 +1668,8 @@ fun HomeScreen(
         PickFolderDialog(
             title = stringResource(R.string.common_move_to),
             folders = folders.map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
-            // 主页的事件都在根目录，这里只提供文件夹目标
-            showRoot = false,
+            // 根目录选项保留：小文件夹的成员事件可借此移出（根层事件选根目录等于原地不动）
+            showRoot = true,
             onDismiss = { singleMoveEventId = null },
             onPick = { targetFolderId ->
                 scope.launch {
@@ -1519,6 +1752,64 @@ fun HomeScreen(
         )
     }
 
+    // 小文件夹重命名弹窗（原长按手势已让位给拖拽，从 ⋮ 菜单进入）
+    if (showMiniRenameDialog && miniRenameTarget != null) {
+        var miniName by remember(miniRenameTarget) { mutableStateOf(miniRenameTarget!!.name) }
+        AlertDialog(
+            onDismissRequest = { showMiniRenameDialog = false; miniRenameTarget = null },
+            title = { Text(stringResource(R.string.common_rename)) },
+            text = {
+                TextField(
+                    value = miniName,
+                    onValueChange = { miniName = it },
+                    placeholder = { Text(stringResource(R.string.mini_folder_merge_placeholder)) },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val target = miniRenameTarget ?: return@TextButton
+                    val finalName = miniName.trim()
+                        .ifBlank { Tr.s(R.string.mini_folder_default_name) }
+                    scope.launch {
+                        container.folderRepository.update(target.copy(name = finalName))
+                    }
+                    showMiniRenameDialog = false
+                    miniRenameTarget = null
+                }) { Text(stringResource(R.string.common_save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMiniRenameDialog = false; miniRenameTarget = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
+
+    // 拖拽合并命名弹窗：确认才创建小文件夹并把两个事件移入；取消则什么也不发生
+    pendingMerge?.let { (dragged, target) ->
+        MiniFolderMergeDialog(
+            onDismiss = { pendingMerge = null },
+            onConfirm = { name ->
+                val finalName = name.trim()
+                    .ifBlank { Tr.s(R.string.mini_folder_default_name) }
+                scope.launch {
+                    val sortIndex = mergedList.firstOrNull { it.event?.id == target.id }
+                        ?.event?.sortIndex ?: 0
+                    val newId = container.folderRepository.add(
+                        FolderEntity(
+                            name = finalName,
+                            kind = FolderKinds.MINI,
+                            sortIndex = sortIndex
+                        )
+                    )
+                    container.eventRepository.moveToFolder(listOf(dragged.id, target.id), newId)
+                }
+                pendingMerge = null
+            }
+        )
+    }
+
     if (vaultNeedSetup) {
         AlertDialog(
             onDismissRequest = { vaultNeedSetup = false },
@@ -1580,8 +1871,14 @@ fun EventRow(
     onMoveToVault: (() -> Unit)? = null,
     onMoveToFolder: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
-    onReorder: ((String) -> Unit)? = null,
-    dragHandle: Modifier? = null,
+    /** 整行长按拖拽修饰符（由 ReorderableItem scope 构造传入，null = 拖拽禁用）。 */
+    dragModifier: Modifier? = null,
+    /** 拖拽被禁用（非手动排序）时长按触发的引导回调；null = 不挂长按监听。 */
+    onBlockedLongPress: (() -> Unit)? = null,
+    /** 小文件夹成员行的缩进（26dp 额外起始边距）。 */
+    indent: Boolean = false,
+    /** 合并手势的目标高亮（指针悬停在该行中段时整行绿底）。 */
+    mergeHighlight: Boolean = false,
     searchQuery: String = "",
     folderBadge: String? = null,
     noteHit: Boolean = false,
@@ -1611,8 +1908,22 @@ fun EventRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(dragModifier ?: Modifier)
+            .then(
+                if (onBlockedLongPress != null) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(onLongPress = { onBlockedLongPress() })
+                    }
+                } else Modifier
+            )
+            .background(if (mergeHighlight) MINI_MERGE_HIGHLIGHT else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(
+                start = if (indent) 42.dp else 16.dp,
+                end = 16.dp,
+                top = 14.dp,
+                bottom = 14.dp
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
@@ -1671,15 +1982,6 @@ fun EventRow(
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
-        if (dragHandle != null) {
-            IconButton(modifier = dragHandle, onClick = {}) {
-                Text(
-                    "⠿",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-        }
         if (!selectionMode && onMoveToVault != null) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -1690,9 +1992,6 @@ fun EventRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
-                    if (onReorder != null) {
-                        ReorderMenuItems(onReorder) { menuExpanded = false }
-                    }
                     if (onMoveToFolder != null) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.home_move_to_folder_ellipsis)) },
@@ -1728,19 +2027,27 @@ fun FolderRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {},
     onMoveToRecycleBin: (() -> Unit)? = null,
-    onReorder: ((String) -> Unit)? = null,
-    dragHandle: Modifier? = null
+    /** 重命名入口（原长按手势已让位给整行拖拽，改从 ⋮ 菜单进）。 */
+    onRename: (() -> Unit)? = null,
+    /** 整行长按拖拽修饰符（由 ReorderableItem scope 构造传入，null = 拖拽禁用）。 */
+    dragModifier: Modifier? = null,
+    /** 拖拽被禁用（非手动排序）时长按触发的引导回调；null = 不挂长按监听。 */
+    onBlockedLongPress: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = if (selectionMode) null else onLongClick
+            .then(dragModifier ?: Modifier)
+            .then(
+                if (onBlockedLongPress != null) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(onLongPress = { onBlockedLongPress() })
+                    }
+                } else Modifier
             )
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1758,15 +2065,6 @@ fun FolderRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )
-        if (dragHandle != null) {
-            IconButton(modifier = dragHandle, onClick = {}) {
-                Text(
-                    "⠿",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-        }
         if (!selectionMode) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -1777,8 +2075,14 @@ fun FolderRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
-                    if (onReorder != null) {
-                        ReorderMenuItems(onReorder) { menuExpanded = false }
+                    if (onRename != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.common_rename)) },
+                            onClick = {
+                                menuExpanded = false
+                                onRename.invoke()
+                            }
+                        )
                     }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.home_move_to_trash)) },
@@ -1801,6 +2105,116 @@ private fun ListItemDivider(inset: Dp = 0.dp) {
             .fillMaxWidth()
             .height(1.dp)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    )
+}
+
+/** 小文件夹的深绿点（区别于普通事件的蓝点）。 */
+private val MINI_FOLDER_DOT = Color(0xFF1B5E20)
+
+/** 合并手势悬停中段时目标行的绿底高亮。 */
+private val MINI_MERGE_HIGHLIGHT = Color(0xFF1B5E20).copy(alpha = 0.15f)
+
+/** 主页根层混排条目：事件行或小文件夹行（两者互斥非空）。 */
+private data class HomeRootEntry(val event: EventEntity? = null, val mini: FolderEntity? = null)
+
+/** 主页列表视图的一行：普通行或小文件夹内缩进的成员行。 */
+private data class HomeRow(
+    val event: EventEntity? = null,
+    val mini: FolderEntity? = null,
+    val indent: Boolean = false
+)
+
+private fun rowKeyOf(row: HomeRow): String =
+    row.mini?.let { "m${it.id}" } ?: "e${row.event!!.id}"
+
+/**
+ * 小文件夹行：混排在事件列表里，深绿点 + 行尾展开箭头；
+ * ⋮ 菜单重命名 / 解散 / 移到回收站（解散与回收站同为「成员回原列表 + 文件夹进回收站」）。
+ */
+@Composable
+private fun MiniFolderRow(
+    folder: FolderEntity,
+    expanded: Boolean,
+    dragModifier: Modifier? = null,
+    onClick: () -> Unit = {},
+    onRename: () -> Unit = {},
+    onDissolve: () -> Unit = {},
+    onMoveToRecycleBin: () -> Unit = {}
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(dragModifier ?: Modifier)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(MINI_FOLDER_DOT)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = folder.name,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onClick) {
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null
+            )
+        }
+        Box {
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
+            }
+            DropdownMenu(
+                modifier = Modifier.widthIn(min = 200.dp),
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.common_rename)) },
+                    onClick = { menuExpanded = false; onRename() }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.mini_folder_dissolve)) },
+                    onClick = { menuExpanded = false; onDissolve() }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_move_to_trash)) },
+                    onClick = { menuExpanded = false; onMoveToRecycleBin() }
+                )
+            }
+        }
+    }
+}
+
+/** 拖拽合并后的命名弹窗：输入框留空则以默认名创建，取消则不合并。 */
+@Composable
+private fun MiniFolderMergeDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.mini_folder_merge_title)) },
+        text = {
+            TextField(
+                value = name,
+                onValueChange = { name = it },
+                placeholder = { Text(stringResource(R.string.mini_folder_merge_placeholder)) },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name) }) { Text(stringResource(R.string.common_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        }
     )
 }
 

@@ -38,6 +38,10 @@
     <string name="common_move_to">移动到</string>
     <string name="common_collapse">收起</string>
     <string name="common_expand">展开</string>
+    <string name="mini_folder_merge_title">合并为小文件夹</string>
+    <string name="mini_folder_merge_placeholder">给这个小文件夹起个名字</string>
+    <string name="mini_folder_default_name">小文件夹</string>
+    <string name="mini_folder_dissolve">解散小文件夹</string>
     <string name="home_manual_sort_toast">请先在设置中切换为手动排序。</string>
     <string name="home_selected_n">已选 %1$d 项</string>
     <string name="home_move_into_folder">移入文件夹</string>
@@ -95,10 +99,6 @@
     <string name="home_cloud_success">备份成功 · %1$s</string>
     <string name="home_cloud_failure">备份失败 · %1$s</string>
     <string name="home_backup_now">立即备份</string>
-    <string name="reorder_up">上移</string>
-    <string name="reorder_down">下移</string>
-    <string name="reorder_top">移到顶部</string>
-    <string name="reorder_bottom">移到底部</string>
     <string name="dlg_name">名称</string>
     <string name="dlg_icon">图标</string>
     <string name="dlg_root_folder">📂  根目录</string>

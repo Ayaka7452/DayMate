@@ -15,7 +15,7 @@ import androidx.room.migration.Migration
         CycleLogEntity::class,
         CycleNoteEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class DayMateDatabase : RoomDatabase() {
@@ -282,6 +282,22 @@ abstract class DayMateDatabase : RoomDatabase() {
         }
 
         /**
+         * v11 -> v12：folders 新增 kind 列（normal/mini），支撑「两个事件合并成小文件夹」。
+         *
+         * 纯加列：既有文件夹一律 normal（行为不变），小文件夹由合并手势新建。
+         * 与 MIGRATION_3_4 同样幂等：历史发布包出现过库结构与版本号不同步的设备，
+         * 列已存在时跳过，避免重复 ALTER TABLE 崩溃。
+         */
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                addColumnIfMissing(
+                    db, "folders", "kind",
+                    "ALTER TABLE folders ADD COLUMN kind TEXT NOT NULL DEFAULT 'normal'"
+                )
+            }
+        }
+
+        /**
          * 重建一张事件表并丢弃 repeatYearly 列，见 [MIGRATION_8_9] 的说明。
          * @param table 目标表名（重建完成后仍是该名字）。
          * @param parentTable 外键指向的父表（folders / vault_folders），用于剔除悬空引用。
@@ -369,7 +385,7 @@ abstract class DayMateDatabase : RoomDatabase() {
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                    MIGRATION_9_10, MIGRATION_10_11
+                    MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12
                 )
                 .build()
         }
