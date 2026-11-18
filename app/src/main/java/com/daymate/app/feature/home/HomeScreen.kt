@@ -92,8 +92,11 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -518,6 +521,14 @@ fun HomeScreen(
         }
         rows.toList()
     }
+    // 网格展开成员格右上角的浅绿「组名」徽标：成员事件 id -> 所属事件组名
+    val memberBadgeNames = remember(minisForRows, memberSnapshot) {
+        val map = mutableMapOf<Long, String>()
+        minisForRows.forEach { mini ->
+            memberSnapshot[mini.id]?.forEach { map[it.id] = mini.name }
+        }
+        map
+    }
     val searchResults = remember(allEvents, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allEvents
@@ -736,11 +747,17 @@ fun HomeScreen(
                             events.forEach { if (it.id !in selectedEventIds) selectedEventIds.add(it.id) }
                             folders.forEach { if (it.id !in selectedFolderIds) selectedFolderIds.add(it.id) }
                         }) { Text(stringResource(R.string.common_select_all)) }
+                        // 合并：选中至少两个根层事件后出现。高频动作放顶栏（用户拍板），不收折叠菜单。
+                        if (selectedEventIds.size >= 2) {
+                            TextButton(onClick = { startMergeFromSelection() }) {
+                                Text(stringResource(R.string.merge_action))
+                            }
+                        }
                         TextButton(
                             onClick = { showDeleteConfirm = true },
                             enabled = totalSelected > 0
                         ) { Text(stringResource(R.string.home_move_to_trash)) }
-                        // 批量模式动作多，顶栏只留全选/删除两个高频按钮，其余收进 ⋮，避免小屏溢出。
+                        // 顶栏只留全选/合并/删除三个高频按钮，移入文件夹、移入 Vault 等次要动作收进 ⋮，避免小屏溢出。
                         Box {
                             IconButton(onClick = { overflowExpanded = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
@@ -749,12 +766,6 @@ fun HomeScreen(
                                 expanded = overflowExpanded,
                                 onDismissRequest = { overflowExpanded = false }
                             ) {
-                                if (selectedEventIds.size >= 2) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.merge_action)) },
-                                        onClick = { overflowExpanded = false; startMergeFromSelection() }
-                                    )
-                                }
                                 if (selectedEventIds.isNotEmpty()) {
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.home_move_into_folder)) },
@@ -1421,6 +1432,7 @@ fun HomeScreen(
                                 selectionMode = selectionMode,
                                 selected = event.id in selectedEventIds,
                                 indent = row.indent,
+                                connector = row.indent,
                                 onClick = {
                                     if (selectionMode) toggleEvent(event.id)
                                     else if (event.specialType == "cycle") onNavigate("cycle")
@@ -1549,7 +1561,9 @@ fun HomeScreen(
                                         )
                                     }
                                 },
-                                folderBadge = event.folderId?.let { folderNameById[it] }
+                                folderBadge = if (row.indent) memberBadgeNames[event.id]
+                                    else event.folderId?.let { folderNameById[it] },
+                                groupBadge = row.indent
                             )
                         }
                     }
@@ -1883,6 +1897,8 @@ fun EventRow(
     folderBadge: String? = null,
     noteHit: Boolean = false,
     indent: Boolean = false,
+    /** true = 事件组成员行：左缘画浅绿竖线（与事件组绿点对齐），串联成员体现包含关系 */
+    connector: Boolean = false,
     festivalRepo: FestivalRepository? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
@@ -1918,6 +1934,16 @@ fun EventRow(
             .fillMaxWidth()
             .then(dragModifier ?: Modifier)
             .then(clickModifier)
+            .then(
+                if (connector) Modifier.drawBehind {
+                    // 浅绿轨线：x=20dp 与事件组行绿点中心（16~26dp，圆心 21dp）对齐，纵向贯穿成员行
+                    drawRect(
+                        color = MINI_FOLDER_DOT.copy(alpha = 0.30f),
+                        topLeft = Offset(20.dp.toPx(), 0f),
+                        size = Size(2.dp.toPx(), size.height)
+                    )
+                } else Modifier
+            )
             .padding(
                 start = if (indent) 42.dp else 16.dp,
                 end = 16.dp,
@@ -2551,6 +2577,8 @@ fun EventGridItem(
     onMerge: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
     folderBadge: String? = null,
+    /** true = 徽标按事件组样式渲染（浅绿底 + 深绿字），用于展开的事件组成员格 */
+    groupBadge: Boolean = false,
     dragModifier: Modifier? = null
 ) {
     val days = CountdownCalculator.daysUntil(event.targetDateEpochDay)
@@ -2615,11 +2643,14 @@ fun EventGridItem(
                         Text(
                             text = folderBadge,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (groupBadge) MINI_FOLDER_DOT else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                                .background(
+                                    if (groupBadge) MINI_FOLDER_DOT.copy(alpha = 0.08f)
+                                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                                )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -2780,12 +2811,13 @@ private fun MiniFolderRow(
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onClick) {
-                Icon(
-                    if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = stringResource(R.string.common_expand)
-                )
-            }
+            // 24dp 小图标收尾（不用 IconButton）：行高与事件行完全一致，不鼓出一截
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(R.string.common_expand),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.size(24.dp)
+            )
         }
         // 展开面板：操作收进这里，收起时界面保持极简
         if (expanded) {
@@ -2799,7 +2831,12 @@ private fun MiniFolderRow(
     }
 }
 
-/** 小文件夹格子（网格）：深绿点 + 名字 + 展开箭头，无成员数、无常驻 ⋮。 */
+/**
+ * 事件组格子（网格）：与事件格同构——同圆角/边框宽度/padding/字级，
+ * 大图标模式：左上 10dp 绿点 + 右上小箭头 + 底部名字；小图标模式：
+ * 居中浅绿圆（内嵌箭头，与事件倒数圆同尺寸同透明度）+ 名字。
+ * 浅绿底 + 细绿边区分「组」与「事件」，格子尺寸与事件格完全一致。
+ */
 @Composable
 private fun MiniFolderGridItem(
     folder: FolderEntity,
@@ -2815,10 +2852,10 @@ private fun MiniFolderGridItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(if (isLarge) 14.dp else 12.dp))
-            .background(MINI_FOLDER_DOT.copy(alpha = 0.08f))
+            .background(MINI_FOLDER_DOT.copy(alpha = 0.06f))
             .border(
-                1.dp,
-                MINI_FOLDER_DOT.copy(alpha = 0.5f),
+                0.5.dp,
+                MINI_FOLDER_DOT.copy(alpha = 0.35f),
                 RoundedCornerShape(if (isLarge) 14.dp else 12.dp)
             )
             .combinedClickable(
@@ -2827,32 +2864,67 @@ private fun MiniFolderGridItem(
             )
             .padding(if (isLarge) 12.dp else 10.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(if (isLarge) 34.dp else 28.dp)
-                    .clip(CircleShape)
-                    .background(MINI_FOLDER_DOT),
-                contentAlignment = Alignment.Center
+        if (isLarge) {
+            // 大图标：结构照抄事件大格（左上圆点、右下留名），箭头放右上表达展开态
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = stringResource(R.string.common_expand),
-                    tint = Color.White
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(MINI_FOLDER_DOT)
+                    )
+                    Icon(
+                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.common_expand),
+                        tint = MINI_FOLDER_DOT.copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = folder.name,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MINI_FOLDER_DOT
-            )
+        } else {
+            // 小图标：居中圆改浅绿底 + 深绿箭头（与事件倒数圆同 34dp 尺寸、同 0.16 透明度），不再是实心绿按钮
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(MINI_FOLDER_DOT.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.common_expand),
+                        tint = MINI_FOLDER_DOT,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         DropdownMenu(
             modifier = Modifier.widthIn(min = 180.dp),
@@ -2875,9 +2947,9 @@ private fun MiniFolderGridItem(
     }
 }
 
-/** 合并命名弹窗：输入框留空用默认名。 */
+/** 合并命名弹窗：输入框留空用默认名。（主页与文件夹内页共用） */
 @Composable
-private fun MiniFolderMergeDialog(
+fun MiniFolderMergeDialog(
     count: Int,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit

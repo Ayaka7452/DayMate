@@ -49,6 +49,7 @@ import com.ayaka7452.daymate.Routes
 import com.ayaka7452.daymate.core.AppContainer
 import com.ayaka7452.daymate.data.db.EventEntity
 import com.ayaka7452.daymate.data.db.FolderEntity
+import com.ayaka7452.daymate.data.db.FolderKinds
 import com.ayaka7452.daymate.feature.common.FolderDialog
 import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import com.ayaka7452.daymate.feature.common.matchesQuery
@@ -57,6 +58,7 @@ import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.home.EventRow
+import com.ayaka7452.daymate.feature.home.MiniFolderMergeDialog
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import sh.calvin.reorderable.ReorderableItem
@@ -172,6 +174,31 @@ fun FolderScreen(
         selectionMode = false
     }
 
+    // ===== 事件组合并（用户拍板：组建在主页根层，成员事件移出本文件夹；扁平合并不嵌套）=====
+    var pendingMergeIds by remember { mutableStateOf(emptyList<Long>()) }
+    var showMergeDialog by remember { mutableStateOf(false) }
+
+    // 从当前多选态发起合并：本页事件都在同一文件夹，只认普通事件（排除周期等特殊类型）
+    fun startMergeFromSelection() {
+        val ids = events
+            .filter { it.id in selectedEventIds && it.specialType == null }
+            .map { it.id }
+        if (ids.size < 2) {
+            Toast.makeText(context, context.getString(R.string.merge_need_two), Toast.LENGTH_SHORT).show()
+            return
+        }
+        pendingMergeIds = ids
+        showMergeDialog = true
+    }
+
+    // 从单事件「更多→合并」发起：预选该事件进入多选态，提示继续勾选
+    fun startMergeFromEvent(eventId: Long) {
+        selectedEventIds.clear()
+        selectedEventIds.add(eventId)
+        selectionMode = true
+        Toast.makeText(context, context.getString(R.string.merge_pick_hint), Toast.LENGTH_SHORT).show()
+    }
+
     Scaffold(
         topBar = {
             if (selectionMode) {
@@ -186,17 +213,41 @@ fun FolderScreen(
                         TextButton(onClick = {
                             events.forEach { if (it.id !in selectedEventIds) selectedEventIds.add(it.id) }
                         }) { Text(Tr.s(R.string.common_select_all)) }
-                        if (selectedEventIds.isNotEmpty()) {
-                            TextButton(onClick = { showMoveDialog = true }) { Text(Tr.s(R.string.folder_move_in)) }
+                        // 合并：与主页批量顶栏同构（高频动作放顶栏），选中至少两个可合并事件后出现
+                        if (selectedEventIds.size >= 2) {
+                            TextButton(onClick = { startMergeFromSelection() }) {
+                                Text(Tr.s(R.string.merge_action))
+                            }
                         }
-                        TextButton(
-                            onClick = { if (vaultSet) vaultConfirmBatch = true else vaultNeedSetup = true },
-                            enabled = selectedEventIds.isNotEmpty()
-                        ) { Text(Tr.s(R.string.folder_move_vault)) }
                         TextButton(
                             onClick = { showDeleteConfirm = true },
                             enabled = totalSelected > 0
                         ) { Text(Tr.s(R.string.folder_move_bin)) }
+                        // 移入文件夹、移入 Vault 收进 ⋮，避免小屏溢出
+                        var overflowExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { overflowExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = Tr.s(R.string.common_more))
+                            }
+                            DropdownMenu(
+                                expanded = overflowExpanded,
+                                onDismissRequest = { overflowExpanded = false }
+                            ) {
+                                if (selectedEventIds.isNotEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text(Tr.s(R.string.folder_move_in)) },
+                                        onClick = { overflowExpanded = false; showMoveDialog = true }
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(Tr.s(R.string.folder_move_vault)) },
+                                    onClick = {
+                                        overflowExpanded = false
+                                        if (vaultSet) vaultConfirmBatch = true else vaultNeedSetup = true
+                                    }
+                                )
+                            }
+                        }
                     }
                 )
             } else {
@@ -329,6 +380,10 @@ fun FolderScreen(
                                 }
                             },
                             onMoveToFolder = { singleMoveEventId = event.id },
+                            // 合并：普通事件可发起（预选后继续勾选），周期等特殊类型不参与
+                            onMerge = if (event.specialType == null) {
+                                { startMergeFromEvent(event.id) }
+                            } else null,
                             onMoveToRecycleBin = {
                                 scope.launch {
                                     container.eventRepository.softDeleteByIds(
@@ -515,6 +570,34 @@ fun FolderScreen(
             },
             dismissButton = {
                 TextButton(onClick = { vaultConfirmBatch = false }) { Text(Tr.s(R.string.common_cancel)) }
+            }
+        )
+    }
+
+    // 合并命名弹窗：与主页共用。组建成 kind=MINI 的根层事件组，成员事件移出本文件夹
+    if (showMergeDialog && pendingMergeIds.isNotEmpty()) {
+        MiniFolderMergeDialog(
+            count = pendingMergeIds.size,
+            onDismiss = { showMergeDialog = false; pendingMergeIds = emptyList() },
+            onConfirm = { name ->
+                val finalName = name.trim().ifBlank { Tr.s(R.string.mini_folder_default_name) }
+                val ids = pendingMergeIds
+                val minSort = events
+                    .filter { it.id in ids }
+                    .minOfOrNull { it.sortIndex } ?: 0
+                scope.launch {
+                    val newId = container.folderRepository.add(
+                        FolderEntity(
+                            name = finalName,
+                            kind = FolderKinds.MINI,
+                            sortIndex = minSort
+                        )
+                    )
+                    container.eventRepository.moveToFolder(ids, newId)
+                }
+                showMergeDialog = false
+                pendingMergeIds = emptyList()
+                exitSelection()
             }
         )
     }
