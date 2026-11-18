@@ -56,6 +56,7 @@ import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
+import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import com.ayaka7452.daymate.feature.home.EventRow
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
@@ -158,12 +159,20 @@ fun FolderScreen(
         }
     }
 
-    fun requireManualToast() {
-        Toast.makeText(
-            context,
-            Tr.s(R.string.folder_sort_hint),
-            Toast.LENGTH_SHORT
-        ).show()
+    fun moveEvent(event: EventEntity, action: String) {
+        if (!manualSort) {
+            Toast.makeText(
+                context,
+                Tr.s(R.string.folder_sort_hint),
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val index = eventList.indexOfFirst { it.id == event.id }
+        if (index >= 0) {
+            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
+            persistEventOrder()
+        }
     }
 
     fun toggleEvent(id: Long) {
@@ -309,8 +318,8 @@ fun FolderScreen(
             ) {
                 items(shownEvents, key = { "e${it.id}" }) { event ->
                     ReorderableItem(reorderableState, key = "e${event.id}") {
-                        val dragModifier = if (manualSort && !selectionMode) {
-                            Modifier.longPressDraggableHandle(
+                        val handle = if (selectionMode && manualSort) {
+                            Modifier.draggableHandle(
                                 onDragStarted = { isDragging = true },
                                 onDragStopped = {
                                     isDragging = false
@@ -344,11 +353,10 @@ fun FolderScreen(
                                     )
                                 }
                             },
-                            dragModifier = dragModifier,
-                            // 非手动排序时长按给 Toast 引导（整行拖拽被禁用，无手势冲突）
-                            onBlockedLongPress = if (!manualSort && !selectionMode) {
-                                { requireManualToast() }
-                            } else null
+                            // 非手动排序时重排项无意义（moveEvent 内部也会直接返回），不展示菜单入口，
+                            // 与 VaultScreen / HomeScreen 的 onReorder = if (manualSort) ... else null 对齐
+                            onReorder = if (manualSort) ({ action -> moveEvent(event, action) }) else null,
+                            dragHandle = handle
                         )
                     }
                     Box(
