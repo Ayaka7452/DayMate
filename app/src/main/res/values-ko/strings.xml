@@ -903,4 +903,12 @@
     <string name="cycle_tip_ovulation_body">배란기에 성관계가 기록되었습니다. 효과적인 피임을 하지 않았다면 임신 위험이 높습니다. 몸 상태에 유의해 주세요.</string>
     <string name="settings_calendar_long_press">길게 눌러 «＋» 열기</string>
     <string name="settings_calendar_long_press_desc">홈 화면의 추가 버튼을 길게 누르면 펼쳐지는 패널에 캘린더 노트 항목을 표시합니다.</string>
+    <string name="merge_action">병합</string>
+    <string name="merge_need_two">병합하려면 이벤트를 두 개 이상 선택하세요.</string>
+    <string name="merge_pick_hint">다른 이벤트를 하나 더 선택한 다음 상단의 \"병합\"을 누르세요.</string>
+    <string name="merge_selected_hint">이벤트 %1$d개를 미니 폴더로 병합합니다.</string>
+    <string name="mini_folder_merge_title">미니 폴더로 병합</string>
+    <string name="mini_folder_merge_placeholder">미니 폴더 이름을 입력하세요</string>
+    <string name="mini_folder_default_name">미니 폴더</string>
+    <string name="mini_folder_dissolve">미니 폴더 해체</string>
 </resources>

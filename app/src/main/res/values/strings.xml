@@ -903,4 +903,12 @@
     <string name="cycle_tip_ovulation_body">You had sexual activity during your ovulation window. If effective contraception was not used, the risk of pregnancy is higher. Please stay alert to how your body feels.</string>
     <string name="settings_calendar_long_press">Long-press \"+\" entry</string>
     <string name="settings_calendar_long_press_desc">When long-pressing the add button on the home screen, show the calendar notes entry in the panel.</string>
+    <string name="merge_action">Merge</string>
+    <string name="merge_need_two">Select at least two events to merge.</string>
+    <string name="merge_pick_hint">Now select another event, then tap \"Merge\" at the top.</string>
+    <string name="merge_selected_hint">Merge %1$d events into a mini folder</string>
+    <string name="mini_folder_merge_title">Merge into mini folder</string>
+    <string name="mini_folder_merge_placeholder">Name this mini folder</string>
+    <string name="mini_folder_default_name">Mini folder</string>
+    <string name="mini_folder_dissolve">Dissolve mini folder</string>
 </resources>

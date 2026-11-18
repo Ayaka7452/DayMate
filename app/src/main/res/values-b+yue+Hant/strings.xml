@@ -903,4 +903,12 @@
     <string name="cycle_tip_ovulation_body">您喺排卵期進行了性行為，如果排卵期冇採取有效避孕措施，懷孕風險會比較大，請隨時留意身體情況。</string>
     <string name="settings_calendar_long_press">長按加號入口</string>
     <string name="settings_calendar_long_press_desc">長按主頁加號時，喺展開面板度顯示「日曆記事」入口。</string>
+    <string name="merge_action">合併</string>
+    <string name="merge_need_two">至少要揀兩個事件先可以合併。</string>
+    <string name="merge_pick_hint">再揀另一個事件，然後撳頂部嘅「合併」。</string>
+    <string name="merge_selected_hint">將 %1$d 個事件合併成小資料夾</string>
+    <string name="mini_folder_merge_title">合併成小資料夾</string>
+    <string name="mini_folder_merge_placeholder">幫呢個小資料夾改個名</string>
+    <string name="mini_folder_default_name">小資料夾</string>
+    <string name="mini_folder_dissolve">解散小資料夾</string>
 </resources>

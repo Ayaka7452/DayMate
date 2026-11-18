@@ -903,4 +903,12 @@
     <string name="cycle_tip_ovulation_body">排卵日に性生活の記録があります。有効な避妊をしていない場合、妊娠のリスクが高まります。体調の変化にご注意ください。</string>
     <string name="settings_calendar_long_press">長押しで「＋」を展開</string>
     <string name="settings_calendar_long_press_desc">ホーム画面の追加ボタンを長押ししたとき、展開パネルにカレンダーノートの項目を表示します。</string>
+    <string name="merge_action">結合</string>
+    <string name="merge_need_two">結合するには2つ以上のイベントを選択してください。</string>
+    <string name="merge_pick_hint">もう1つイベントを選んで、上部の「結合」をタップしてください。</string>
+    <string name="merge_selected_hint">%1$d件のイベントをミニフォルダに結合します</string>
+    <string name="mini_folder_merge_title">ミニフォルダに結合</string>
+    <string name="mini_folder_merge_placeholder">ミニフォルダに名前を付ける</string>
+    <string name="mini_folder_default_name">ミニフォルダ</string>
+    <string name="mini_folder_dissolve">ミニフォルダを解散</string>
 </resources>

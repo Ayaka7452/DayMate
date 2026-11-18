@@ -318,8 +318,9 @@ fun FolderScreen(
             ) {
                 items(shownEvents, key = { "e${it.id}" }) { event ->
                     ReorderableItem(reorderableState, key = "e${event.id}") {
-                        val handle = if (selectionMode && manualSort) {
-                            Modifier.draggableHandle(
+                        val canDrag = manualSort && !selectionMode
+                        val dragModifier = if (canDrag) {
+                            Modifier.longPressDraggableHandle(
                                 onDragStarted = { isDragging = true },
                                 onDragStopped = {
                                     isDragging = false
@@ -356,7 +357,10 @@ fun FolderScreen(
                             // 非手动排序时重排项无意义（moveEvent 内部也会直接返回），不展示菜单入口，
                             // 与 VaultScreen / HomeScreen 的 onReorder = if (manualSort) ... else null 对齐
                             onReorder = if (manualSort) ({ action -> moveEvent(event, action) }) else null,
-                            dragHandle = handle
+                            dragModifier = dragModifier,
+                            onBlockedLongPress = if (!canDrag && !selectionMode && event.specialType == null) {
+                                { Toast.makeText(context, context.getString(R.string.home_manual_sort_toast), Toast.LENGTH_SHORT).show() }
+                            } else null
                         )
                     }
                     Box(
