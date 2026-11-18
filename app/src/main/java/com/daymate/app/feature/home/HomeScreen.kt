@@ -1517,6 +1517,7 @@ fun HomeScreen(
                                 folder = mini,
                                 expanded = mini.id in expandedMiniIds,
                                 isLarge = isLarge,
+                                itemCount = memberSnapshot[mini.id]?.size ?: 0,
                                 onClick = {
                                     if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
                                     else expandedMiniIds.add(mini.id)
@@ -1929,6 +1930,8 @@ fun EventRow(
         Modifier.clickable(onClick = onClick)
     }
 
+    // 事件组成员行轨线颜色跟随主题色（与事件组点同源）；drawBehind 不能读组合态，先在组合期取好
+    val connectorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1936,9 +1939,9 @@ fun EventRow(
             .then(clickModifier)
             .then(
                 if (connector) Modifier.drawBehind {
-                    // 浅绿轨线：x=20dp 与事件组行绿点中心（16~26dp，圆心 21dp）对齐，纵向贯穿成员行
+                    // 主题色轨线：x=20dp 与事件组行点中心（16~26dp，圆心 21dp）对齐，纵向贯穿成员行
                     drawRect(
-                        color = MINI_FOLDER_DOT.copy(alpha = 0.30f),
+                        color = connectorColor,
                         topLeft = Offset(20.dp.toPx(), 0f),
                         size = Size(2.dp.toPx(), size.height)
                     )
@@ -2643,12 +2646,12 @@ fun EventGridItem(
                         Text(
                             text = folderBadge,
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (groupBadge) MINI_FOLDER_DOT else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (groupBadge) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(
-                                    if (groupBadge) MINI_FOLDER_DOT.copy(alpha = 0.08f)
+                                    if (groupBadge) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                                     else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -2775,7 +2778,7 @@ private fun rowKeyOf(row: HomeRow): String =
 private fun rootKeyOf(entry: HomeRootEntry): String =
     entry.mini?.let { "m${it.id}" } ?: "e${entry.event!!.id}"
 
-private val MINI_FOLDER_DOT = Color(0xFF1B5E20)
+// 事件组配色自 v1.26.8 起跟随主题色（colorScheme.primary），不再用固定深绿常量
 
 /**
  * 小文件夹行（列表）：深绿点 + 名字 + 展开箭头，极简。
@@ -2803,7 +2806,7 @@ private fun MiniFolderRow(
                 modifier = Modifier
                     .size(10.dp)
                     .clip(CircleShape)
-                    .background(MINI_FOLDER_DOT)
+                    .background(MaterialTheme.colorScheme.primary)
             )
             Spacer(Modifier.width(10.dp))
             Text(
@@ -2842,20 +2845,23 @@ private fun MiniFolderGridItem(
     folder: FolderEntity,
     expanded: Boolean,
     isLarge: Boolean,
+    itemCount: Int = 0,
     onClick: () -> Unit = {},
     onRename: () -> Unit = {},
     onDissolve: () -> Unit = {},
     onMoveToRecycleBin: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    // 事件组配色跟随主题（用户拍板）：主视觉全部取 colorScheme.primary，默认主题即主题色设计
+    val groupColor = MaterialTheme.colorScheme.primary
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(if (isLarge) 14.dp else 12.dp))
-            .background(MINI_FOLDER_DOT.copy(alpha = 0.06f))
+            .background(groupColor.copy(alpha = 0.06f))
             .border(
                 0.5.dp,
-                MINI_FOLDER_DOT.copy(alpha = 0.35f),
+                groupColor.copy(alpha = 0.35f),
                 RoundedCornerShape(if (isLarge) 14.dp else 12.dp)
             )
             .combinedClickable(
@@ -2865,7 +2871,8 @@ private fun MiniFolderGridItem(
             .padding(if (isLarge) 12.dp else 10.dp)
     ) {
         if (isLarge) {
-            // 大图标：结构照抄事件大格（左上圆点、右下留名），箭头放右上表达展开态
+            // 大图标：行结构与事件大格同构（顶行 / titleMedium / 名字），格子等高；
+            // 中间行放成员数（复用 settings_unit_items「N 条」），替代事件的倒数大字位置
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.SpaceBetween
@@ -2879,16 +2886,26 @@ private fun MiniFolderGridItem(
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(MINI_FOLDER_DOT)
+                            .background(groupColor)
                     )
                     Icon(
                         if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = stringResource(R.string.common_expand),
-                        tint = MINI_FOLDER_DOT.copy(alpha = 0.7f),
+                        tint = groupColor.copy(alpha = 0.7f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
                 Spacer(Modifier.height(8.dp))
+                if (itemCount > 0) {
+                    Text(
+                        text = stringResource(R.string.settings_unit_items, itemCount),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = groupColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = folder.name,
                     style = MaterialTheme.typography.bodyMedium,
@@ -2897,7 +2914,7 @@ private fun MiniFolderGridItem(
                 )
             }
         } else {
-            // 小图标：居中圆改浅绿底 + 深绿箭头（与事件倒数圆同 34dp 尺寸、同 0.16 透明度），不再是实心绿按钮
+            // 小图标：居中圆 + 名字 + 成员数小字，三行结构与事件小格（圆/名字/倒数）同构等高
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -2907,13 +2924,13 @@ private fun MiniFolderGridItem(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(MINI_FOLDER_DOT.copy(alpha = 0.16f)),
+                        .background(groupColor.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = stringResource(R.string.common_expand),
-                        tint = MINI_FOLDER_DOT,
+                        tint = groupColor,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -2924,6 +2941,16 @@ private fun MiniFolderGridItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (itemCount > 0) {
+                    Text(
+                        text = stringResource(R.string.settings_unit_items, itemCount),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1
+                    )
+                } else {
+                    Spacer(Modifier.height(14.dp))
+                }
             }
         }
         DropdownMenu(
