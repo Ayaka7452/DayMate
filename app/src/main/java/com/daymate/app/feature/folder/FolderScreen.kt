@@ -56,7 +56,6 @@ import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
-import com.ayaka7452.daymate.feature.common.targetIndexForAction
 import com.ayaka7452.daymate.feature.home.EventRow
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
@@ -156,22 +155,6 @@ fun FolderScreen(
             eventList.forEachIndexed { index, e ->
                 container.eventRepository.update(e.copy(sortIndex = index))
             }
-        }
-    }
-
-    fun moveEvent(event: EventEntity, action: String) {
-        if (!manualSort) {
-            Toast.makeText(
-                context,
-                Tr.s(R.string.folder_sort_hint),
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-        val index = eventList.indexOfFirst { it.id == event.id }
-        if (index >= 0) {
-            eventList.moveItem(index, targetIndexForAction(index, eventList.size, action))
-            persistEventOrder()
         }
     }
 
@@ -354,9 +337,6 @@ fun FolderScreen(
                                     )
                                 }
                             },
-                            // 非手动排序时重排项无意义（moveEvent 内部也会直接返回），不展示菜单入口，
-                            // 与 VaultScreen / HomeScreen 的 onReorder = if (manualSort) ... else null 对齐
-                            onReorder = if (manualSort) ({ action -> moveEvent(event, action) }) else null,
                             dragModifier = dragModifier,
                             onBlockedLongPress = if (!canDrag && !selectionMode && event.specialType == null) {
                                 { Toast.makeText(context, context.getString(R.string.home_manual_sort_toast), Toast.LENGTH_SHORT).show() }

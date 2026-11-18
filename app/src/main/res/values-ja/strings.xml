@@ -597,7 +597,6 @@
     <string name="bin_purge_title">完全に削除しますか？</string>
     <string name="bin_purge_desc">この%1$sを完全に削除します。元に戻せません。</string>
     <string name="bin_purge">完全に削除</string>
-    <string name="folder_sort_hint">先に設定で手動並べ替えに切り替えてください。</string>
     <string name="folder_selected_n">%1$d 件選択中</string>
     <string name="folder_move_in">フォルダへ移動</string>
     <string name="folder_move_vault">Vault へ移動</string>
@@ -906,9 +905,9 @@
     <string name="merge_action">結合</string>
     <string name="merge_need_two">結合するには2つ以上のイベントを選択してください。</string>
     <string name="merge_pick_hint">もう1つイベントを選んで、上部の「結合」をタップしてください。</string>
-    <string name="merge_selected_hint">%1$d件のイベントをミニフォルダに結合します</string>
-    <string name="mini_folder_merge_title">ミニフォルダに結合</string>
-    <string name="mini_folder_merge_placeholder">ミニフォルダに名前を付ける</string>
-    <string name="mini_folder_default_name">ミニフォルダ</string>
-    <string name="mini_folder_dissolve">ミニフォルダを解散</string>
+    <string name="merge_selected_hint">%1$d件のイベントをイベントグループに結合します</string>
+    <string name="mini_folder_merge_title">イベントグループに結合</string>
+    <string name="mini_folder_merge_placeholder">イベントグループに名前を付ける</string>
+    <string name="mini_folder_default_name">イベントグループ</string>
+    <string name="mini_folder_dissolve">イベントグループを解散</string>
 </resources>

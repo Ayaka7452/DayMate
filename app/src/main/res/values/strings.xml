@@ -597,7 +597,6 @@
     <string name="bin_purge_title">Delete permanently?</string>
     <string name="bin_purge_desc">This %1$s will be permanently deleted. This cannot be undone.</string>
     <string name="bin_purge">Delete forever</string>
-    <string name="folder_sort_hint">Switch to manual sorting in Settings first.</string>
     <string name="folder_selected_n">%1$d selected</string>
     <string name="folder_move_in">Move to folder</string>
     <string name="folder_move_vault">Move to Vault</string>
@@ -906,9 +905,9 @@
     <string name="merge_action">Merge</string>
     <string name="merge_need_two">Select at least two events to merge.</string>
     <string name="merge_pick_hint">Now select another event, then tap \"Merge\" at the top.</string>
-    <string name="merge_selected_hint">Merge %1$d events into a mini folder</string>
-    <string name="mini_folder_merge_title">Merge into mini folder</string>
-    <string name="mini_folder_merge_placeholder">Name this mini folder</string>
-    <string name="mini_folder_default_name">Mini folder</string>
-    <string name="mini_folder_dissolve">Dissolve mini folder</string>
+    <string name="merge_selected_hint">Merge %1$d events into an event group</string>
+    <string name="mini_folder_merge_title">Merge into event group</string>
+    <string name="mini_folder_merge_placeholder">Name this event group</string>
+    <string name="mini_folder_default_name">Event group</string>
+    <string name="mini_folder_dissolve">Dissolve event group</string>
 </resources>

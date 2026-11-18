@@ -720,6 +720,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             if (selectionMode) {
+                var overflowExpanded by remember { mutableStateOf(false) }
                 TopAppBar(
                     title = { Text(stringResource(R.string.home_selected_n, totalSelected)) },
                     navigationIcon = {
@@ -735,27 +736,43 @@ fun HomeScreen(
                             events.forEach { if (it.id !in selectedEventIds) selectedEventIds.add(it.id) }
                             folders.forEach { if (it.id !in selectedFolderIds) selectedFolderIds.add(it.id) }
                         }) { Text(stringResource(R.string.common_select_all)) }
-                        if (selectedEventIds.isNotEmpty()) {
-                            TextButton(onClick = { showMoveDialog = true }) { Text(stringResource(R.string.home_move_into_folder)) }
-                        }
-                        // 合并：选中至少两个根层事件后出现。与拖拽彻底分离，走多选菜单，零手势冲突。
-                        if (selectedEventIds.size >= 2) {
-                            TextButton(onClick = { startMergeFromSelection() }) {
-                                Text(stringResource(R.string.merge_action))
-                            }
-                        }
-                        TextButton(
-                            onClick = {
-                                if (!vaultSet) vaultNeedSetup = true
-                                else if (!vaultReady) toastVaultLocked()
-                                else vaultConfirmBatch = true
-                            },
-                            enabled = totalSelected > 0
-                        ) { Text(stringResource(R.string.home_move_to_vault)) }
                         TextButton(
                             onClick = { showDeleteConfirm = true },
                             enabled = totalSelected > 0
                         ) { Text(stringResource(R.string.home_move_to_trash)) }
+                        // 批量模式动作多，顶栏只留全选/删除两个高频按钮，其余收进 ⋮，避免小屏溢出。
+                        Box {
+                            IconButton(onClick = { overflowExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
+                            }
+                            DropdownMenu(
+                                expanded = overflowExpanded,
+                                onDismissRequest = { overflowExpanded = false }
+                            ) {
+                                if (selectedEventIds.size >= 2) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.merge_action)) },
+                                        onClick = { overflowExpanded = false; startMergeFromSelection() }
+                                    )
+                                }
+                                if (selectedEventIds.isNotEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.home_move_into_folder)) },
+                                        onClick = { overflowExpanded = false; showMoveDialog = true }
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.home_move_to_vault)) },
+                                    enabled = totalSelected > 0,
+                                    onClick = {
+                                        overflowExpanded = false
+                                        if (!vaultSet) vaultNeedSetup = true
+                                        else if (!vaultReady) toastVaultLocked()
+                                        else vaultConfirmBatch = true
+                                    }
+                                )
+                            }
+                        }
                     }
                 )
             } else if (searchActive) {
@@ -1320,8 +1337,9 @@ fun HomeScreen(
                 ) {
                 items(folderList, key = { "f${it.id}" }) { folder ->
                     ReorderableItem(reorderableState, key = "f${folder.id}") {
-                        val handle = if (manualSort && !selectionMode) {
-                            Modifier.draggableHandle(
+                        val canDrag = manualSort && !selectionMode
+                        val dragModifier = if (canDrag) {
+                            Modifier.longPressDraggableHandle(
                                 onDragStarted = { isDragging = true },
                                 onDragStopped = {
                                     isDragging = false
@@ -1337,18 +1355,19 @@ fun HomeScreen(
                                 if (selectionMode) toggleFolder(folder.id)
                                 else onNavigate("folder/${folder.id}")
                             },
-                            onLongClick = {
-                                if (!selectionMode) {
-                                    folderDialogTarget = folder
-                                    showFolderDialog = true
-                                }
+                            onRename = {
+                                folderDialogTarget = folder
+                                showFolderDialog = true
                             },
                             onMoveToRecycleBin = {
                                 folderToDelete = folder
                                 showFolderDeleteConfirm = true
                             },
                             onReorder = { action -> moveFolder(folder, action) },
-                            dragHandle = handle
+                            dragModifier = dragModifier,
+                            onBlockedLongPress = if (!canDrag && !selectionMode) {
+                                { Toast.makeText(context, context.getString(R.string.home_manual_sort_toast), Toast.LENGTH_SHORT).show() }
+                            } else null
                         )
                     }
                     ListItemDivider()
@@ -2020,19 +2039,27 @@ fun FolderRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
+    onRename: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
     onReorder: ((String) -> Unit)? = null,
-    dragHandle: Modifier? = null
+    dragModifier: Modifier? = null,
+    onBlockedLongPress: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    // 与 EventRow 同一套手势：可拖拽时长按交给库 handle（只挂 clickable）；
+    // 非手动排序时长按弹「切手动」提示；搜索等无拖拽场景保留长按重命名。
+    val clickModifier = when {
+        dragModifier != null -> Modifier.clickable(onClick = onClick)
+        onBlockedLongPress != null -> Modifier.combinedClickable(onClick = onClick, onLongClick = { onBlockedLongPress() })
+        onLongClick != null -> Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        else -> Modifier.clickable(onClick = onClick)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = if (selectionMode) null else onLongClick
-            )
+            .then(dragModifier ?: Modifier)
+            .then(clickModifier)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -2050,15 +2077,6 @@ fun FolderRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )
-        if (dragHandle != null) {
-            IconButton(modifier = dragHandle, onClick = {}) {
-                Text(
-                    "⠿",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-        }
         if (!selectionMode) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -2069,6 +2087,15 @@ fun FolderRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
+                    if (onRename != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.common_rename)) },
+                            onClick = {
+                                menuExpanded = false
+                                onRename()
+                            }
+                        )
+                    }
                     if (onReorder != null) {
                         ReorderMenuItems(onReorder) { menuExpanded = false }
                     }

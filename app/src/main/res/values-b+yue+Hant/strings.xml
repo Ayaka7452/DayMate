@@ -597,7 +597,6 @@
     <string name="bin_purge_title">徹底刪除？</string>
     <string name="bin_purge_desc">會永久刪除呢個%1$s，冇得復原。</string>
     <string name="bin_purge">徹底刪除</string>
-    <string name="folder_sort_hint">要先去設定度轉做手動排序。</string>
     <string name="folder_selected_n">揀咗 %1$d 項</string>
     <string name="folder_move_in">搬入資料夾</string>
     <string name="folder_move_vault">搬入 Vault</string>
@@ -906,9 +905,9 @@
     <string name="merge_action">合併</string>
     <string name="merge_need_two">至少要揀兩個事件先可以合併。</string>
     <string name="merge_pick_hint">再揀另一個事件，然後撳頂部嘅「合併」。</string>
-    <string name="merge_selected_hint">將 %1$d 個事件合併成小資料夾</string>
-    <string name="mini_folder_merge_title">合併成小資料夾</string>
-    <string name="mini_folder_merge_placeholder">幫呢個小資料夾改個名</string>
-    <string name="mini_folder_default_name">小資料夾</string>
-    <string name="mini_folder_dissolve">解散小資料夾</string>
+    <string name="merge_selected_hint">將 %1$d 個事件合併成事件組</string>
+    <string name="mini_folder_merge_title">合併成事件組</string>
+    <string name="mini_folder_merge_placeholder">幫呢個事件組改個名</string>
+    <string name="mini_folder_default_name">事件組</string>
+    <string name="mini_folder_dissolve">解散事件組</string>
 </resources>

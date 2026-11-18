@@ -597,7 +597,6 @@
     <string name="bin_purge_title">완전히 삭제할까요?</string>
     <string name="bin_purge_desc">이 %1$s을(를) 영구 삭제합니다. 되돌릴 수 없습니다.</string>
     <string name="bin_purge">영구 삭제</string>
-    <string name="folder_sort_hint">먼저 설정에서 수동 정렬로 전환하세요.</string>
     <string name="folder_selected_n">%1$d개 선택됨</string>
     <string name="folder_move_in">폴더로 이동</string>
     <string name="folder_move_vault">Vault로 이동</string>
@@ -906,9 +905,9 @@
     <string name="merge_action">병합</string>
     <string name="merge_need_two">병합하려면 이벤트를 두 개 이상 선택하세요.</string>
     <string name="merge_pick_hint">다른 이벤트를 하나 더 선택한 다음 상단의 \"병합\"을 누르세요.</string>
-    <string name="merge_selected_hint">이벤트 %1$d개를 미니 폴더로 병합합니다.</string>
-    <string name="mini_folder_merge_title">미니 폴더로 병합</string>
-    <string name="mini_folder_merge_placeholder">미니 폴더 이름을 입력하세요</string>
-    <string name="mini_folder_default_name">미니 폴더</string>
-    <string name="mini_folder_dissolve">미니 폴더 해체</string>
+    <string name="merge_selected_hint">이벤트 %1$d개를 이벤트 그룹으로 병합합니다.</string>
+    <string name="mini_folder_merge_title">이벤트 그룹으로 병합</string>
+    <string name="mini_folder_merge_placeholder">이벤트 그룹 이름을 입력하세요</string>
+    <string name="mini_folder_default_name">이벤트 그룹</string>
+    <string name="mini_folder_dissolve">이벤트 그룹 해체</string>
 </resources>
