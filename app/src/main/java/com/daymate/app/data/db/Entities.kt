@@ -28,6 +28,11 @@ data class FolderEntity(
     val isPinned: Boolean = false,
     /** 文件夹类型，见 [FolderKinds]。历史数据经迁移统一置为 normal。 */
     val kind: String = FolderKinds.NORMAL,
+    /**
+     * 归属父文件夹 id：仅事件组（kind=mini）可能非空，表示该组存放在哪个文件夹里。
+     * 根层事件组与普通文件夹恒为 null（文件夹不嵌套）。
+     */
+    val parentId: Long? = null,
     val isDeleted: Boolean = false,
     val deletedAt: Long = 0,
     val createdAt: Long = System.currentTimeMillis()

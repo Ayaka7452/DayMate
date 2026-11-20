@@ -409,10 +409,11 @@ fun HomeScreen(
     val eventList = remember {
         mutableStateListOf<EventEntity>().apply { addAll(events) }
     }
-    // 根层混排：事件与小文件夹按 sortIndex 归并（同值 mini 在前，合并创建时落在目标事件上方）
+    // 根层混排：事件与根层事件组按 sortIndex 归并（同值 mini 在前，合并创建时落在目标事件上方）
+    // 存放在文件夹里的事件组（parentId != null）只在对应文件夹内页显示，不进主页根层。
     val mergedList = remember {
         mutableStateListOf<HomeRootEntry>().apply {
-            val minis = folders.filter { it.kind == FolderKinds.MINI }.sortedBy { it.sortIndex }
+            val minis = folders.filter { it.kind == FolderKinds.MINI && it.parentId == null }.sortedBy { it.sortIndex }
             var mi = 0
             for (e in events) {
                 while (mi < minis.size && minis[mi].sortIndex <= e.sortIndex) {
@@ -447,10 +448,10 @@ fun HomeScreen(
         }
     }
 
-    // 根层混排同步（Flow 更新且非拖拽中）：事件与小文件夹按 sortIndex 归并
+    // 根层混排同步（Flow 更新且非拖拽中）：事件与根层事件组按 sortIndex 归并
     LaunchedEffect(folders, events) {
         if (isDragging) return@LaunchedEffect
-        val minis = folders.filter { it.kind == FolderKinds.MINI }.sortedBy { it.sortIndex }
+        val minis = folders.filter { it.kind == FolderKinds.MINI && it.parentId == null }.sortedBy { it.sortIndex }
         mergedList.clear()
         var mi = 0
         for (e in events) {
@@ -491,7 +492,7 @@ fun HomeScreen(
     // 列表/网格共用的行序列：mini 混排在事件里，展开的 mini 随后内联缩进成员行。
     // 自动排序下事件按剩余天数排、mini 追加其后（自动模式无拖拽，顺序只影响展开入口位置）。
     val mergedSnapshot = mergedList.toList()
-    val minisForRows = remember(folders) { folders.filter { it.kind == FolderKinds.MINI } }
+    val minisForRows = remember(folders) { folders.filter { it.kind == FolderKinds.MINI && it.parentId == null } }
     val memberSnapshot = memberLists.toMap()
     val expandedSnapshot = expandedMiniIds.toList()
     val displayRows = remember(mergedSnapshot, minisForRows, memberSnapshot, expandedSnapshot, defaultSort) {
@@ -1397,6 +1398,7 @@ fun HomeScreen(
                             MiniFolderRow(
                                 folder = mini,
                                 expanded = mini.id in expandedMiniIds,
+                                itemCount = memberSnapshot[mini.id]?.size ?: 0,
                                 dragModifier = handle,
                                 onClick = {
                                     if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
@@ -1808,9 +1810,15 @@ fun HomeScreen(
                 TextButton(onClick = {
                     val fid = folderToDelete!!.id
                     scope.launch {
-                        container.eventRepository.unparentByFolders(listOf(fid))
+                        // v1.26.9：删除文件夹连带解散其下事件组（parentId 指向它），
+                        // 成员事件（folderId 指向子组）与直属事件一并解归属回根层，防悬空引用。
+                        // 删的若是事件组本身，childMinis 为空，行为与旧版一致。
+                        val childMinis = folders
+                            .filter { it.kind == FolderKinds.MINI && it.parentId == fid }
+                            .map { it.id }
+                        container.eventRepository.unparentByFolders(listOf(fid) + childMinis)
                         container.folderRepository.softDeleteByIds(
-                            listOf(fid),
+                            listOf(fid) + childMinis,
                             System.currentTimeMillis()
                         )
                     }
@@ -2782,12 +2790,14 @@ private fun rootKeyOf(entry: HomeRootEntry): String =
 
 /**
  * 小文件夹行（列表）：深绿点 + 名字 + 展开箭头，极简。
- * 重命名/解散/移回收站收进点击展开后的面板，不常驻 ⋮、不显示成员数。
+ * 重命名/解散/移回收站收进点击展开后的面板，不常驻 ⋮；
+ * 成员数（v1.26.9）放名字右侧、展开箭头左边，不占独立行。
  */
 @Composable
-private fun MiniFolderRow(
+fun MiniFolderRow(
     folder: FolderEntity,
     expanded: Boolean,
+    itemCount: Int = 0,
     dragModifier: Modifier? = null,
     onClick: () -> Unit = {},
     onRename: () -> Unit = {},
@@ -2814,6 +2824,15 @@ private fun MiniFolderRow(
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
             )
+            // 成员数：放展开箭头左边（用户指定），小字不抢名字
+            if (itemCount > 0) {
+                Text(
+                    text = stringResource(R.string.settings_unit_items, itemCount),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+                Spacer(Modifier.width(8.dp))
+            }
             // 24dp 小图标收尾（不用 IconButton）：行高与事件行完全一致，不鼓出一截
             Icon(
                 if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -2872,7 +2891,8 @@ private fun MiniFolderGridItem(
     ) {
         if (isLarge) {
             // 大图标：行结构与事件大格同构（顶行 / titleMedium / 名字），格子等高；
-            // 中间行放成员数（复用 settings_unit_items「N 条」），替代事件的倒数大字位置
+            // 成员数放右上角、展开箭头左边（用户指定），中间 titleMedium 行用空 Text
+            // 占位保持行高与事件大格的倒数行一致（随字体缩放同步变化）。
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.SpaceBetween
@@ -2888,23 +2908,27 @@ private fun MiniFolderGridItem(
                             .clip(CircleShape)
                             .background(groupColor)
                     )
-                    Icon(
-                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = stringResource(R.string.common_expand),
-                        tint = groupColor.copy(alpha = 0.7f),
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (itemCount > 0) {
+                            Text(
+                                text = stringResource(R.string.settings_unit_items, itemCount),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = groupColor,
+                                maxLines = 1
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        Icon(
+                            if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.common_expand),
+                            tint = groupColor.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
-                if (itemCount > 0) {
-                    Text(
-                        text = stringResource(R.string.settings_unit_items, itemCount),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = groupColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                // 等高占位：成员数已移顶行，此行保住与事件大格 titleMedium 倒数行同高
+                Text("", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = folder.name,

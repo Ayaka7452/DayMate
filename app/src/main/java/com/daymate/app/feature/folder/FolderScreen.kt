@@ -59,6 +59,7 @@ import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.home.EventRow
 import com.ayaka7452.daymate.feature.home.MiniFolderMergeDialog
+import com.ayaka7452.daymate.feature.home.MiniFolderRow
 import com.ayaka7452.daymate.R
 import com.ayaka7452.daymate.core.i18n.Tr
 import sh.calvin.reorderable.ReorderableItem
@@ -82,6 +83,25 @@ fun FolderScreen(
     val events by eventsFlow.collectAsState(initial = emptyList())
     val allFoldersFlow = remember { container.folderRepository.observeAll() }
     val allFolders by allFoldersFlow.collectAsState(initial = emptyList())
+
+    // ===== 事件组（v1.26.9）：存放在本文件夹下的事件组（kind=mini 且 parentId=本文件夹）=====
+    // 成员事件的 folderId 指向组 id，通过组的 parentId 间接归属本文件夹。
+    val minis = allFolders.filter { it.kind == FolderKinds.MINI && it.parentId == folderId }
+    val allEventsFlow = remember { container.eventRepository.observeAll() }
+    val allEvents by allEventsFlow.collectAsState(initial = emptyList())
+    val memberLists = remember(minis, allEvents) {
+        minis.associate { mini ->
+            mini.id to allEvents
+                .filter { it.folderId == mini.id }
+                .sortedBy { it.sortIndex }
+        }
+    }
+    val expandedMiniIds = remember { mutableStateListOf<Long>() }
+    // 组重命名 / 解散确认弹窗状态
+    var miniRenameTarget by remember { mutableStateOf<FolderEntity?>(null) }
+    var showMiniRenameDialog by remember { mutableStateOf(false) }
+    var miniToDelete by remember { mutableStateOf<FolderEntity?>(null) }
+
     val vaultSet by container.settingsRepository.vaultPasswordSet
         .collectAsState(initial = false)
 
@@ -139,6 +159,11 @@ fun FolderScreen(
     val shownEvents = remember(displayEvents, query) {
         if (query.isEmpty()) displayEvents
         else displayEvents.filter { matchesQuery(it.title, it.note, query) }
+    }
+    // 组名也参与搜索过滤
+    val shownMinis = remember(minis, query) {
+        if (query.isEmpty()) minis
+        else minis.filter { it.name.lowercase().contains(query.lowercase()) }
     }
 
     val listState = rememberLazyListState()
@@ -317,7 +342,7 @@ fun FolderScreen(
                         .padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
-            if (events.isEmpty()) {
+            if (events.isEmpty() && minis.isEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -330,7 +355,7 @@ fun FolderScreen(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
-            } else if (searchActive && query.isNotEmpty() && shownEvents.isEmpty()) {
+            } else if (searchActive && query.isNotEmpty() && shownEvents.isEmpty() && shownMinis.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -350,6 +375,63 @@ fun FolderScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
+                // 事件组区（v1.26.9）：本文件夹下的事件组固定排在事件列表前。
+                // 组不参与拖拽/多选（与主页网格同理，避免手势与选择语义复杂化），多选模式下点击无效。
+                items(shownMinis, key = { "m${it.id}" }) { mini ->
+                    MiniFolderRow(
+                        folder = mini,
+                        expanded = mini.id in expandedMiniIds,
+                        itemCount = memberLists[mini.id]?.size ?: 0,
+                        onClick = {
+                            if (!selectionMode) {
+                                if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
+                                else expandedMiniIds.add(mini.id)
+                            }
+                        },
+                        onRename = {
+                            miniRenameTarget = mini
+                            showMiniRenameDialog = true
+                        },
+                        onDissolve = { miniToDelete = mini },
+                        onMoveToRecycleBin = { miniToDelete = mini }
+                    )
+                    // 展开的组成员行：缩进 + 左缘浅绿竖线串联（与主页一致），不参与多选与拖拽
+                    if (mini.id in expandedMiniIds) {
+                        memberLists[mini.id]?.forEach { member ->
+                            EventRow(
+                                event = member,
+                                festivalRepo = container.festivalRepository,
+                                indent = true,
+                                connector = true,
+                                onClick = {
+                                    if (member.specialType == "cycle") onNavigate("cycle")
+                                    else onNavigate("event_detail?eventId=${member.id}")
+                                },
+                                onMoveToVault = {
+                                    if (vaultSet) {
+                                        scope.launch { container.vaultBridge.moveEventToVault(member.id) }
+                                    } else {
+                                        vaultNeedSetup = true
+                                    }
+                                },
+                                onMoveToRecycleBin = {
+                                    scope.launch {
+                                        container.eventRepository.softDeleteByIds(
+                                            listOf(member.id),
+                                            System.currentTimeMillis()
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    )
+                }
                 items(shownEvents, key = { "e${it.id}" }) { event ->
                     ReorderableItem(reorderableState, key = "e${event.id}") {
                         val canDrag = manualSort && !selectionMode
@@ -433,10 +515,14 @@ fun FolderScreen(
                 // 此前这里调 folderRepository.delete()（@Delete → DELETE FROM folders），
                 // 同一个「删除文件夹」概念存在不可撤销与可撤销两套实现。
                 scope.launch {
-                    folder?.let {
-                        container.eventRepository.unparentByFolders(listOf(it.id))
+                    folder?.let { f ->
+                        // 连带解散本文件夹下的事件组：成员（folderId 指向子组）与直属事件一并解归属
+                        val childMinis = allFolders
+                            .filter { it.kind == FolderKinds.MINI && it.parentId == f.id }
+                            .map { m -> m.id }
+                        container.eventRepository.unparentByFolders(listOf(f.id) + childMinis)
                         container.folderRepository.softDeleteByIds(
-                            listOf(it.id),
+                            listOf(f.id) + childMinis,
                             System.currentTimeMillis()
                         )
                     }
@@ -522,10 +608,14 @@ fun FolderScreen(
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
-                        folder?.let {
-                            container.eventRepository.unparentByFolders(listOf(it.id))
+                        folder?.let { f ->
+                            // 连带解散本文件夹下的事件组（同 FolderDialog.onDelete）
+                            val childMinis = allFolders
+                                .filter { it.kind == FolderKinds.MINI && it.parentId == f.id }
+                                .map { m -> m.id }
+                            container.eventRepository.unparentByFolders(listOf(f.id) + childMinis)
                             container.folderRepository.softDeleteByIds(
-                                listOf(it.id),
+                                listOf(f.id) + childMinis,
                                 System.currentTimeMillis()
                             )
                         }
@@ -574,7 +664,8 @@ fun FolderScreen(
         )
     }
 
-    // 合并命名弹窗：与主页共用。组建成 kind=MINI 的根层事件组，成员事件移出本文件夹
+    // 合并命名弹窗：与主页共用。组建 kind=MINI 的事件组，parentId 指向本文件夹（v1.26.9 起组留在文件夹内），
+    // 成员事件 folderId 指向新组，仍归属本文件夹
     if (showMergeDialog && pendingMergeIds.isNotEmpty()) {
         MiniFolderMergeDialog(
             count = pendingMergeIds.size,
@@ -590,6 +681,7 @@ fun FolderScreen(
                         FolderEntity(
                             name = finalName,
                             kind = FolderKinds.MINI,
+                            parentId = folderId,
                             sortIndex = minSort
                         )
                     )
@@ -598,6 +690,66 @@ fun FolderScreen(
                 showMergeDialog = false
                 pendingMergeIds = emptyList()
                 exitSelection()
+            }
+        )
+    }
+
+    // 事件组重命名弹窗（与主页同款）
+    if (showMiniRenameDialog && miniRenameTarget != null) {
+        var miniName by remember(miniRenameTarget) { mutableStateOf(miniRenameTarget!!.name) }
+        AlertDialog(
+            onDismissRequest = { showMiniRenameDialog = false; miniRenameTarget = null },
+            title = { Text(Tr.s(R.string.common_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = miniName,
+                    onValueChange = { miniName = it },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val target = miniRenameTarget ?: return@TextButton
+                    val finalName = miniName.trim()
+                    if (finalName.isNotBlank()) {
+                        scope.launch { container.folderRepository.update(target.copy(name = finalName)) }
+                    }
+                    showMiniRenameDialog = false
+                    miniRenameTarget = null
+                }) { Text(Tr.s(R.string.common_save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMiniRenameDialog = false; miniRenameTarget = null }) {
+                    Text(Tr.s(R.string.common_cancel))
+                }
+            }
+        )
+    }
+
+    // 事件组解散/移入回收站确认：成员事件回归本文件夹（组在文件夹内，成员不回主页根层）
+    if (miniToDelete != null) {
+        val target = miniToDelete!!
+        AlertDialog(
+            onDismissRequest = { miniToDelete = null },
+            title = { Text(Tr.s(R.string.home_move_to_trash_title)) },
+            text = { Text(Tr.s(R.string.home_folder_delete_confirm_desc, target.name)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val memberIds = memberLists[target.id]?.map { it.id } ?: emptyList()
+                    scope.launch {
+                        if (memberIds.isNotEmpty()) {
+                            container.eventRepository.moveToFolder(memberIds, folderId)
+                        }
+                        container.folderRepository.softDeleteByIds(
+                            listOf(target.id),
+                            System.currentTimeMillis()
+                        )
+                    }
+                    miniToDelete = null
+                }) { Text(Tr.s(R.string.home_move_to_trash)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { miniToDelete = null }) { Text(Tr.s(R.string.common_cancel)) }
             }
         )
     }
