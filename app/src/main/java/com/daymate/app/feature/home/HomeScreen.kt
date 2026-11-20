@@ -23,7 +23,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -2816,11 +2815,10 @@ private fun rootKeyOf(entry: HomeRootEntry): String =
 // 事件组配色自 v1.26.8 起跟随主题色（colorScheme.primary），不再用固定深绿常量
 
 /**
- * 小文件夹行（列表）：深绿点 + 名字 + 展开箭头，极简。
- * 重命名/解散/移回收站收进点击展开后的面板，不常驻 ⋮；
- * 成员数（v1.26.9）放名字右侧、展开箭头左边，不占独立行。
+ * 小文件夹行（列表）：主题色圆点 + 名字 + 成员数 + 展开箭头 + ⋮。
+ * v1.27.0 起（用户拍板）：编辑动作不再放展开面板，收进行尾 ⋮（与普通事件行对齐）；
+ * 行尾顺序 = 展开箭头在左、⋮ 在右。点行只切换展开（成员行内联显示）。
  */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun MiniFolderRow(
     folder: FolderEntity,
@@ -2836,57 +2834,77 @@ fun MiniFolderRow(
     /** 文件夹内页用：移出当前文件夹回根层。null = 不显示入口。 */
     onMoveOutOfFolder: (() -> Unit)? = null
 ) {
-    Column(
+    var menuExpanded by remember { mutableStateOf(false) }
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(dragModifier ?: Modifier)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-            Spacer(Modifier.width(10.dp))
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = folder.name,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        // 成员数：放展开箭头左边（用户指定），小字不抢名字
+        if (itemCount > 0) {
             Text(
-                text = folder.name,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
+                text = stringResource(R.string.settings_unit_items, itemCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
-            // 成员数：放展开箭头左边（用户指定），小字不抢名字
-            if (itemCount > 0) {
-                Text(
-                    text = stringResource(R.string.settings_unit_items, itemCount),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            // 24dp 小图标收尾（不用 IconButton）：行高与事件行完全一致，不鼓出一截
-            Icon(
-                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.common_expand),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                modifier = Modifier.size(24.dp)
-            )
+            Spacer(Modifier.width(8.dp))
         }
-        // 展开面板：操作收进这里，收起时界面保持极简。
-        // FlowRow：主页四个动作、文件夹内页五个动作，小屏单行放不下时自动换行
-        if (expanded) {
-            Spacer(Modifier.height(6.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = onRename) { Text(stringResource(R.string.common_rename)) }
-                TextButton(onClick = onDissolve) { Text(stringResource(R.string.mini_folder_dissolve)) }
+        // 24dp 小图标（不用 IconButton）：行高与事件行完全一致，不鼓出一截
+        Icon(
+            if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = stringResource(R.string.common_expand),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+            modifier = Modifier.size(24.dp)
+        )
+        // ⋮：与普通事件行同构（IconButton + DropdownMenu），编辑动作全收这里
+        Box {
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
+            }
+            DropdownMenu(
+                modifier = Modifier.widthIn(min = 200.dp),
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.common_rename)) },
+                    onClick = { menuExpanded = false; onRename() }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.mini_folder_dissolve)) },
+                    onClick = { menuExpanded = false; onDissolve() }
+                )
                 if (onMoveIntoFolder != null) {
-                    TextButton(onClick = onMoveIntoFolder) { Text(stringResource(R.string.folder_move_in)) }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.folder_move_in)) },
+                        onClick = { menuExpanded = false; onMoveIntoFolder() }
+                    )
                 }
                 if (onMoveOutOfFolder != null) {
-                    TextButton(onClick = onMoveOutOfFolder) { Text(stringResource(R.string.folder_move_out)) }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.folder_move_out)) },
+                        onClick = { menuExpanded = false; onMoveOutOfFolder() }
+                    )
                 }
-                TextButton(onClick = onMoveToRecycleBin) { Text(stringResource(R.string.home_move_to_trash)) }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.home_move_to_trash)) },
+                    onClick = { menuExpanded = false; onMoveToRecycleBin() }
+                )
             }
         }
     }
