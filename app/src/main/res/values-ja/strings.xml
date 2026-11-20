@@ -599,6 +599,7 @@
     <string name="bin_purge">完全に削除</string>
     <string name="folder_selected_n">%1$d 件選択中</string>
     <string name="folder_move_in">フォルダへ移動</string>
+    <string name="folder_move_out">フォルダ外へ移動</string>
     <string name="folder_move_vault">Vault へ移動</string>
     <string name="folder_move_bin">ゴミ箱へ移動</string>
     <string name="folder_menu">メニュー</string>

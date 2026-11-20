@@ -599,6 +599,7 @@
     <string name="bin_purge">彻底删除</string>
     <string name="folder_selected_n">已选 %1$d 项</string>
     <string name="folder_move_in">移入文件夹</string>
+    <string name="folder_move_out">移出文件夹</string>
     <string name="folder_move_vault">移入 Vault</string>
     <string name="folder_move_bin">移入回收站</string>
     <string name="folder_menu">菜单</string>

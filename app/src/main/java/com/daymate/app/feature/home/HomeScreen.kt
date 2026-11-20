@@ -23,6 +23,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -434,6 +435,8 @@ fun HomeScreen(
     // 小文件夹重命名弹窗
     var miniRenameTarget by remember { mutableStateOf<FolderEntity?>(null) }
     var showMiniRenameDialog by remember { mutableStateOf(false) }
+    // 根层事件组「移入文件夹」目标：弹 PickFolderDialog 选择目标文件夹（v1.26.10）
+    var miniMoveIntoTarget by remember { mutableStateOf<FolderEntity?>(null) }
 
     LaunchedEffect(folders) {
         if (!isDragging) {
@@ -1415,7 +1418,8 @@ fun HomeScreen(
                                 onMoveToRecycleBin = {
                                     folderToDelete = mini
                                     showFolderDeleteConfirm = true
-                                }
+                                },
+                                onMoveIntoFolder = { miniMoveIntoTarget = mini }
                             )
                         }
                         ListItemDivider()
@@ -1535,7 +1539,8 @@ fun HomeScreen(
                                 onMoveToRecycleBin = {
                                     folderToDelete = mini
                                     showFolderDeleteConfirm = true
-                                }
+                                },
+                                onMoveIntoFolder = { miniMoveIntoTarget = mini }
                             )
                         } else if (event != null) {
                             EventGridItem(
@@ -1754,6 +1759,28 @@ fun HomeScreen(
                         container.eventRepository.moveToFolder(listOf(it), targetFolderId)
                     }
                     singleMoveEventId = null
+                }
+            }
+        )
+    }
+
+    // 根层事件组移入文件夹（v1.26.10）：只改组自身 parentId，成员事件 folderId 仍指向组，
+    // 归属随组走；目标只列普通文件夹（事件组不可嵌套进事件组）
+    if (miniMoveIntoTarget != null) {
+        PickFolderDialog(
+            title = stringResource(R.string.folder_move_in),
+            folders = folders
+                .filter { it.kind == FolderKinds.NORMAL }
+                .map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
+            showRoot = false,
+            onDismiss = { miniMoveIntoTarget = null },
+            onPick = { targetFolderId ->
+                val target = miniMoveIntoTarget
+                miniMoveIntoTarget = null
+                if (target != null) {
+                    scope.launch {
+                        container.folderRepository.update(target.copy(parentId = targetFolderId))
+                    }
                 }
             }
         )
@@ -2793,6 +2820,7 @@ private fun rootKeyOf(entry: HomeRootEntry): String =
  * 重命名/解散/移回收站收进点击展开后的面板，不常驻 ⋮；
  * 成员数（v1.26.9）放名字右侧、展开箭头左边，不占独立行。
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun MiniFolderRow(
     folder: FolderEntity,
@@ -2802,7 +2830,11 @@ fun MiniFolderRow(
     onClick: () -> Unit = {},
     onRename: () -> Unit = {},
     onDissolve: () -> Unit = {},
-    onMoveToRecycleBin: () -> Unit = {}
+    onMoveToRecycleBin: () -> Unit = {},
+    /** 主页根层用：移入某个文件夹（弹选择框）。null = 不显示入口。 */
+    onMoveIntoFolder: (() -> Unit)? = null,
+    /** 文件夹内页用：移出当前文件夹回根层。null = 不显示入口。 */
+    onMoveOutOfFolder: (() -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -2841,12 +2873,19 @@ fun MiniFolderRow(
                 modifier = Modifier.size(24.dp)
             )
         }
-        // 展开面板：操作收进这里，收起时界面保持极简
+        // 展开面板：操作收进这里，收起时界面保持极简。
+        // FlowRow：主页四个动作、文件夹内页五个动作，小屏单行放不下时自动换行
         if (expanded) {
             Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = onRename) { Text(stringResource(R.string.common_rename)) }
                 TextButton(onClick = onDissolve) { Text(stringResource(R.string.mini_folder_dissolve)) }
+                if (onMoveIntoFolder != null) {
+                    TextButton(onClick = onMoveIntoFolder) { Text(stringResource(R.string.folder_move_in)) }
+                }
+                if (onMoveOutOfFolder != null) {
+                    TextButton(onClick = onMoveOutOfFolder) { Text(stringResource(R.string.folder_move_out)) }
+                }
                 TextButton(onClick = onMoveToRecycleBin) { Text(stringResource(R.string.home_move_to_trash)) }
             }
         }
@@ -2868,7 +2907,11 @@ private fun MiniFolderGridItem(
     onClick: () -> Unit = {},
     onRename: () -> Unit = {},
     onDissolve: () -> Unit = {},
-    onMoveToRecycleBin: () -> Unit = {}
+    onMoveToRecycleBin: () -> Unit = {},
+    /** 主页根层用：移入某个文件夹（弹选择框）。null = 不显示入口。 */
+    onMoveIntoFolder: (() -> Unit)? = null,
+    /** 文件夹内页用：移出当前文件夹回根层。null = 不显示入口。 */
+    onMoveOutOfFolder: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     // 事件组配色跟随主题（用户拍板）：主视觉全部取 colorScheme.primary，默认主题即主题色设计
@@ -2990,6 +3033,18 @@ private fun MiniFolderGridItem(
                 text = { Text(stringResource(R.string.mini_folder_dissolve)) },
                 onClick = { menuExpanded = false; onDissolve() }
             )
+            if (onMoveIntoFolder != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.folder_move_in)) },
+                    onClick = { menuExpanded = false; onMoveIntoFolder() }
+                )
+            }
+            if (onMoveOutOfFolder != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.folder_move_out)) },
+                    onClick = { menuExpanded = false; onMoveOutOfFolder() }
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.home_move_to_trash)) },
                 onClick = { menuExpanded = false; onMoveToRecycleBin() }

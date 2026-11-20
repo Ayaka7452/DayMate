@@ -86,7 +86,10 @@ fun FolderScreen(
 
     // ===== 事件组（v1.26.9）：存放在本文件夹下的事件组（kind=mini 且 parentId=本文件夹）=====
     // 成员事件的 folderId 指向组 id，通过组的 parentId 间接归属本文件夹。
-    val minis = allFolders.filter { it.kind == FolderKinds.MINI && it.parentId == folderId }
+    // v1.26.10 起按 sortIndex 与直属事件混排，不再固定排在事件前面。
+    val minis = allFolders
+        .filter { it.kind == FolderKinds.MINI && it.parentId == folderId }
+        .sortedBy { it.sortIndex }
     val allEventsFlow = remember { container.eventRepository.observeAll() }
     val allEvents by allEventsFlow.collectAsState(initial = emptyList())
     val memberLists = remember(minis, allEvents) {
@@ -140,47 +143,87 @@ fun FolderScreen(
 
     // 拖拽排序用的可变镜像列表（拖拽中不同步，避免跳动）
     var isDragging by remember { mutableStateOf(false) }
-    val eventList = remember { mutableStateListOf<EventEntity>() }
-    LaunchedEffect(events) {
-        if (!isDragging) {
-            eventList.clear()
-            eventList.addAll(events)
+
+    // ===== 文件夹内混排镜像（v1.26.10）：直属事件与本文件夹下的事件组按 sortIndex 归并 =====
+    // 与主页根层同一套模型：两组条目共用 sortIndex 空间，manual 模式下可互相拖拽换位，
+    // 事件组不再固定排在事件前面。
+    val mergedList = remember { mutableStateListOf<FolderEntry>() }
+    LaunchedEffect(events, minis) {
+        if (isDragging) return@LaunchedEffect
+        mergedList.clear()
+        var mi = 0
+        for (e in events) {
+            while (mi < minis.size && minis[mi].sortIndex <= e.sortIndex) {
+                mergedList.add(FolderEntry(mini = minis[mi])); mi++
+            }
+            mergedList.add(FolderEntry(event = e))
         }
+        while (mi < minis.size) { mergedList.add(FolderEntry(mini = minis[mi])); mi++ }
     }
 
-    // 事件显示列表：manual 保持手动顺序，其余按剩余天数排序
-    val eventSnapshot = eventList.toList()
-    val displayEvents = remember(eventSnapshot, defaultSort) {
-        sortEventsForDisplay(eventSnapshot, defaultSort) { eventDaysUntil(it.targetDateEpochDay) }
-    }
+    fun entryKeyOf(entry: FolderEntry): String =
+        entry.mini?.let { "m${it.id}" } ?: "e${entry.event!!.id}"
 
-    // 页内搜索过滤（标题 + 备注）
+    // 渲染行序列：manual 保持混排手动顺序，其余事件按剩余天数排序、事件组追加其后。
+    // 搜索时直属事件匹配标题/备注，事件组匹配组名（展开成员随组显示并同样过滤）。
     val query = searchQuery.trim()
-    val shownEvents = remember(displayEvents, query) {
-        if (query.isEmpty()) displayEvents
-        else displayEvents.filter { matchesQuery(it.title, it.note, query) }
-    }
-    // 组名也参与搜索过滤
-    val shownMinis = remember(minis, query) {
-        if (query.isEmpty()) minis
-        else minis.filter { it.name.lowercase().contains(query.lowercase()) }
+    val mergedSnapshot = mergedList.toList()
+    val expandedSnapshot = expandedMiniIds.toList()
+    val displayRows = remember(mergedSnapshot, defaultSort, query, expandedSnapshot, memberLists) {
+        fun hit(title: String, note: String?) = query.isEmpty() || matchesQuery(title, note, query)
+        val rows = mutableListOf<FolderEntry>()
+        if (manualSort) {
+            for (entry in mergedSnapshot) {
+                val mini = entry.mini
+                if (mini != null) {
+                    if (!hit(mini.name, null)) continue
+                    rows.add(FolderEntry(mini = mini))
+                    if (mini.id in expandedSnapshot) {
+                        memberLists[mini.id]?.forEach { m ->
+                            if (hit(m.title, m.note)) rows.add(FolderEntry(event = m, indent = true))
+                        }
+                    }
+                } else entry.event?.let { e ->
+                    if (hit(e.title, e.note)) rows.add(FolderEntry(event = e))
+                }
+            }
+        } else {
+            sortEventsForDisplay(
+                mergedSnapshot.mapNotNull { it.event }.filter { hit(it.title, it.note) },
+                defaultSort
+            ) { eventDaysUntil(it.targetDateEpochDay) }.forEach { rows.add(FolderEntry(event = it)) }
+            minis.filter { hit(it.name, null) }.forEach { mini ->
+                rows.add(FolderEntry(mini = mini))
+                if (mini.id in expandedSnapshot) {
+                    memberLists[mini.id]?.forEach { m ->
+                        if (hit(m.title, m.note)) rows.add(FolderEntry(event = m, indent = true))
+                    }
+                }
+            }
+        }
+        rows.toList()
     }
 
     val listState = rememberLazyListState()
+    // 混排换位（v1.26.10）：e*=直属事件、m*=事件组，二者可互相拖拽换位（与主页根层同构）
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
         val fk = from.key.toString()
         val tk = to.key.toString()
-        if (fk.startsWith("e") && tk.startsWith("e")) {
-            val fi = eventList.indexOfFirst { "e${it.id}" == fk }
-            val ti = eventList.indexOfFirst { "e${it.id}" == tk }
-            if (fi >= 0 && ti >= 0) eventList.moveItem(fi, ti)
+        if ((fk.startsWith("e") || fk.startsWith("m")) && (tk.startsWith("e") || tk.startsWith("m"))) {
+            val fi = mergedList.indexOfFirst { entryKeyOf(it) == fk }
+            val ti = mergedList.indexOfFirst { entryKeyOf(it) == tk }
+            if (fi >= 0 && ti >= 0) mergedList.moveItem(fi, ti)
         }
     }
 
-    fun persistEventOrder() {
+    fun persistOrder() {
+        // 先快照：快拖时库可能在协程遍历途中继续改 SnapshotStateList，直接遍历会抛
+        // ConcurrentModificationException（v1.26.1 真机崩溃根因，与主页根层同款写法）
+        val snapshot = mergedList.toList()
         scope.launch {
-            eventList.forEachIndexed { index, e ->
-                container.eventRepository.update(e.copy(sortIndex = index))
+            snapshot.forEachIndexed { index, entry ->
+                entry.event?.let { container.eventRepository.update(it.copy(sortIndex = index)) }
+                entry.mini?.let { container.folderRepository.update(it.copy(sortIndex = index)) }
             }
         }
     }
@@ -355,7 +398,7 @@ fun FolderScreen(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
-            } else if (searchActive && query.isNotEmpty() && shownEvents.isEmpty() && shownMinis.isEmpty()) {
+            } else if (searchActive && query.isNotEmpty() && displayRows.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -375,41 +418,70 @@ fun FolderScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                // 事件组区（v1.26.9）：本文件夹下的事件组固定排在事件列表前。
-                // 组不参与拖拽/多选（与主页网格同理，避免手势与选择语义复杂化），多选模式下点击无效。
-                items(shownMinis, key = { "m${it.id}" }) { mini ->
-                    MiniFolderRow(
-                        folder = mini,
-                        expanded = mini.id in expandedMiniIds,
-                        itemCount = memberLists[mini.id]?.size ?: 0,
-                        onClick = {
-                            if (!selectionMode) {
-                                if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
-                                else expandedMiniIds.add(mini.id)
-                            }
-                        },
-                        onRename = {
-                            miniRenameTarget = mini
-                            showMiniRenameDialog = true
-                        },
-                        onDissolve = { miniToDelete = mini },
-                        onMoveToRecycleBin = { miniToDelete = mini }
-                    )
-                    // 展开的组成员行：缩进 + 左缘浅绿竖线串联（与主页一致），不参与多选与拖拽
-                    if (mini.id in expandedMiniIds) {
-                        memberLists[mini.id]?.forEach { member ->
+                // 混排行序列（v1.26.10）：事件组与直属事件按 sortIndex 归并，manual 模式下
+                // 长按整行拖拽换位（与主页根层同构）；事件组的展开成员行是独立行（indent 标记），
+                // 不参与拖拽与多选。
+                items(displayRows, key = { entryKeyOf(it) }) { row ->
+                    val mini = row.mini
+                    val event = row.event
+                    if (mini != null) {
+                        ReorderableItem(reorderableState, key = "m${mini.id}") {
+                            val canDrag = manualSort && !selectionMode
+                            val dragModifier = if (canDrag) {
+                                Modifier.longPressDraggableHandle(
+                                    onDragStarted = { isDragging = true },
+                                    onDragStopped = {
+                                        isDragging = false
+                                        persistOrder()
+                                    }
+                                )
+                            } else null
+                            MiniFolderRow(
+                                folder = mini,
+                                expanded = mini.id in expandedMiniIds,
+                                itemCount = memberLists[mini.id]?.size ?: 0,
+                                dragModifier = dragModifier,
+                                onClick = {
+                                    if (!selectionMode) {
+                                        if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
+                                        else expandedMiniIds.add(mini.id)
+                                    }
+                                },
+                                onRename = {
+                                    miniRenameTarget = mini
+                                    showMiniRenameDialog = true
+                                },
+                                onDissolve = { miniToDelete = mini },
+                                onMoveToRecycleBin = { miniToDelete = mini },
+                                // 移出文件夹：组回主页根层，成员归属随组走（只改 parentId）
+                                onMoveOutOfFolder = {
+                                    scope.launch {
+                                        container.folderRepository.update(mini.copy(parentId = null))
+                                    }
+                                }
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        )
+                    } else if (event != null) {
+                        if (row.indent) {
+                            // 展开的组成员行：缩进 + 左缘竖线串联（与主页一致），不参与拖拽与多选
                             EventRow(
-                                event = member,
+                                event = event,
                                 festivalRepo = container.festivalRepository,
                                 indent = true,
                                 connector = true,
                                 onClick = {
-                                    if (member.specialType == "cycle") onNavigate("cycle")
-                                    else onNavigate("event_detail?eventId=${member.id}")
+                                    if (event.specialType == "cycle") onNavigate("cycle")
+                                    else onNavigate("event_detail?eventId=${event.id}")
                                 },
                                 onMoveToVault = {
                                     if (vaultSet) {
-                                        scope.launch { container.vaultBridge.moveEventToVault(member.id) }
+                                        scope.launch { container.vaultBridge.moveEventToVault(event.id) }
                                     } else {
                                         vaultNeedSetup = true
                                     }
@@ -417,75 +489,68 @@ fun FolderScreen(
                                 onMoveToRecycleBin = {
                                     scope.launch {
                                         container.eventRepository.softDeleteByIds(
-                                            listOf(member.id),
+                                            listOf(event.id),
                                             System.currentTimeMillis()
                                         )
                                     }
                                 }
                             )
-                        }
-                    }
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    )
-                }
-                items(shownEvents, key = { "e${it.id}" }) { event ->
-                    ReorderableItem(reorderableState, key = "e${event.id}") {
-                        val canDrag = manualSort && !selectionMode
-                        val dragModifier = if (canDrag) {
-                            Modifier.longPressDraggableHandle(
-                                onDragStarted = { isDragging = true },
-                                onDragStopped = {
-                                    isDragging = false
-                                    persistEventOrder()
-                                }
-                            )
-                        } else null
-                        EventRow(
-                            event = event,
-                            festivalRepo = container.festivalRepository,
-                            selectionMode = selectionMode,
-                            selected = event.id in selectedEventIds,
-                            onClick = {
-                                if (selectionMode) toggleEvent(event.id)
-                                else if (event.specialType == "cycle") onNavigate("cycle")
-                                else onNavigate("event_detail?eventId=${event.id}")
-                            },
-                            onMoveToVault = {
-                                if (vaultSet) {
-                                    scope.launch { container.vaultBridge.moveEventToVault(event.id) }
-                                } else {
-                                    vaultNeedSetup = true
-                                }
-                            },
-                            onMoveToFolder = { singleMoveEventId = event.id },
-                            // 合并：普通事件可发起（预选后继续勾选），周期等特殊类型不参与
-                            onMerge = if (event.specialType == null) {
-                                { startMergeFromEvent(event.id) }
-                            } else null,
-                            onMoveToRecycleBin = {
-                                scope.launch {
-                                    container.eventRepository.softDeleteByIds(
-                                        listOf(event.id),
-                                        System.currentTimeMillis()
+                        } else {
+                            ReorderableItem(reorderableState, key = "e${event.id}") {
+                                val canDrag = manualSort && !selectionMode
+                                val dragModifier = if (canDrag) {
+                                    Modifier.longPressDraggableHandle(
+                                        onDragStarted = { isDragging = true },
+                                        onDragStopped = {
+                                            isDragging = false
+                                            persistOrder()
+                                        }
                                     )
-                                }
-                            },
-                            dragModifier = dragModifier,
-                            onBlockedLongPress = if (!canDrag && !selectionMode && event.specialType == null) {
-                                { Toast.makeText(context, context.getString(R.string.home_manual_sort_toast), Toast.LENGTH_SHORT).show() }
-                            } else null
+                                } else null
+                                EventRow(
+                                    event = event,
+                                    festivalRepo = container.festivalRepository,
+                                    selectionMode = selectionMode,
+                                    selected = event.id in selectedEventIds,
+                                    onClick = {
+                                        if (selectionMode) toggleEvent(event.id)
+                                        else if (event.specialType == "cycle") onNavigate("cycle")
+                                        else onNavigate("event_detail?eventId=${event.id}")
+                                    },
+                                    onMoveToVault = {
+                                        if (vaultSet) {
+                                            scope.launch { container.vaultBridge.moveEventToVault(event.id) }
+                                        } else {
+                                            vaultNeedSetup = true
+                                        }
+                                    },
+                                    onMoveToFolder = { singleMoveEventId = event.id },
+                                    // 合并：普通事件可发起（预选后继续勾选），周期等特殊类型不参与
+                                    onMerge = if (event.specialType == null) {
+                                        { startMergeFromEvent(event.id) }
+                                    } else null,
+                                    onMoveToRecycleBin = {
+                                        scope.launch {
+                                            container.eventRepository.softDeleteByIds(
+                                                listOf(event.id),
+                                                System.currentTimeMillis()
+                                            )
+                                        }
+                                    },
+                                    dragModifier = dragModifier,
+                                    onBlockedLongPress = if (!canDrag && !selectionMode && event.specialType == null) {
+                                        { Toast.makeText(context, context.getString(R.string.home_manual_sort_toast), Toast.LENGTH_SHORT).show() }
+                                    } else null
+                                )
+                            }
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         )
                     }
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    )
                 }
             }
             }
@@ -754,3 +819,14 @@ fun FolderScreen(
         )
     }
 }
+
+/**
+ * 文件夹内混排条目（v1.26.10）：直属事件或本文件夹下的事件组，
+ * 与主页根层 [com.ayaka7452.daymate.feature.home.HomeRootEntry] 同构；
+ * indent=true 表示事件组的展开成员行（渲染缩进，不参与拖拽）。
+ */
+private data class FolderEntry(
+    val event: EventEntity? = null,
+    val mini: FolderEntity? = null,
+    val indent: Boolean = false
+)
