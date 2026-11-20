@@ -134,6 +134,7 @@ import com.ayaka7452.daymate.feature.common.eventDaysUntil
 import com.ayaka7452.daymate.feature.common.highlightedText
 import com.ayaka7452.daymate.feature.common.matchesQuery
 import com.ayaka7452.daymate.feature.common.moveItem
+import com.ayaka7452.daymate.feature.common.moveGroupMembersOut
 import com.ayaka7452.daymate.feature.common.noteHitOnly
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.common.targetIndexForAction
@@ -1746,18 +1747,38 @@ fun HomeScreen(
     }
 
     if (singleMoveEventId != null) {
+        // 分流（v1.27.1）：组成员 vs 根层事件——
+        // 成员事件：目标只列普通文件夹，「根目录」= 移出事件组（落到组所在层级），
+        //           移出后组剩余 <2 自动解散（无提示，见 moveGroupMembersOut）
+        // 根层事件：保持原行为（只提供文件夹目标）
+        val moved = allEvents.firstOrNull { it.id == singleMoveEventId }
+        val isMember = moved != null && folders.any { it.id == moved.folderId && it.kind == FolderKinds.MINI }
         PickFolderDialog(
             title = stringResource(R.string.common_move_to),
-            folders = folders.map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
-            // 主页的事件都在根目录，这里只提供文件夹目标
-            showRoot = false,
+            folders = if (isMember) {
+                folders.filter { it.kind == FolderKinds.NORMAL }
+                    .map { it.id to "${it.icon ?: "📁"}  ${it.name}" }
+            } else {
+                folders.map { it.id to "${it.icon ?: "📁"}  ${it.name}" }
+            },
+            showRoot = isMember,
             onDismiss = { singleMoveEventId = null },
             onPick = { targetFolderId ->
-                scope.launch {
-                    singleMoveEventId?.let {
-                        container.eventRepository.moveToFolder(listOf(it), targetFolderId)
+                val ev = moved
+                singleMoveEventId = null
+                if (ev != null) {
+                    scope.launch {
+                        if (isMember) {
+                            val groupParent = folders.firstOrNull { it.id == ev.folderId }?.parentId
+                            moveGroupMembersOut(
+                                container,
+                                listOf(ev.id),
+                                if (targetFolderId == null) groupParent else targetFolderId
+                            )
+                        } else {
+                            container.eventRepository.moveToFolder(listOf(ev.id), targetFolderId)
+                        }
                     }
-                    singleMoveEventId = null
                 }
             }
         )

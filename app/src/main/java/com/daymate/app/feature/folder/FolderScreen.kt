@@ -55,6 +55,7 @@ import com.ayaka7452.daymate.feature.common.PickFolderDialog
 import com.ayaka7452.daymate.feature.common.matchesQuery
 import com.ayaka7452.daymate.feature.common.SortModes
 import com.ayaka7452.daymate.feature.common.eventDaysUntil
+import com.ayaka7452.daymate.feature.common.moveGroupMembersOut
 import com.ayaka7452.daymate.feature.common.moveItem
 import com.ayaka7452.daymate.feature.common.sortEventsForDisplay
 import com.ayaka7452.daymate.feature.home.EventRow
@@ -469,7 +470,9 @@ fun FolderScreen(
                         )
                     } else if (event != null) {
                         if (row.indent) {
-                            // 展开的组成员行：缩进 + 左缘竖线串联（与主页一致），不参与拖拽与多选
+                            // 展开的组成员行：缩进 + 左缘竖线串联（与主页一致），不参与拖拽与多选；
+                            // ⋮ 支持「移到文件夹…」（v1.27.1）：移出组落组父级 / 移入其他普通文件夹，
+                            // 移出后组剩余 <2 自动解散（无提示）
                             EventRow(
                                 event = event,
                                 festivalRepo = container.festivalRepository,
@@ -486,6 +489,7 @@ fun FolderScreen(
                                         vaultNeedSetup = true
                                     }
                                 },
+                                onMoveToFolder = { singleMoveEventId = event.id },
                                 onMoveToRecycleBin = {
                                     scope.launch {
                                         container.eventRepository.softDeleteByIds(
@@ -619,20 +623,42 @@ fun FolderScreen(
     }
 
     if (singleMoveEventId != null) {
+        // 分流（v1.27.1）：组成员 vs 直属事件——
+        // 成员事件：目标只列普通文件夹，「根目录」= 移出事件组（落到组所在层级），
+        //           移出后组剩余 <2 自动解散（无提示，见 moveGroupMembersOut）
+        // 直属事件：保持原行为（排除本文件夹，根目录 = 移出本文件夹）
+        val moved = allEvents.firstOrNull { it.id == singleMoveEventId }
+        val isMember = moved != null && allFolders.any { it.id == moved.folderId && it.kind == FolderKinds.MINI }
         PickFolderDialog(
             title = Tr.s(R.string.common_move_to),
-            folders = allFolders
-                .filter { it.id != folderId }
-                .map { it.id to "${it.icon ?: "📁"}  ${it.name}" },
-            // 根目录选项保留：可把事件移出当前文件夹
+            folders = if (isMember) {
+                allFolders
+                    .filter { it.kind == FolderKinds.NORMAL }
+                    .map { it.id to "${it.icon ?: "📁"}  ${it.name}" }
+            } else {
+                allFolders
+                    .filter { it.id != folderId }
+                    .map { it.id to "${it.icon ?: "📁"}  ${it.name}" }
+            },
+            // 根目录：直属事件 = 移出当前文件夹；组成员 = 移出事件组
             showRoot = true,
             onDismiss = { singleMoveEventId = null },
             onPick = { targetFolderId ->
-                scope.launch {
-                    singleMoveEventId?.let {
-                        container.eventRepository.moveToFolder(listOf(it), targetFolderId)
+                val ev = moved
+                singleMoveEventId = null
+                if (ev != null) {
+                    scope.launch {
+                        if (isMember) {
+                            val groupParent = allFolders.firstOrNull { it.id == ev.folderId }?.parentId
+                            moveGroupMembersOut(
+                                container,
+                                listOf(ev.id),
+                                if (targetFolderId == null) groupParent else targetFolderId
+                            )
+                        } else {
+                            container.eventRepository.moveToFolder(listOf(ev.id), targetFolderId)
+                        }
                     }
-                    singleMoveEventId = null
                 }
             }
         )
