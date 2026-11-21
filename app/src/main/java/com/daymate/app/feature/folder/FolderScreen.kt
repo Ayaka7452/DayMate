@@ -230,12 +230,8 @@ fun FolderScreen(
     }
 
     val listState = rememberLazyListState()
-    // 混排换位（v1.26.10）：e*=直属事件、m*=事件组，二者可互相拖拽换位（与主页根层同构）；
-    // g<gid>e<eid>*=成员行（v1.27.2）：只在同一事件组内部换位，写 memberOrder 镜像
-    val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-        applyMove(from.key.toString(), to.key.toString())
-    }
-
+    // 换位逻辑（局部函数须先声明后引用）：e*=直属事件、m*=事件组，二者可互相拖拽换位
+    //（与主页根层同构）；g<gid>e<eid>*=成员行（v1.27.2）：只在同一事件组内部换位，写 memberOrder 镜像
     fun applyMove(fk: String, tk: String) {
         when {
             fk.startsWith("g") && tk.startsWith("g") -> {
@@ -262,6 +258,10 @@ fun FolderScreen(
                 if (fi >= 0 && ti >= 0) mergedList.moveItem(fi, ti)
             }
         }
+    }
+
+    val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+        applyMove(from.key.toString(), to.key.toString())
     }
 
     fun persistOrder() {
