@@ -600,6 +600,7 @@
     <string name="folder_selected_n">%1$d selected</string>
     <string name="folder_move_in">Move to folder</string>
     <string name="folder_move_out">Move out of folder</string>
+    <string name="group_member_move_out">Remove from group</string>
     <string name="folder_move_vault">Move to Vault</string>
     <string name="folder_move_bin">Move to Trash</string>
     <string name="folder_menu">Menu</string>

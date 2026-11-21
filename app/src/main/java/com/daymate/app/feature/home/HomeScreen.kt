@@ -507,7 +507,7 @@ fun HomeScreen(
                 if (mini != null) {
                     rows.add(HomeRow(mini = mini))
                     if (mini.id in expandedSet) {
-                        memberSnapshot[mini.id]?.forEach { rows.add(HomeRow(event = it, indent = true)) }
+                        memberSnapshot[mini.id]?.forEach { rows.add(HomeRow(event = it, indent = true, groupId = mini.id)) }
                     }
                 } else entry.event?.let { rows.add(HomeRow(event = it)) }
             }
@@ -519,7 +519,7 @@ fun HomeScreen(
             minisForRows.sortedBy { it.sortIndex }.forEach { mini ->
                 rows.add(HomeRow(mini = mini))
                 if (mini.id in expandedSet) {
-                    memberSnapshot[mini.id]?.forEach { rows.add(HomeRow(event = it, indent = true)) }
+                    memberSnapshot[mini.id]?.forEach { rows.add(HomeRow(event = it, indent = true, groupId = mini.id)) }
                 }
             }
         }
@@ -594,7 +594,8 @@ fun HomeScreen(
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
-    // 列表/网格共用的换位逻辑：f*=大文件夹、e*=事件、m*=小文件夹，只在同类之间排序。
+    // 列表/网格共用的换位逻辑：f*=大文件夹、e*=事件、m*=小文件夹、g<gid>e<eid>*=事件组成员行（v1.27.2），
+    // 排序只在同类之间：成员行仅限同一事件组内部换位。
     // 合并已彻底移到「更多→多选」菜单，这里只做纯排序，不判合并目标。
     fun applyMove(fk: String, tk: String) {
         when {
@@ -602,6 +603,24 @@ fun HomeScreen(
                 val fi = folderList.indexOfFirst { "f${it.id}" == fk }
                 val ti = folderList.indexOfFirst { "f${it.id}" == tk }
                 if (fi >= 0 && ti >= 0) folderList.moveItem(fi, ti)
+            }
+            fk.startsWith("g") && tk.startsWith("g") -> {
+                // 组内成员换位（v1.27.2）：只在同一事件组的成员之间；memberLists[gid] 重赋值驱动重组
+                val fg = fk.removePrefix("g").substringBefore("e")
+                val tg = tk.removePrefix("g").substringBefore("e")
+                if (fg.isNotEmpty() && fg == tg) {
+                    val gid = fg.toLong()
+                    val fe = fk.substringAfter("e").toLongOrNull()
+                    val te = tk.substringAfter("e").toLongOrNull()
+                    if (fe != null && te != null) {
+                        val list = memberLists[gid] ?: return
+                        val fi = list.indexOfFirst { it.id == fe }
+                        val ti = list.indexOfFirst { it.id == te }
+                        if (fi >= 0 && ti >= 0) {
+                            memberLists[gid] = list.toMutableList().apply { moveItem(fi, ti) }
+                        }
+                    }
+                }
             }
             (fk.startsWith("e") || fk.startsWith("m")) && (tk.startsWith("e") || tk.startsWith("m")) -> {
                 val fi = mergedList.indexOfFirst { rootKeyOf(it) == fk }
@@ -614,7 +633,14 @@ fun HomeScreen(
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
         applyMove(from.key.toString(), to.key.toString())
     }
+    // 网格拖拽「动了没有」标记（v1.27.2，用户拍板）：长按不动松手 = 出菜单，长按拖动 = 排序。
+    // 列表拖拽走 reorderableState 不会写这个标记，互不干扰。
+    var gridDragMoved by remember { mutableStateOf(false) }
+    // 网格格菜单展开目标（文件夹/事件组共用）：拖拽不动松手时置为对应格 id
+    var folderGridMenuId by remember { mutableStateOf<Long?>(null) }
+
     val gridReorderableState = rememberReorderableLazyGridState(gridState) { from, to ->
+        gridDragMoved = true
         applyMove(from.key.toString(), to.key.toString())
     }
 
@@ -1424,12 +1450,17 @@ fun HomeScreen(
                         }
                         ListItemDivider()
                     } else if (event != null) {
-                        ReorderableItem(reorderableState, key = "e${event.id}") {
-                            val canDrag = manualSort && !selectionMode && !row.indent && event.folderId == null
+                        ReorderableItem(reorderableState, key = rowKeyOf(row)) {
+                            // v1.27.2：成员行也可拖拽（组内换位）；直属行条件不变
+                            val canDrag = manualSort && !selectionMode &&
+                                (if (row.indent) row.groupId != null else event.folderId == null)
                             val dragModifier = if (canDrag) {
                                 Modifier.longPressDraggableHandle(
                                     onDragStarted = { isDragging = true },
-                                    onDragStopped = { isDragging = false; persistRootOrder() }
+                                    onDragStopped = {
+                                        isDragging = false
+                                        if (row.indent) persistMemberOrders() else persistRootOrder()
+                                    }
                                 )
                             } else null
                             EventRow(
@@ -1448,6 +1479,16 @@ fun HomeScreen(
                                     if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
                                 },
                                 onMoveToFolder = { singleMoveEventId = event.id },
+                                // 一键移出事件组（v1.27.2）：落到组所在层级（组在文件夹内=该文件夹，组在根层=主页根层）
+                                onLeaveGroup = if (row.indent) { {
+                                    scope.launch {
+                                        moveGroupMembersOut(
+                                            container,
+                                            listOf(event.id),
+                                            folders.firstOrNull { it.id == row.groupId }?.parentId
+                                        )
+                                    }
+                                } } else null,
                                 onMerge = if (event.folderId == null && event.specialType == null) {
                                     { startMergeFromEvent(event.id) }
                                 } else null,
@@ -1493,55 +1534,89 @@ fun HomeScreen(
                 ) {
                     items(folderList, key = { "f${it.id}" }) { folder ->
                         val count = allEvents.count { it.folderId == folder.id }
-                        FolderGridItem(
-                            folder = folder,
-                            itemCount = count,
-                            isLarge = isLarge,
-                            selectionMode = selectionMode,
-                            selected = folder.id in selectedFolderIds,
-                            onClick = {
-                                if (selectionMode) toggleFolder(folder.id)
-                                else onNavigate("folder/${folder.id}")
-                            },
-                            onLongClick = {
-                                if (!selectionMode) {
-                                    folderDialogTarget = folder
-                                    showFolderDialog = true
+                        ReorderableItem(gridReorderableState, key = "f${folder.id}") {
+                            // 根目录文件夹格拖拽排序（v1.27.2，用户拍板）：
+                            // 长按拖动 = 排序；长按不动松手 = 出菜单，与原长按行为等价
+                            val handle = if (manualSort && !selectionMode) {
+                                Modifier.longPressDraggableHandle(
+                                    onDragStarted = { isDragging = true; gridDragMoved = false },
+                                    onDragStopped = {
+                                        isDragging = false
+                                        persistFolderOrder()
+                                        if (!gridDragMoved) folderGridMenuId = folder.id
+                                    }
+                                )
+                            } else null
+                            FolderGridItem(
+                                folder = folder,
+                                itemCount = count,
+                                isLarge = isLarge,
+                                selectionMode = selectionMode,
+                                selected = folder.id in selectedFolderIds,
+                                modifier = handle ?: Modifier,
+                                menuExpanded = folderGridMenuId == folder.id,
+                                onMenuExpandedChange = { if (!it) folderGridMenuId = null },
+                                onClick = {
+                                    if (selectionMode) toggleFolder(folder.id)
+                                    else onNavigate("folder/${folder.id}")
+                                },
+                                onLongClick = {
+                                    if (!selectionMode) {
+                                        folderDialogTarget = folder
+                                        showFolderDialog = true
+                                    }
+                                },
+                                onMoveToRecycleBin = {
+                                    folderToDelete = folder
+                                    showFolderDeleteConfirm = true
                                 }
-                            },
-                            onMoveToRecycleBin = {
-                                folderToDelete = folder
-                                showFolderDeleteConfirm = true
-                            }
-                        )
+                            )
+                        }
                     }
                     items(displayRows, key = { rowKeyOf(it) }) { row ->
                         val mini = row.mini
                         val event = row.event
                         if (mini != null) {
-                            MiniFolderGridItem(
-                                folder = mini,
-                                expanded = mini.id in expandedMiniIds,
-                                isLarge = isLarge,
-                                itemCount = memberSnapshot[mini.id]?.size ?: 0,
-                                onClick = {
-                                    if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
-                                    else expandedMiniIds.add(mini.id)
-                                },
-                                onRename = {
-                                    miniRenameTarget = mini
-                                    showMiniRenameDialog = true
-                                },
-                                onDissolve = {
-                                    folderToDelete = mini
-                                    showFolderDeleteConfirm = true
-                                },
-                                onMoveToRecycleBin = {
-                                    folderToDelete = mini
-                                    showFolderDeleteConfirm = true
-                                },
-                                onMoveIntoFolder = { miniMoveIntoTarget = mini }
-                            )
+                            ReorderableItem(gridReorderableState, key = "m${mini.id}") {
+                                // 根目录事件组格拖拽排序（v1.27.2）：与文件夹格同款交互——
+                                // 长按拖动排序、长按不动松手出菜单
+                                val handle = if (manualSort && !selectionMode) {
+                                    Modifier.longPressDraggableHandle(
+                                        onDragStarted = { isDragging = true; gridDragMoved = false },
+                                        onDragStopped = {
+                                            isDragging = false
+                                            persistRootOrder()
+                                            if (!gridDragMoved) folderGridMenuId = mini.id
+                                        }
+                                    )
+                                } else null
+                                MiniFolderGridItem(
+                                    folder = mini,
+                                    expanded = mini.id in expandedMiniIds,
+                                    isLarge = isLarge,
+                                    itemCount = memberSnapshot[mini.id]?.size ?: 0,
+                                    modifier = handle ?: Modifier,
+                                    menuExpanded = folderGridMenuId == mini.id,
+                                    onMenuExpandedChange = { if (!it) folderGridMenuId = null },
+                                    onClick = {
+                                        if (mini.id in expandedMiniIds) expandedMiniIds.remove(mini.id)
+                                        else expandedMiniIds.add(mini.id)
+                                    },
+                                    onRename = {
+                                        miniRenameTarget = mini
+                                        showMiniRenameDialog = true
+                                    },
+                                    onDissolve = {
+                                        folderToDelete = mini
+                                        showFolderDeleteConfirm = true
+                                    },
+                                    onMoveToRecycleBin = {
+                                        folderToDelete = mini
+                                        showFolderDeleteConfirm = true
+                                    },
+                                    onMoveIntoFolder = { miniMoveIntoTarget = mini }
+                                )
+                            }
                         } else if (event != null) {
                             EventGridItem(
                                 event = event,
@@ -1558,6 +1633,16 @@ fun HomeScreen(
                                     if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
                                 },
                                 onMoveToFolder = { singleMoveEventId = event.id },
+                                // 一键移出事件组（v1.27.2）：成员格也提供，落组所在层级
+                                onLeaveGroup = if (row.indent) { {
+                                    scope.launch {
+                                        moveGroupMembersOut(
+                                            container,
+                                            listOf(event.id),
+                                            folders.firstOrNull { it.id == row.groupId }?.parentId
+                                        )
+                                    }
+                                } } else null,
                                 onMerge = if (event.folderId == null && event.specialType == null) {
                                     { startMergeFromEvent(event.id) }
                                 } else null,
@@ -1942,6 +2027,8 @@ fun EventRow(
     onClick: () -> Unit = {},
     onMoveToVault: (() -> Unit)? = null,
     onMoveToFolder: (() -> Unit)? = null,
+    /** 仅事件组成员行用（v1.27.2）：一键移出事件组，落到组所在层级。null = 不显示入口。 */
+    onLeaveGroup: (() -> Unit)? = null,
     onMerge: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
     onReorder: ((String) -> Unit)? = null,
@@ -2094,6 +2181,16 @@ fun EventRow(
                             onClick = {
                                 menuExpanded = false
                                 onMoveToFolder.invoke()
+                            }
+                        )
+                    }
+                    // 一键移出事件组（v1.27.2）：落组所在层级，剩余 <2 自动解散（无提示）
+                    if (onLeaveGroup != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.group_member_move_out)) },
+                            onClick = {
+                                menuExpanded = false
+                                onLeaveGroup.invoke()
                             }
                         )
                     }
@@ -2495,12 +2592,15 @@ fun FolderGridItem(
     selected: Boolean = false,
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
-    onMoveToRecycleBin: (() -> Unit)? = null
+    onMoveToRecycleBin: (() -> Unit)? = null,
+    /** 菜单展开态由调用方持有（v1.27.2）：长按拖拽不动松手时由外部触发菜单 */
+    menuExpanded: Boolean = false,
+    onMenuExpandedChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(if (isLarge) 14.dp else 12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
@@ -2515,7 +2615,7 @@ fun FolderGridItem(
                     if (selectionMode) {
                         onClick()
                     } else if (onMoveToRecycleBin != null) {
-                        menuExpanded = true
+                        onMenuExpandedChange(true)
                     } else {
                         onLongClick()
                     }
@@ -2599,19 +2699,19 @@ fun FolderGridItem(
         DropdownMenu(
             modifier = Modifier.widthIn(min = 200.dp),
             expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false }
+            onDismissRequest = { onMenuExpandedChange(false) }
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.home_edit_folder)) },
                 onClick = {
-                    menuExpanded = false
+                    onMenuExpandedChange(false)
                     onLongClick()
                 }
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.home_move_to_trash)) },
                 onClick = {
-                    menuExpanded = false
+                    onMenuExpandedChange(false)
                     onMoveToRecycleBin?.invoke()
                 }
             )
@@ -2632,6 +2732,8 @@ fun EventGridItem(
     onClick: () -> Unit = {},
     onMoveToVault: (() -> Unit)? = null,
     onMoveToFolder: (() -> Unit)? = null,
+    /** 仅事件组成员格用（v1.27.2）：一键移出事件组，落到组所在层级。null = 不显示入口。 */
+    onLeaveGroup: (() -> Unit)? = null,
     onMerge: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
     folderBadge: String? = null,
@@ -2789,6 +2891,16 @@ fun EventGridItem(
                     }
                 )
             }
+            // 一键移出事件组（v1.27.2）：落组所在层级，剩余 <2 自动解散（无提示）
+            if (onLeaveGroup != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.group_member_move_out)) },
+                    onClick = {
+                        menuExpanded = false
+                        onLeaveGroup.invoke()
+                    }
+                )
+            }
             if (onMerge != null) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.merge_action)) },
@@ -2824,11 +2936,17 @@ private data class HomeRootEntry(val event: EventEntity? = null, val mini: Folde
 private data class HomeRow(
     val event: EventEntity? = null,
     val mini: FolderEntity? = null,
-    val indent: Boolean = false
+    val indent: Boolean = false,
+    /** indent 行专用：成员所属事件组 id（v1.27.2，用于组内拖拽 key 与一键移出事件组） */
+    val groupId: Long? = null
 )
 
-private fun rowKeyOf(row: HomeRow): String =
-    row.mini?.let { "m${it.id}" } ?: "e${row.event!!.id}"
+private fun rowKeyOf(row: HomeRow): String = when {
+    row.mini != null -> "m${row.mini.id}"
+    // 成员行（v1.27.2）：g<组id>e<事件id>，与直属事件（e*）区分，支持组内拖拽换位
+    row.indent && row.groupId != null -> "g${row.groupId}e${row.event!!.id}"
+    else -> "e${row.event!!.id}"
+}
 
 private fun rootKeyOf(entry: HomeRootEntry): String =
     entry.mini?.let { "m${it.id}" } ?: "e${entry.event!!.id}"
@@ -2950,13 +3068,16 @@ private fun MiniFolderGridItem(
     /** 主页根层用：移入某个文件夹（弹选择框）。null = 不显示入口。 */
     onMoveIntoFolder: (() -> Unit)? = null,
     /** 文件夹内页用：移出当前文件夹回根层。null = 不显示入口。 */
-    onMoveOutOfFolder: (() -> Unit)? = null
+    onMoveOutOfFolder: (() -> Unit)? = null,
+    /** 菜单展开态由调用方持有（v1.27.2）：长按拖拽不动松手时由外部触发菜单 */
+    menuExpanded: Boolean = false,
+    onMenuExpandedChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
     // 事件组配色跟随主题（用户拍板）：主视觉全部取 colorScheme.primary，默认主题即主题色设计
     val groupColor = MaterialTheme.colorScheme.primary
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(if (isLarge) 14.dp else 12.dp))
             .background(groupColor.copy(alpha = 0.06f))
@@ -2967,7 +3088,7 @@ private fun MiniFolderGridItem(
             )
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = { menuExpanded = true }
+                onLongClick = { onMenuExpandedChange(true) }
             )
             .padding(if (isLarge) 12.dp else 10.dp)
     ) {
@@ -3062,31 +3183,31 @@ private fun MiniFolderGridItem(
         DropdownMenu(
             modifier = Modifier.widthIn(min = 180.dp),
             expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false }
+            onDismissRequest = { onMenuExpandedChange(false) }
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.common_rename)) },
-                onClick = { menuExpanded = false; onRename() }
+                onClick = { onMenuExpandedChange(false); onRename() }
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.mini_folder_dissolve)) },
-                onClick = { menuExpanded = false; onDissolve() }
+                onClick = { onMenuExpandedChange(false); onDissolve() }
             )
             if (onMoveIntoFolder != null) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.folder_move_in)) },
-                    onClick = { menuExpanded = false; onMoveIntoFolder() }
+                    onClick = { onMenuExpandedChange(false); onMoveIntoFolder() }
                 )
             }
             if (onMoveOutOfFolder != null) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.folder_move_out)) },
-                    onClick = { menuExpanded = false; onMoveOutOfFolder() }
+                    onClick = { onMenuExpandedChange(false); onMoveOutOfFolder() }
                 )
             }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.home_move_to_trash)) },
-                onClick = { menuExpanded = false; onMoveToRecycleBin() }
+                onClick = { onMenuExpandedChange(false); onMoveToRecycleBin() }
             )
         }
     }

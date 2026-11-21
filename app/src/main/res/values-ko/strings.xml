@@ -600,6 +600,7 @@
     <string name="folder_selected_n">%1$d개 선택됨</string>
     <string name="folder_move_in">폴더로 이동</string>
     <string name="folder_move_out">폴더 밖으로 이동</string>
+    <string name="group_member_move_out">그룹 밖으로 이동</string>
     <string name="folder_move_vault">Vault로 이동</string>
     <string name="folder_move_bin">휴지통으로 이동</string>
     <string name="folder_menu">메뉴</string>

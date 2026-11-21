@@ -162,15 +162,38 @@ fun FolderScreen(
         while (mi < minis.size) { mergedList.add(FolderEntry(mini = minis[mi])); mi++ }
     }
 
-    fun entryKeyOf(entry: FolderEntry): String =
-        entry.mini?.let { "m${it.id}" } ?: "e${entry.event!!.id}"
+    fun entryKeyOf(entry: FolderEntry): String = when {
+        entry.mini != null -> "m${entry.mini.id}"
+        // 成员行（v1.27.2）：g<组id>e<事件id>，与直属事件（e*）区分，支持组内拖拽换位
+        entry.indent && entry.groupId != null -> "g${entry.groupId}e${entry.event!!.id}"
+        else -> "e${entry.event!!.id}"
+    }
+
+    // 成员行拖拽镜像（v1.27.2）：组id -> 成员 eventId 顺序。memberLists 是派生值不可原地改，
+    // 拖拽换位写这里驱动重组；落库后 flow 刷新 memberLists 与 order 一致时自动清掉回落库序。
+    val memberOrder = remember { mutableStateMapOf<Long, List<Long>>() }
+    LaunchedEffect(memberLists, isDragging) {
+        if (isDragging) return@LaunchedEffect
+        memberOrder.keys.toList().forEach { gid ->
+            val base = memberLists[gid]?.map { it.id } ?: emptyList()
+            if (memberOrder[gid] == base) memberOrder.remove(gid)
+        }
+    }
 
     // 渲染行序列：manual 保持混排手动顺序，其余事件按剩余天数排序、事件组追加其后。
     // 搜索时直属事件匹配标题/备注，事件组匹配组名（展开成员随组显示并同样过滤）。
+    // 成员行顺序（v1.27.2）：拖拽中取 memberOrder 镜像，其余回落库序。
     val query = searchQuery.trim()
     val mergedSnapshot = mergedList.toList()
     val expandedSnapshot = expandedMiniIds.toList()
-    val displayRows = remember(mergedSnapshot, defaultSort, query, expandedSnapshot, memberLists) {
+    val memberOrderSnapshot = memberOrder.toMap()
+    fun membersOf(miniId: Long): List<EventEntity> {
+        val base = memberLists[miniId] ?: return emptyList()
+        val order = memberOrderSnapshot[miniId] ?: return base
+        val byId = base.associateBy { it.id }
+        return order.mapNotNull { byId[it] }.ifEmpty { base }
+    }
+    val displayRows = remember(mergedSnapshot, defaultSort, query, expandedSnapshot, memberLists, memberOrderSnapshot) {
         fun hit(title: String, note: String?) = query.isEmpty() || matchesQuery(title, note, query)
         val rows = mutableListOf<FolderEntry>()
         if (manualSort) {
@@ -180,8 +203,8 @@ fun FolderScreen(
                     if (!hit(mini.name, null)) continue
                     rows.add(FolderEntry(mini = mini))
                     if (mini.id in expandedSnapshot) {
-                        memberLists[mini.id]?.forEach { m ->
-                            if (hit(m.title, m.note)) rows.add(FolderEntry(event = m, indent = true))
+                        membersOf(mini.id).forEach { m ->
+                            if (hit(m.title, m.note)) rows.add(FolderEntry(event = m, indent = true, groupId = mini.id))
                         }
                     }
                 } else entry.event?.let { e ->
@@ -196,8 +219,8 @@ fun FolderScreen(
             minis.filter { hit(it.name, null) }.forEach { mini ->
                 rows.add(FolderEntry(mini = mini))
                 if (mini.id in expandedSnapshot) {
-                    memberLists[mini.id]?.forEach { m ->
-                        if (hit(m.title, m.note)) rows.add(FolderEntry(event = m, indent = true))
+                    membersOf(mini.id).forEach { m ->
+                        if (hit(m.title, m.note)) rows.add(FolderEntry(event = m, indent = true, groupId = mini.id))
                     }
                 }
             }
@@ -206,14 +229,37 @@ fun FolderScreen(
     }
 
     val listState = rememberLazyListState()
-    // 混排换位（v1.26.10）：e*=直属事件、m*=事件组，二者可互相拖拽换位（与主页根层同构）
+    // 混排换位（v1.26.10）：e*=直属事件、m*=事件组，二者可互相拖拽换位（与主页根层同构）；
+    // g<gid>e<eid>*=成员行（v1.27.2）：只在同一事件组内部换位，写 memberOrder 镜像
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-        val fk = from.key.toString()
-        val tk = to.key.toString()
-        if ((fk.startsWith("e") || fk.startsWith("m")) && (tk.startsWith("e") || tk.startsWith("m"))) {
-            val fi = mergedList.indexOfFirst { entryKeyOf(it) == fk }
-            val ti = mergedList.indexOfFirst { entryKeyOf(it) == tk }
-            if (fi >= 0 && ti >= 0) mergedList.moveItem(fi, ti)
+        applyMove(from.key.toString(), to.key.toString())
+    }
+
+    fun applyMove(fk: String, tk: String) {
+        when {
+            fk.startsWith("g") && tk.startsWith("g") -> {
+                val fg = fk.removePrefix("g").substringBefore("e")
+                val tg = tk.removePrefix("g").substringBefore("e")
+                if (fg.isNotEmpty() && fg == tg) {
+                    val gid = fg.toLong()
+                    val fe = fk.substringAfter("e").toLongOrNull()
+                    val te = tk.substringAfter("e").toLongOrNull()
+                    if (fe != null && te != null) {
+                        val base = memberLists[gid] ?: return
+                        val cur = memberOrder[gid] ?: base.map { it.id }
+                        val fi = cur.indexOf(fe)
+                        val ti = cur.indexOf(te)
+                        if (fi >= 0 && ti >= 0) {
+                            memberOrder[gid] = cur.toMutableList().apply { moveItem(fi, ti) }
+                        }
+                    }
+                }
+            }
+            (fk.startsWith("e") || fk.startsWith("m")) && (tk.startsWith("e") || tk.startsWith("m")) -> {
+                val fi = mergedList.indexOfFirst { entryKeyOf(it) == fk }
+                val ti = mergedList.indexOfFirst { entryKeyOf(it) == tk }
+                if (fi >= 0 && ti >= 0) mergedList.moveItem(fi, ti)
+            }
         }
     }
 
@@ -225,6 +271,19 @@ fun FolderScreen(
             snapshot.forEachIndexed { index, entry ->
                 entry.event?.let { container.eventRepository.update(it.copy(sortIndex = index)) }
                 entry.mini?.let { container.folderRepository.update(it.copy(sortIndex = index)) }
+            }
+        }
+    }
+
+    /** 成员行拖拽落库（v1.27.2）：memberOrder 按组写 sortIndex（组内独立空间），flow 刷新后镜像自动清。 */
+    fun persistMemberOrders() {
+        val snapshot = memberOrder.toMap()
+        scope.launch {
+            snapshot.forEach { (gid, ids) ->
+                val byId = memberLists[gid]?.associateBy { it.id } ?: return@forEach
+                ids.forEachIndexed { index, id ->
+                    byId[id]?.let { container.eventRepository.update(it.copy(sortIndex = index)) }
+                }
             }
         }
     }
@@ -421,7 +480,7 @@ fun FolderScreen(
             ) {
                 // 混排行序列（v1.26.10）：事件组与直属事件按 sortIndex 归并，manual 模式下
                 // 长按整行拖拽换位（与主页根层同构）；事件组的展开成员行是独立行（indent 标记），
-                // 不参与拖拽与多选。
+                // v1.27.2 起支持组内长按拖拽换位，不参与多选。
                 items(displayRows, key = { entryKeyOf(it) }) { row ->
                     val mini = row.mini
                     val event = row.event
@@ -470,35 +529,57 @@ fun FolderScreen(
                         )
                     } else if (event != null) {
                         if (row.indent) {
-                            // 展开的组成员行：缩进 + 左缘竖线串联（与主页一致），不参与拖拽与多选；
-                            // ⋮ 支持「移到文件夹…」（v1.27.1）：移出组落组父级 / 移入其他普通文件夹，
-                            // 移出后组剩余 <2 自动解散（无提示）
-                            EventRow(
-                                event = event,
-                                festivalRepo = container.festivalRepository,
-                                indent = true,
-                                connector = true,
-                                onClick = {
-                                    if (event.specialType == "cycle") onNavigate("cycle")
-                                    else onNavigate("event_detail?eventId=${event.id}")
-                                },
-                                onMoveToVault = {
-                                    if (vaultSet) {
-                                        scope.launch { container.vaultBridge.moveEventToVault(event.id) }
-                                    } else {
-                                        vaultNeedSetup = true
+                            // 展开的组成员行：缩进 + 左缘竖线串联（与主页一致），不参与多选。
+                            // v1.27.2：支持组内长按拖拽换位；⋮ 新增「移出事件组」一键落组所在层级，
+                            // 与「移到文件夹…」并存；移出后组剩余 <2 自动解散（无提示）
+                            ReorderableItem(reorderableState, key = entryKeyOf(row)) {
+                                val canDrag = manualSort && !selectionMode
+                                val dragModifier = if (canDrag) {
+                                    Modifier.longPressDraggableHandle(
+                                        onDragStarted = { isDragging = true },
+                                        onDragStopped = {
+                                            isDragging = false
+                                            persistMemberOrders()
+                                        }
+                                    )
+                                } else null
+                                EventRow(
+                                    event = event,
+                                    festivalRepo = container.festivalRepository,
+                                    indent = true,
+                                    connector = true,
+                                    dragModifier = dragModifier,
+                                    onClick = {
+                                        if (event.specialType == "cycle") onNavigate("cycle")
+                                        else onNavigate("event_detail?eventId=${event.id}")
+                                    },
+                                    onMoveToVault = {
+                                        if (vaultSet) {
+                                            scope.launch { container.vaultBridge.moveEventToVault(event.id) }
+                                        } else {
+                                            vaultNeedSetup = true
+                                        }
+                                    },
+                                    onMoveToFolder = { singleMoveEventId = event.id },
+                                    onLeaveGroup = { {
+                                        scope.launch {
+                                            moveGroupMembersOut(
+                                                container,
+                                                listOf(event.id),
+                                                allFolders.firstOrNull { it.id == row.groupId }?.parentId
+                                            )
+                                        }
+                                    } },
+                                    onMoveToRecycleBin = {
+                                        scope.launch {
+                                            container.eventRepository.softDeleteByIds(
+                                                listOf(event.id),
+                                                System.currentTimeMillis()
+                                            )
+                                        }
                                     }
-                                },
-                                onMoveToFolder = { singleMoveEventId = event.id },
-                                onMoveToRecycleBin = {
-                                    scope.launch {
-                                        container.eventRepository.softDeleteByIds(
-                                            listOf(event.id),
-                                            System.currentTimeMillis()
-                                        )
-                                    }
-                                }
-                            )
+                                )
+                            }
                         } else {
                             ReorderableItem(reorderableState, key = "e${event.id}") {
                                 val canDrag = manualSort && !selectionMode
@@ -849,10 +930,12 @@ fun FolderScreen(
 /**
  * 文件夹内混排条目（v1.26.10）：直属事件或本文件夹下的事件组，
  * 与主页根层 [com.ayaka7452.daymate.feature.home.HomeRootEntry] 同构；
- * indent=true 表示事件组的展开成员行（渲染缩进，不参与拖拽）。
+ * indent=true 表示事件组的展开成员行（渲染缩进；v1.27.2 起支持组内拖拽换位）。
  */
 private data class FolderEntry(
     val event: EventEntity? = null,
     val mini: FolderEntity? = null,
-    val indent: Boolean = false
+    val indent: Boolean = false,
+    /** indent 行专用：成员所属事件组 id（v1.27.2，用于组内拖拽 key 与一键移出事件组） */
+    val groupId: Long? = null
 )
