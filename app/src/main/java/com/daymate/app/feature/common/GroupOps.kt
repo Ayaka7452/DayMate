@@ -5,7 +5,7 @@ import com.ayaka7452.daymate.data.db.FolderKinds
 import kotlinx.coroutines.flow.first
 
 /**
- * 把事件组成员移出事件组（v1.27.1）。
+ * 把事件组成员移出事件组。
  *
  * 移出后逐组检查存活成员数，剩余不足 2 个时组自动解散（无提示，用户拍板）：
  * 剩余成员回归组所在层级（组的 parentId，null = 主页根层），组本体软删。

@@ -86,9 +86,9 @@ fun FolderScreen(
     val allFoldersFlow = remember { container.folderRepository.observeAll() }
     val allFolders by allFoldersFlow.collectAsState(initial = emptyList())
 
-    // ===== 事件组（v1.26.9）：存放在本文件夹下的事件组（kind=mini 且 parentId=本文件夹）=====
+    // ===== 事件组：存放在本文件夹下的事件组（kind=mini 且 parentId=本文件夹）=====
     // 成员事件的 folderId 指向组 id，通过组的 parentId 间接归属本文件夹。
-    // v1.26.10 起按 sortIndex 与直属事件混排，不再固定排在事件前面。
+    // 按 sortIndex 与直属事件混排，不再固定排在事件前面。
     val minis = allFolders
         .filter { it.kind == FolderKinds.MINI && it.parentId == folderId }
         .sortedBy { it.sortIndex }
@@ -146,7 +146,7 @@ fun FolderScreen(
     // 拖拽排序用的可变镜像列表（拖拽中不同步，避免跳动）
     var isDragging by remember { mutableStateOf(false) }
 
-    // ===== 文件夹内混排镜像（v1.26.10）：直属事件与本文件夹下的事件组按 sortIndex 归并 =====
+    // ===== 文件夹内混排镜像：直属事件与本文件夹下的事件组按 sortIndex 归并 =====
     // 与主页根层同一套模型：两组条目共用 sortIndex 空间，manual 模式下可互相拖拽换位，
     // 事件组不再固定排在事件前面。
     val mergedList = remember { mutableStateListOf<FolderEntry>() }
@@ -165,12 +165,12 @@ fun FolderScreen(
 
     fun entryKeyOf(entry: FolderEntry): String = when {
         entry.mini != null -> "m${entry.mini.id}"
-        // 成员行（v1.27.2）：g<组id>e<事件id>，与直属事件（e*）区分，支持组内拖拽换位
+        // 成员行：g<组id>e<事件id>，与直属事件（e*）区分，支持组内拖拽换位
         entry.indent && entry.groupId != null -> "g${entry.groupId}e${entry.event!!.id}"
         else -> "e${entry.event!!.id}"
     }
 
-    // 成员行拖拽镜像（v1.27.2）：组id -> 成员 eventId 顺序。memberLists 是派生值不可原地改，
+    // 成员行拖拽镜像：组id -> 成员 eventId 顺序。memberLists 是派生值不可原地改，
     // 拖拽换位写这里驱动重组；落库后 flow 刷新 memberLists 与 order 一致时自动清掉回落库序。
     val memberOrder = remember { mutableStateMapOf<Long, List<Long>>() }
     LaunchedEffect(memberLists, isDragging) {
@@ -183,7 +183,7 @@ fun FolderScreen(
 
     // 渲染行序列：manual 保持混排手动顺序，其余事件按剩余天数排序、事件组追加其后。
     // 搜索时直属事件匹配标题/备注，事件组匹配组名（展开成员随组显示并同样过滤）。
-    // 成员行顺序（v1.27.2）：拖拽中取 memberOrder 镜像，其余回落库序。
+    // 成员行顺序：拖拽中取 memberOrder 镜像，其余回落库序。
     val query = searchQuery.trim()
     val mergedSnapshot = mergedList.toList()
     val expandedSnapshot = expandedMiniIds.toList()
@@ -231,7 +231,7 @@ fun FolderScreen(
 
     val listState = rememberLazyListState()
     // 换位逻辑（局部函数须先声明后引用）：e*=直属事件、m*=事件组，二者可互相拖拽换位
-    //（与主页根层同构）；g<gid>e<eid>*=成员行（v1.27.2）：只在同一事件组内部换位，写 memberOrder 镜像
+    //（与主页根层同构）；g<gid>e<eid>*=成员行：只在同一事件组内部换位，写 memberOrder 镜像
     fun applyMove(fk: String, tk: String) {
         when {
             fk.startsWith("g") && tk.startsWith("g") -> {
@@ -276,7 +276,7 @@ fun FolderScreen(
         }
     }
 
-    /** 成员行拖拽落库（v1.27.2）：memberOrder 按组写 sortIndex（组内独立空间），flow 刷新后镜像自动清。 */
+    /** 成员行拖拽落库：memberOrder 按组写 sortIndex（组内独立空间），flow 刷新后镜像自动清。 */
     fun persistMemberOrders() {
         val snapshot = memberOrder.toMap()
         scope.launch {
@@ -479,9 +479,9 @@ fun FolderScreen(
                 contentPadding = padding,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                // 混排行序列（v1.26.10）：事件组与直属事件按 sortIndex 归并，manual 模式下
+                // 混排行序列：事件组与直属事件按 sortIndex 归并，manual 模式下
                 // 长按整行拖拽换位（与主页根层同构）；事件组的展开成员行是独立行（indent 标记），
-                // v1.27.2 起支持组内长按拖拽换位，不参与多选。
+                // 支持组内长按拖拽换位，不参与多选。
                 items(displayRows, key = { entryKeyOf(it) }) { row ->
                     val mini = row.mini
                     val event = row.event
@@ -531,7 +531,7 @@ fun FolderScreen(
                     } else if (event != null) {
                         if (row.indent) {
                             // 展开的组成员行：缩进 + 左缘竖线串联（与主页一致），不参与多选。
-                            // v1.27.2：支持组内长按拖拽换位；⋮ 新增「移出事件组」一键落组所在层级，
+                            // 支持组内长按拖拽换位；⋮ 新增「移出事件组」一键落组所在层级，
                             // 与「移到文件夹…」并存；移出后组剩余 <2 自动解散（无提示）
                             ReorderableItem(reorderableState, key = entryKeyOf(row)) {
                                 val canDrag = manualSort && !selectionMode
@@ -705,7 +705,7 @@ fun FolderScreen(
     }
 
     if (singleMoveEventId != null) {
-        // 分流（v1.27.1）：组成员 vs 直属事件——
+        // 分流：组成员 vs 直属事件——
         // 成员事件：目标只列普通文件夹，「根目录」= 移出事件组（落到组所在层级），
         //           移出后组剩余 <2 自动解散（无提示，见 moveGroupMembersOut）
         // 直属事件：保持原行为（排除本文件夹，根目录 = 移出本文件夹）
@@ -837,7 +837,7 @@ fun FolderScreen(
         )
     }
 
-    // 合并命名弹窗：与主页共用。组建 kind=MINI 的事件组，parentId 指向本文件夹（v1.26.9 起组留在文件夹内），
+    // 合并命名弹窗：与主页共用。组建 kind=MINI 的事件组，parentId 指向本文件夹（组留在文件夹内），
     // 成员事件 folderId 指向新组，仍归属本文件夹
     if (showMergeDialog && pendingMergeIds.isNotEmpty()) {
         MiniFolderMergeDialog(
@@ -929,14 +929,14 @@ fun FolderScreen(
 }
 
 /**
- * 文件夹内混排条目（v1.26.10）：直属事件或本文件夹下的事件组，
+ * 文件夹内混排条目：直属事件或本文件夹下的事件组，
  * 与主页根层 [com.ayaka7452.daymate.feature.home.HomeRootEntry] 同构；
- * indent=true 表示事件组的展开成员行（渲染缩进；v1.27.2 起支持组内拖拽换位）。
+ * indent=true 表示事件组的展开成员行（渲染缩进，支持组内拖拽换位）。
  */
 private data class FolderEntry(
     val event: EventEntity? = null,
     val mini: FolderEntity? = null,
     val indent: Boolean = false,
-    /** indent 行专用：成员所属事件组 id（v1.27.2，用于组内拖拽 key 与一键移出事件组） */
+    /** indent 行专用：成员所属事件组 id（用于组内拖拽 key 与一键移出事件组） */
     val groupId: Long? = null
 )

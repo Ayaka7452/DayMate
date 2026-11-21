@@ -435,7 +435,7 @@ fun HomeScreen(
     // 小文件夹重命名弹窗
     var miniRenameTarget by remember { mutableStateOf<FolderEntity?>(null) }
     var showMiniRenameDialog by remember { mutableStateOf(false) }
-    // 根层事件组「移入文件夹」目标：弹 PickFolderDialog 选择目标文件夹（v1.26.10）
+    // 根层事件组「移入文件夹」目标：弹 PickFolderDialog 选择目标文件夹
     var miniMoveIntoTarget by remember { mutableStateOf<FolderEntity?>(null) }
 
     LaunchedEffect(folders) {
@@ -594,7 +594,7 @@ fun HomeScreen(
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
-    // 列表/网格共用的换位逻辑：f*=大文件夹、e*=事件、m*=小文件夹、g<gid>e<eid>*=事件组成员行（v1.27.2），
+    // 列表/网格共用的换位逻辑：f*=大文件夹、e*=事件、m*=小文件夹、g<gid>e<eid>*=事件组成员行，
     // 排序只在同类之间：成员行仅限同一事件组内部换位。
     // 合并已彻底移到「更多→多选」菜单，这里只做纯排序，不判合并目标。
     fun applyMove(fk: String, tk: String) {
@@ -605,7 +605,7 @@ fun HomeScreen(
                 if (fi >= 0 && ti >= 0) folderList.moveItem(fi, ti)
             }
             fk.startsWith("g") && tk.startsWith("g") -> {
-                // 组内成员换位（v1.27.2）：只在同一事件组的成员之间；memberLists[gid] 重赋值驱动重组
+                // 组内成员换位：只在同一事件组的成员之间；memberLists[gid] 重赋值驱动重组
                 val fg = fk.removePrefix("g").substringBefore("e")
                 val tg = tk.removePrefix("g").substringBefore("e")
                 if (fg.isNotEmpty() && fg == tg) {
@@ -633,7 +633,7 @@ fun HomeScreen(
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
         applyMove(from.key.toString(), to.key.toString())
     }
-    // 网格拖拽「动了没有」标记（v1.27.2，用户拍板）：长按不动松手 = 出菜单，长按拖动 = 排序。
+    // 网格拖拽「动了没有」标记：长按不动松手 = 出菜单，长按拖动 = 排序。
     // 列表拖拽走 reorderableState 不会写这个标记，互不干扰。
     var gridDragMoved by remember { mutableStateOf(false) }
     // 网格格菜单展开目标（文件夹/事件组共用）：拖拽不动松手时置为对应格 id
@@ -1451,7 +1451,7 @@ fun HomeScreen(
                         ListItemDivider()
                     } else if (event != null) {
                         ReorderableItem(reorderableState, key = rowKeyOf(row)) {
-                            // v1.27.2：成员行也可拖拽（组内换位）；直属行条件不变
+                            // 成员行也可拖拽（组内换位）；直属行条件不变
                             val canDrag = manualSort && !selectionMode &&
                                 (if (row.indent) row.groupId != null else event.folderId == null)
                             val dragModifier = if (canDrag) {
@@ -1479,7 +1479,7 @@ fun HomeScreen(
                                     if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
                                 },
                                 onMoveToFolder = { singleMoveEventId = event.id },
-                                // 一键移出事件组（v1.27.2）：落到组所在层级（组在文件夹内=该文件夹，组在根层=主页根层）
+                                // 一键移出事件组：落到组所在层级（组在文件夹内=该文件夹，组在根层=主页根层）
                                 onLeaveGroup = if (row.indent) { {
                                     scope.launch {
                                         moveGroupMembersOut(
@@ -1535,7 +1535,7 @@ fun HomeScreen(
                     items(folderList, key = { "f${it.id}" }) { folder ->
                         val count = allEvents.count { it.folderId == folder.id }
                         ReorderableItem(gridReorderableState, key = "f${folder.id}") {
-                            // 根目录文件夹格拖拽排序（v1.27.2，用户拍板）：
+                            // 根目录文件夹格拖拽排序：
                             // 长按拖动 = 排序；长按不动松手 = 出菜单，与原长按行为等价
                             val handle = if (manualSort && !selectionMode) {
                                 Modifier.longPressDraggableHandle(
@@ -1578,7 +1578,7 @@ fun HomeScreen(
                         val event = row.event
                         if (mini != null) {
                             ReorderableItem(gridReorderableState, key = "m${mini.id}") {
-                                // 根目录事件组格拖拽排序（v1.27.2）：与文件夹格同款交互——
+                                // 根目录事件组格拖拽排序：与文件夹格同款交互——
                                 // 长按拖动排序、长按不动松手出菜单
                                 val handle = if (manualSort && !selectionMode) {
                                     Modifier.longPressDraggableHandle(
@@ -1633,7 +1633,7 @@ fun HomeScreen(
                                     if (!vaultSet) vaultNeedSetup = true else if (!vaultReady) toastVaultLocked() else vaultConfirmEventId = event.id
                                 },
                                 onMoveToFolder = { singleMoveEventId = event.id },
-                                // 一键移出事件组（v1.27.2）：成员格也提供，落组所在层级
+                                // 一键移出事件组：成员格也提供，落组所在层级
                                 onLeaveGroup = if (row.indent) { {
                                     scope.launch {
                                         moveGroupMembersOut(
@@ -1832,7 +1832,7 @@ fun HomeScreen(
     }
 
     if (singleMoveEventId != null) {
-        // 分流（v1.27.1）：组成员 vs 根层事件——
+        // 分流：组成员 vs 根层事件——
         // 成员事件：目标只列普通文件夹，「根目录」= 移出事件组（落到组所在层级），
         //           移出后组剩余 <2 自动解散（无提示，见 moveGroupMembersOut）
         // 根层事件：保持原行为（只提供文件夹目标）
@@ -1869,7 +1869,7 @@ fun HomeScreen(
         )
     }
 
-    // 根层事件组移入文件夹（v1.26.10）：只改组自身 parentId，成员事件 folderId 仍指向组，
+    // 根层事件组移入文件夹：只改组自身 parentId，成员事件 folderId 仍指向组，
     // 归属随组走；目标只列普通文件夹（事件组不可嵌套进事件组）
     if (miniMoveIntoTarget != null) {
         PickFolderDialog(
@@ -1942,7 +1942,7 @@ fun HomeScreen(
                 TextButton(onClick = {
                     val fid = folderToDelete!!.id
                     scope.launch {
-                        // v1.26.9：删除文件夹连带解散其下事件组（parentId 指向它），
+                        // 删除文件夹连带解散其下事件组（parentId 指向它），
                         // 成员事件（folderId 指向子组）与直属事件一并解归属回根层，防悬空引用。
                         // 删的若是事件组本身，childMinis 为空，行为与旧版一致。
                         val childMinis = folders
@@ -2027,7 +2027,7 @@ fun EventRow(
     onClick: () -> Unit = {},
     onMoveToVault: (() -> Unit)? = null,
     onMoveToFolder: (() -> Unit)? = null,
-    /** 仅事件组成员行用（v1.27.2）：一键移出事件组，落到组所在层级。null = 不显示入口。 */
+    /** 仅事件组成员行用：一键移出事件组，落到组所在层级。null = 不显示入口。 */
     onLeaveGroup: (() -> Unit)? = null,
     onMerge: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
@@ -2184,7 +2184,7 @@ fun EventRow(
                             }
                         )
                     }
-                    // 一键移出事件组（v1.27.2）：落组所在层级，剩余 <2 自动解散（无提示）
+                    // 一键移出事件组：落组所在层级，剩余 <2 自动解散（无提示）
                     if (onLeaveGroup != null) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.group_member_move_out)) },
@@ -2593,7 +2593,7 @@ fun FolderGridItem(
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
     onMoveToRecycleBin: (() -> Unit)? = null,
-    /** 菜单展开态由调用方持有（v1.27.2）：长按拖拽不动松手时由外部触发菜单 */
+    /** 菜单展开态由调用方持有：长按拖拽不动松手时由外部触发菜单 */
     menuExpanded: Boolean = false,
     onMenuExpandedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
@@ -2732,7 +2732,7 @@ fun EventGridItem(
     onClick: () -> Unit = {},
     onMoveToVault: (() -> Unit)? = null,
     onMoveToFolder: (() -> Unit)? = null,
-    /** 仅事件组成员格用（v1.27.2）：一键移出事件组，落到组所在层级。null = 不显示入口。 */
+    /** 仅事件组成员格用：一键移出事件组，落到组所在层级。null = 不显示入口。 */
     onLeaveGroup: (() -> Unit)? = null,
     onMerge: (() -> Unit)? = null,
     onMoveToRecycleBin: (() -> Unit)? = null,
@@ -2891,7 +2891,7 @@ fun EventGridItem(
                     }
                 )
             }
-            // 一键移出事件组（v1.27.2）：落组所在层级，剩余 <2 自动解散（无提示）
+            // 一键移出事件组：落组所在层级，剩余 <2 自动解散（无提示）
             if (onLeaveGroup != null) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.group_member_move_out)) },
@@ -2937,13 +2937,13 @@ private data class HomeRow(
     val event: EventEntity? = null,
     val mini: FolderEntity? = null,
     val indent: Boolean = false,
-    /** indent 行专用：成员所属事件组 id（v1.27.2，用于组内拖拽 key 与一键移出事件组） */
+    /** indent 行专用：成员所属事件组 id（用于组内拖拽 key 与一键移出事件组） */
     val groupId: Long? = null
 )
 
 private fun rowKeyOf(row: HomeRow): String = when {
     row.mini != null -> "m${row.mini.id}"
-    // 成员行（v1.27.2）：g<组id>e<事件id>，与直属事件（e*）区分，支持组内拖拽换位
+    // 成员行：g<组id>e<事件id>，与直属事件（e*）区分，支持组内拖拽换位
     row.indent && row.groupId != null -> "g${row.groupId}e${row.event!!.id}"
     else -> "e${row.event!!.id}"
 }
@@ -2951,11 +2951,11 @@ private fun rowKeyOf(row: HomeRow): String = when {
 private fun rootKeyOf(entry: HomeRootEntry): String =
     entry.mini?.let { "m${it.id}" } ?: "e${entry.event!!.id}"
 
-// 事件组配色自 v1.26.8 起跟随主题色（colorScheme.primary），不再用固定深绿常量
+// 事件组配色跟随主题色（colorScheme.primary），不再用固定深绿常量
 
 /**
  * 小文件夹行（列表）：主题色圆点 + 名字 + 成员数 + 展开箭头 + ⋮。
- * v1.27.0 起（用户拍板）：编辑动作不再放展开面板，收进行尾 ⋮（与普通事件行对齐）；
+ * 编辑动作不再放展开面板，收进行尾 ⋮（与普通事件行对齐）；
  * 行尾顺序 = 展开箭头在左、⋮ 在右。点行只切换展开（成员行内联显示）。
  */
 @Composable
@@ -3069,12 +3069,12 @@ private fun MiniFolderGridItem(
     onMoveIntoFolder: (() -> Unit)? = null,
     /** 文件夹内页用：移出当前文件夹回根层。null = 不显示入口。 */
     onMoveOutOfFolder: (() -> Unit)? = null,
-    /** 菜单展开态由调用方持有（v1.27.2）：长按拖拽不动松手时由外部触发菜单 */
+    /** 菜单展开态由调用方持有：长按拖拽不动松手时由外部触发菜单 */
     menuExpanded: Boolean = false,
     onMenuExpandedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // 事件组配色跟随主题（用户拍板）：主视觉全部取 colorScheme.primary，默认主题即主题色设计
+    // 事件组配色跟随主题：主视觉全部取 colorScheme.primary，默认主题即主题色设计
     val groupColor = MaterialTheme.colorScheme.primary
     Box(
         modifier = modifier
