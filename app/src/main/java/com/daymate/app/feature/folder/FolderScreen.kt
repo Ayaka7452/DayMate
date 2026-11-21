@@ -562,7 +562,7 @@ fun FolderScreen(
                                         }
                                     },
                                     onMoveToFolder = { singleMoveEventId = event.id },
-                                    onLeaveGroup = { {
+                                    onLeaveGroup = {
                                         scope.launch {
                                             moveGroupMembersOut(
                                                 container,
@@ -570,7 +570,7 @@ fun FolderScreen(
                                                 allFolders.firstOrNull { it.id == row.groupId }?.parentId
                                             )
                                         }
-                                    } },
+                                    },
                                     onMoveToRecycleBin = {
                                         scope.launch {
                                             container.eventRepository.softDeleteByIds(
