@@ -478,6 +478,20 @@ fun HomeScreen(
     }
     val allEvents by allEventsFlow.collectAsState(initial = allEventsSeed)
     val folderNameById = remember(folders) { folders.associate { it.id to it.name } }
+    // 文件夹事件总数 = 直属事件 + 文件夹内所有事件组的成员
+    // （成员的 folderId 指向事件组，事件组的 parentId 才指向文件夹，故需两跳求和）
+    val folderTotalCounts = remember(allEvents, folders) {
+        val childMiniIds = folders
+            .filter { it.kind == FolderKinds.MINI && it.parentId != null }
+            .groupBy { it.parentId!! }
+            .mapValues { (_, list) -> list.map { it.id }.toSet() }
+        folders.filter { it.kind == FolderKinds.NORMAL }.associate { folder ->
+            val miniIds = childMiniIds[folder.id] ?: emptySet()
+            folder.id to allEvents.count { e ->
+                e.folderId == folder.id || (e.folderId != null && e.folderId in miniIds)
+            }
+        }
+    }
 
     // 小文件夹成员同步：folderId 指向 mini 的存活事件按 sortIndex 分组
     LaunchedEffect(allEvents, folders) {
@@ -1390,6 +1404,7 @@ fun HomeScreen(
                         } else null
                         FolderRow(
                             folder = folder,
+                            itemCount = folderTotalCounts[folder.id] ?: 0,
                             selectionMode = selectionMode,
                             selected = folder.id in selectedFolderIds,
                             onClick = {
@@ -1533,7 +1548,7 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(gridSpacingDp)
                 ) {
                     items(folderList, key = { "f${it.id}" }) { folder ->
-                        val count = allEvents.count { it.folderId == folder.id }
+                        val count = folderTotalCounts[folder.id] ?: 0
                         ReorderableItem(gridReorderableState, key = "f${folder.id}") {
                             // 根目录文件夹格拖拽排序：
                             // 长按拖动 = 排序；长按不动松手 = 出菜单，与原长按行为等价
@@ -2217,6 +2232,7 @@ fun EventRow(
 @Composable
 fun FolderRow(
     folder: FolderEntity,
+    itemCount: Int = 0,
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onClick: () -> Unit = {},
@@ -2258,6 +2274,15 @@ fun FolderRow(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )
+        // 事件总数（含组内成员）：与 MiniFolderRow 同款小字，放菜单左边
+        if (!selectionMode && itemCount > 0) {
+            Text(
+                text = stringResource(R.string.settings_unit_items, itemCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.width(8.dp))
+        }
         if (!selectionMode) {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
