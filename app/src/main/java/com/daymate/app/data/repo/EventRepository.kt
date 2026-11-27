@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.merge
 
 class EventRepository(
     private val dao: EventDao,
-    private val onChanged: () -> Unit = {}
+    private val onChanged: () -> Unit = {},
+    /** 事件被删除（软删/硬删）时通知，供 widget 清理勾选里的幽灵 id。 */
+    private val onEventsRemoved: (List<Long>) -> Unit = {}
 ) {
 
     /**
@@ -54,12 +56,14 @@ class EventRepository(
     suspend fun delete(event: EventEntity) =
         dao.delete(event).also {
             AppLogger.log("Data", "删除事件 id=${event.id}")
+            onEventsRemoved(listOf(event.id))
             onChanged(); refreshSignal.tryEmit(Unit)
         }
 
     suspend fun deleteByIds(ids: List<Long>) =
         dao.deleteByIds(ids).also {
             AppLogger.log("Data", "删除事件 ids=$ids")
+            onEventsRemoved(ids)
             onChanged(); refreshSignal.tryEmit(Unit)
         }
 
@@ -68,6 +72,7 @@ class EventRepository(
     suspend fun softDeleteByIds(ids: List<Long>, ts: Long) =
         dao.softDeleteByIds(ids, ts).also {
             AppLogger.log("Data", "移入回收站 ids=$ids")
+            onEventsRemoved(ids)
             onChanged(); refreshSignal.tryEmit(Unit)
         }
 

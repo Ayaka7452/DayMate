@@ -80,6 +80,42 @@ object WidgetPrefs {
             .apply()
     }
 
+    /**
+     * 剔除勾选顺序里已被删除的事件 id，并回写清理磁盘（自我净化）。
+     * 事件删除只改 DB 的 isDeleted，不会同步这里的 SharedPreferences；残留的幽灵 id
+     * 在配置页仍占着勾选序号与名额（如删掉序号 1 的，后面事件全从 2 起排、勾不满上限）。
+     * [aliveIds] 必须来自存活事件集合；调用方在列表首帧为空时不要传空集合，否则会误清勾选。
+     * 返回清理后的顺序（无变化时即原顺序）。
+     */
+    fun pruneSelectedOrderFor(ctx: Context, appWidgetId: Int, aliveIds: Set<Long>): List<Long> {
+        val current = selectedOrderFor(ctx, appWidgetId)
+        val kept = current.filter { it in aliveIds }
+        if (kept.size != current.size) setSelectedOrderFor(ctx, appWidgetId, kept)
+        return kept
+    }
+
+    /**
+     * 事件被删除时调用：从所有小组件实例的勾选顺序里剔除这些 id（源头清理）。
+     * 删除只改 DB 的 isDeleted，不会同步这里的 SharedPreferences；若不清理，
+     * 幽灵 id 会在配置页占着勾选序号与名额。遍历三种 provider 的全部实例，
+     * 只回写确实含被删 id 的那些，避免无谓写盘。
+     */
+    fun removeIdsFromAllWidgets(ctx: Context, removedIds: Set<Long>) {
+        if (removedIds.isEmpty()) return
+        val manager = AppWidgetManager.getInstance(ctx)
+        for (cls in listOf(
+            CountdownWidgetProvider::class.java,
+            CountdownWidgetSmallProvider::class.java,
+            CountdownWidgetSquareProvider::class.java
+        )) {
+            for (id in manager.getAppWidgetIds(ComponentName(ctx, cls))) {
+                val current = selectedOrderFor(ctx, id)
+                val kept = current.filterNot { it in removedIds }
+                if (kept.size != current.size) setSelectedOrderFor(ctx, id, kept)
+            }
+        }
+    }
+
     /** 小组件被移除时清理其全部配置。 */
     fun clearWidget(ctx: Context, appWidgetId: Int) {
         prefs(ctx).edit()
@@ -219,7 +255,10 @@ object WidgetRenderer {
         val festival = runCatching {
             container.festivalRepository.todayInfo(LocalDate.now())
         }.getOrNull()
-        val selected = WidgetPrefs.selectedOrderFor(context, appWidgetId)
+        // 兜底剔除已删除事件残留的幽灵 id（清理存量：删除时的源头清理见 removeIdsFromAllWidgets），
+        // 顺带回写净化磁盘；单/多事件形态判断均基于干净列表。
+        val aliveIds = events.map { it.id }.toSet()
+        val selected = WidgetPrefs.pruneSelectedOrderFor(context, appWidgetId, aliveIds)
         if (selected.size >= 2) {
             return buildListViews(context, container, appWidgetId, events, festival, selected)
         }

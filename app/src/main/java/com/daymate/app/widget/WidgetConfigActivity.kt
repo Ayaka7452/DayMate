@@ -49,6 +49,7 @@ import com.ayaka7452.daymate.core.i18n.Tr
 import com.ayaka7452.daymate.core.log.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -150,8 +151,16 @@ private fun WidgetConfigScreen(
     val events by remember { container.eventRepository.observeAll() }
         .collectAsState(initial = emptyList())
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    // 勾选顺序即列表显示顺序
-    var checkedOrder by remember { mutableStateOf(WidgetPrefs.selectedOrderFor(ctx, appWidgetId)) }
+    // 勾选顺序即列表显示顺序。同步预载存活 id：首帧 events 为空，若用空集合 prune 会误清全部勾选。
+    val aliveIds = remember {
+        runCatching {
+            kotlinx.coroutines.runBlocking { container.eventRepository.observeAll().first() }
+        }.getOrDefault(emptyList()).map { it.id }.toSet()
+    }
+    // 剔除已删除事件残留的幽灵 id（占序号/名额），并回写清理磁盘
+    var checkedOrder by remember {
+        mutableStateOf(WidgetPrefs.pruneSelectedOrderFor(ctx, appWidgetId, aliveIds))
+    }
     var opacity by remember { mutableStateOf(WidgetPrefs.opacityFor(ctx, appWidgetId).toFloat()) }
     // 勾选上限按该组件当前尺寸算（与渲染层同口径），槽位硬上限 4
     val limit = remember { minOf(MULTI_LIMIT, WidgetRenderer.listSlotCount(ctx, appWidgetId)) }

@@ -73,7 +73,12 @@ class AppContainer(context: Context) {
         }
     }
 
-    val eventRepository = EventRepository(mainDb.eventDao(), ::notifyDataChanged)
+    val eventRepository = EventRepository(
+        mainDb.eventDao(),
+        ::notifyDataChanged,
+        // 删除事件时立即从所有 widget 勾选顺序里剔除，避免幽灵 id 占序号/名额
+        { ids -> runCatching { com.ayaka7452.daymate.widget.WidgetPrefs.removeIdsFromAllWidgets(appContext, ids.toSet()) } }
+    )
     val folderRepository = FolderRepository(mainDb.folderDao(), ::notifyDataChanged)
     val vaultRepository = VaultRepository(mainDb.vaultEventDao(), ::notifyDataChanged)
     val vaultFolderRepository = VaultFolderRepository(mainDb.vaultFolderDao(), ::notifyDataChanged)
